@@ -1,0 +1,9 @@
+# Tool caches and disposable diagnostics, not authoritative QA evidence.
+output/
+mental_model/
+**/node_modules/
+**/.env
+**/.env.*
+!**/.env.example
+**/*.log
+# Decide explicitly which project evidence to retain; do not hide results by default.
