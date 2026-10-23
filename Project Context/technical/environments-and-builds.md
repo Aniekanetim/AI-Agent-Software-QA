@@ -1,5 +1,7 @@
 # Environments and builds
 
+**Maintenance:** Human environment/technical owner. Agents record access/setup observations and actual runtime identities in their request, discovery context or shared progress, and propose canonical updates to this owner.
+
 **Owner:** not assigned. **State:** setup template; no target configured. **Updated:** not supplied.
 
 ## Project and QA locations
@@ -8,6 +10,7 @@
 | --- | --- |
 | QA root on this machine | Not configured |
 | Application repository / checkout | Not configured |
+| Hosted-only access | A URL and authorized access can suffice for discovery; application checkout/start commands are not required for an already hosted target |
 | Application source revision / branch | Not supplied |
 | Human QA reviewer / developer role | Not assigned |
 | Timezone for project records/scheduling | Not supplied |

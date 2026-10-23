@@ -1,6 +1,6 @@
 # Package notes
 
-**Version:** 1.1.0. **Created and updated:** 22 October 2026. **State:** reusable workflow package; no configured project or execution history.
+**Version:** 1.2.0. **Created:** 22 October 2026. **Updated:** 23 October 2026. **State:** reusable workflow package; no configured product, live discovery or QA execution history.
 
 ## Source and purpose
 
@@ -13,6 +13,14 @@ The reusable core consists of the working contract, seven iterative testing acti
 Actual business rules, acceptance criteria, visual baseline, build/source identity, tools, accounts, data, measurable quality targets, test cases, observed results and reviewer decisions come from the adopting project. Before/after targets are used when the investigation needs them; two synthetic builds and eight cases are not universal workflow requirements.
 
 Schedules belong to their configured app/project/chat. This export does not create, move or disable one. The source project and its existing hourly check-in remain separate.
+
+## Version 1.2.0: independent discovery and context ownership
+
+Added a request-driven Product Discovery procedure for onboarding, targeted learning and refresh, including hosted-only access, authentication/session handling, evidence-backed knowledge entries, clarification, completion and resumption. No browser agent/runtime is bundled: the adopting agent needs actual tools and authorized target access.
+
+Root Project Context is human-maintained. The agent maintains a separate `Product Discovery/Project Context/` with business, product, design and technical observations. Sources, inference, capture review, owner-intent decisions, freshness and limits remain distinguishable. Agents propose baseline changes; responsible humans publish them. There is no automatic promotion/synchronization.
+
+QA reads both stores and can link an explicit discovery request without changing the five board statuses or bypassing G1–G5. Entry points, templates and QA check-in instructions now distinguish human source revisions, discovery entry versions and served identity. Browser session-state exclusions were added; existing tracked secrets would still need separate remediation. No real target, account, request, knowledge claim or discovery schedule was added.
 
 ## Version 1.1.0: release closure improvement
 
@@ -40,6 +48,25 @@ All 79 local links/anchors resolved across 29 Markdown files, including after co
 
 Distribution repository: https://github.com/Aniekanetim/AI-Agent-Software-QA
 
-The public edition adds a ready-to-copy agent adoption prompt, repository adoption guide, fork/template/clone entry points and an MIT license. It starts with its own Git history. Project rules, execution evidence, private assistant notes and machine-level scheduler configuration are not part of this distribution. The workflow remains version 1.1.0 and the project templates remain unconfigured.
+The public edition initially shipped as version 1.1.0 with an agent adoption prompt, adoption guide, fork/template/clone entry points and MIT license. It has its own Git history. Project rules, actual execution evidence, private assistant notes and machine-level scheduler configuration are excluded. The current version is identified above; project templates remain unconfigured.
 
 Publication preflight validated 91 local links/anchors across 29 Markdown files intended for Git, with no broken references or credential-pattern findings. The five live status folders remain empty. Earlier validation counts above describe their respective local-package snapshots, including the optional ignored continuity note.
+
+## Version 1.2.0 validation
+
+Validated on 23 October 2026: all 145 relative Markdown links/anchors resolve across 37 Markdown files, including in a relocated copy whose path contains spaces. All eight human-baseline template files survive relocation with identical hashes. The QA board still has exactly five status folders and zero live tickets; discovery requests are also empty. Six authentication/environment-file exclusion checks and four evidence-visibility checks passed. No credential-pattern findings were detected in the distributed Markdown; this is a limited pattern scan, not a guarantee that future evidence contains no secrets.
+
+The following eight written-procedure scenarios were reviewed for consistency:
+
+| Scenario | Documented response checked |
+| --- | --- |
+| Hosted application without source or requirements | Authorize bounded learning using URL/access; record missing intent without blocking unrelated observation or inventing test expectations |
+| Authentication expires or a role is unavailable | Request appropriate access, retain the gap and continue only independent authorized journeys; do not bypass access or store session secrets in context |
+| Observed behavior conflicts with an accepted rule | Preserve both references and return for QA assessment; do not rewrite the human baseline |
+| QA needs targeted product learning | Link an explicit discovery request, original question and separate authorization/checkpoints; return versioned outputs without automatically passing the QA ticket |
+| A relevant requirement/application area changes | Flag affected entries for refresh, preserve prior evidence and avoid automatic synchronization or full recrawls |
+| Work resumes after interruption or transfer | Read claims, checkpoints, actual approvals and responses; recheck access/versions without repeating unanswered requests |
+| A discovery suggests a requirement change | Keep the proposal separate from capture review; the responsible human decides/publishes and the agent links the actual revision |
+| No actionable QA ticket or discovery request exists | Do not fabricate work, trigger a crawl, change files or activate a schedule |
+
+These checks assess package structure and the written procedures. No staging URL was supplied, so no browser walkthrough, sign-in, account creation, product tests or actual owner confirmation was performed. Ownership controls are agent instructions, not filesystem access enforcement. Existing MustPayroll repositories, evidence and the configured source-project check-in were not changed. No discovery schedule was activated.

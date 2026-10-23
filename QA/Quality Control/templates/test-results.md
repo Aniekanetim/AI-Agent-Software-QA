@@ -9,6 +9,7 @@
 | Executor and method | <AI/tool execution or named human action, accurately distinguished> |
 | Target and environment | <served build identity, normal browser or API URL as applicable> |
 | Context/design/criterion basis | <applicable versions and IDs> |
+| Discovery references | <OBS IDs/entry versions or None used; separate from the human test basis> |
 | Test data identity / controls | <isolated data, relevant fixture/fault control> |
 | Tool configuration | <actual browser/client/runtime, workers/retries/workload where relevant> |
 

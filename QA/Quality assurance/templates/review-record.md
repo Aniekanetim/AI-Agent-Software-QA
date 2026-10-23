@@ -6,6 +6,7 @@
 | --- | --- |
 | Ticket / gate / request revision | <ID and G1–G5> |
 | Target build / context revision | <exact identities> |
+| Discovery references / versions | <OBS IDs and entry versions or None used; separate from human sources and served build> |
 | Request date / human reviewer | <actual values> |
 | Decision requested | <one specific scope, finding, execution or handoff decision> |
 | Supporting plan/results | <direct links> |

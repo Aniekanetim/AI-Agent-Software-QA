@@ -11,6 +11,7 @@
 | Audience / handoff recipient | <named person or responsible role; acceptance required or not> |
 | Target version / served build / source revision | <exact identities> |
 | Test basis / design revision / criterion IDs | <actual applicable sources> |
+| Discovery references / versions | <relevant OBS IDs/versions or None used; learning coverage is not test execution> |
 | Environment / intended use | <local, staging, production; scope and limits> |
 | Availability | <planned or actual; do not equate QA completion with deployment> |
 

@@ -2,7 +2,13 @@
 
 This board gives the AI QA agent and developers tickets to work on. Each ticket is a Markdown file; the folder containing it is its current board status. The [QA workflow](../QA/Quality%20assurance/qa-workflow.md) defines how the AI performs the work and obtains human decisions.
 
-[Project Context](../Project%20Context/README.md) supplies shared requirements, acceptance criteria, design references, business rules and technical information. The board records work and conversations; context documents establish the applicable product expectations. Read both before acting on a ticket.
+[Human-maintained Project Context](../Project%20Context/README.md) locates product sources, owners, states and revisions. Applicable accepted sources establish expectations. [AI-managed discovery context](../Product%20Discovery/Project%20Context/README.md) supplies observations, journeys and setup/investigation knowledge. Read relevant sources in both before acting; discoveries are not automatically requirements.
+
+## Requesting product discovery
+
+This five-folder board continues to manage QA assignments and defects. Learning requests belong in the independent [Product Discovery pipeline](../Product%20Discovery/README.md). When a QA ticket needs exploration, identify the question/affected check and link a targeted discovery request in both directions. Record its required output and separate authorization; keep the QA ticket's current folder and checkpoint. Continue independent authorized checks.
+
+Keep a QA-origin question and responses on its original ticket and question index; the discovery request links that conversation rather than repeating it. Discovery returns knowledge entries, human/discovery revisions, served identity and gaps. It cannot supply an invented requirement, approve tests or move the QA ticket to Tested-Ok. Humans publish baseline changes; agents maintain their own discoveries and operational records.
 
 ## Where work belongs
 
@@ -28,7 +34,7 @@ Ticket references include stable IDs. When a file moves, keep its ID, contents a
 
 ## Initial testing and defect reporting
 
-1. Read the complete assignment and Project Context index. Identify the build, testing objective and applicable source revisions/criteria; resolve necessary gaps through the clarification procedure below. Prepare the existing workflow's scope/design/readiness briefing.
+1. Read the complete assignment, both context indexes and relevant sources/discoveries. Identify the build, objective, human-source revisions/criteria and discovery versions; resolve necessary gaps through the procedure below. Prepare the QA scope/design/readiness briefing.
 2. Execute only the work covered by the recorded human authorization. Keep actual outcomes, inferences and human decisions distinct.
 3. Open a new Dev Todo ticket for each distinct defect. Record reproduction, expected/actual behavior, evidence, severity, supported cause or hypothesis, proposed correction and release impact. Link its parent and relevant test case.
 4. Keep the parent assignment in Ready for QA while blocking findings or required decisions remain. Record its linked blockers and next action; do not repeatedly run the same tests against an unchanged build.
@@ -52,7 +58,7 @@ An original bug can reach Tested-Ok while a separate regression remains open. Li
 
 ## AI check-in procedure
 
-1. Read [AGENTS.md](../AGENTS.md), [shared progress](../unified_project_context.md), the [Project Context index](../Project%20Context/README.md), this board README and the [QA workflow](../QA/Quality%20assurance/qa-workflow.md).
+1. Read [AGENTS.md](../AGENTS.md), [shared progress](../unified_project_context.md), the [human context index](../Project%20Context/README.md), the [discovery context index](../Product%20Discovery/Project%20Context/README.md), this README and the [QA workflow](../QA/Quality%20assurance/qa-workflow.md).
 2. Inspect ticket Markdown files directly inside Ready for QA and Retest. Read their ownership, waiting reason, linked blockers, clarification responses and existing decisions before selecting work. Consult the ticket's applicable source revisions/BR/AC IDs, rather than assuming the latest implementation defines expected behavior.
 3. Resume eligible unfinished work owned by this QA chat first. Otherwise choose an unclaimed actionable ticket across both queues by priority P0, P1, P2, P3, then oldest creation time, then ticket ID. If priority or essential input is missing, request that information once and record what is needed.
 4. Respect another worker's claim. Before claiming, re-read the ticket and record the owner, claim time, workflow checkpoint and next action. Handle one ticket at a time and verify that its ID is not duplicated elsewhere on the board.
@@ -87,7 +93,7 @@ Record the waiting reason and next action in the ticket's fields. Keep it in its
 | Ticket / question ID | Original comment | Needed from | Affected work | Raised |
 | --- | --- | --- | --- | --- |
 
-Append the actual answer to the ticket, retaining the question and earlier responses. Resolve the expectation with the responsible source owner; update the canonical document or link the owner's decision when appropriate. Record the resulting revision, answer and resumption checkpoint on the ticket. Remove its index row only when the question is resolved; the conversation remains on the ticket. Clear only the resolved waiting reason. A changed requirement may require revised cases and approval at the affected workflow gate. Refresh the index link if the ticket moves while its question remains open.
+Append the actual answer, retaining the conversation. Resolve intent with the responsible owner, who maintains/publishes any canonical change. The agent links the actual decision/source revision without editing root Project Context. Record the answer and resumption checkpoint. Remove the index row only when resolved; clear only its waiting reason. Changed criteria may require revised cases and approval. Refresh question links if the ticket moves.
 
 ## Build or feature ticket template
 
@@ -116,6 +122,7 @@ Copy this into a new file in Ready for QA and replace the placeholders. Do not r
 2. <Observable business requirement.>
 <Links to supplied requirements/designs; unresolved questions or assumptions.>
 - Context sources and revision: <exact links and Git commit or immutable source version>
+- Discovery knowledge and versions: <relevant OBS IDs/entry revisions, linked request, or None used; not the requirement authority>
 - Business rules / acceptance criteria: <BR and AC IDs, or ticket-specific criteria>
 - Design reference: <applicable handoff/version, not applicable, or missing>
 
@@ -194,6 +201,7 @@ Create a new file in Dev Todo for a newly observed defect. Keep API reproduction
 ## Expected result
 <Observable result from the acceptance criterion or business rule.>
 - Context source/revision and BR/AC IDs: <exact rule/criterion references>
+- Discovery references: <relevant OBS IDs/versions and originating request, or None used; distinguish observations from expected behavior>
 - Applicable design handoff/version: <reference, not applicable, or missing>
 
 ## Actual result

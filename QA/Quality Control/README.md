@@ -2,6 +2,8 @@
 
 Use this area for the checks and evidence produced by an authorized assignment. The [QA workflow](../Quality%20assurance/qa-workflow.md) defines planning and review. The board's bug ticket is the authoritative defect report; link it instead of creating duplicate reports here.
 
+Use applicable accepted [human sources](../../Project%20Context/README.md) for expected behavior and relevant [discoveries](../../Product%20Discovery/Project%20Context/README.md) for navigation/setup/investigation. Record human-source revisions, discovery OBS IDs/versions and served identity separately. Discovery reports stay in their own pipeline; learning coverage is not QC execution evidence or a passing result.
+
 ## Organize by target and testing type
 
 Create only the directories needed by real work:

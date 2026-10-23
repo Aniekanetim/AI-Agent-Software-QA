@@ -1,5 +1,7 @@
 # Business rules
 
+**Maintenance:** Human business/product owner. Agents read applicable rules and propose clarifications; observed behavior does not populate this baseline automatically.
+
 **Owner:** not assigned. **State:** template; no rules supplied. **Applicable revision/date:** not supplied.
 
 ## Canonical rules

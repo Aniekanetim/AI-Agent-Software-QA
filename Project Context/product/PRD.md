@@ -1,5 +1,7 @@
 # Product requirements
 
+**Maintenance:** Human product owner/team. Agents propose changes on the originating request/ticket; candidate expectations remain in discovery records until the responsible human establishes the intended behavior.
+
 **Owner:** not assigned. **State:** template; no product baseline supplied. **Applicable release/revision/date:** not supplied.
 
 ## Feature and user journey

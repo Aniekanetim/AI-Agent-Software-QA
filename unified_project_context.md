@@ -1,14 +1,14 @@
 # Shared project progress
 
-**Project:** not configured. **Current checkpoint:** setup. **Execution:** not started. **Human decisions:** none recorded. **Schedule:** not configured for this project.
+**Project:** not configured. **Current checkpoint:** setup. **QA/discovery execution:** not started. **Human project decisions:** none recorded. **Schedules:** not configured for this project.
 
 ## Purpose and ownership
 
-Replace this section with the actual product goal, QA objective, project owner, human QA reviewer and developer contact/role. Use [Project Context](Project%20Context/README.md) for maintained product knowledge; do not duplicate its requirements here.
+Record the supplied product goal, learning/testing objective and actual owner/reviewer/contact roles. The [root context](Project%20Context/README.md) is human-maintained; the [discovery context](Product%20Discovery/Project%20Context/README.md) is agent-maintained. Link their sources without duplicating requirements or inferring owner agreement. Operational progress here may be maintained by the agent.
 
 ## Current work
 
-No live assignment exists. [The board](QA%20task%20management%20Board/README.md) is the intake point. Create a real ticket after supplying project context, then record its ID, current folder, workflow checkpoint, relevant source/build revisions, next action and waiting reason here when work materially changes.
+No live QA assignment or discovery request exists. [The QA board](QA%20task%20management%20Board/README.md) supplies testing work; [discovery requests](Product%20Discovery/README.md) supply learning work. Record the active ID/link, owner, pipeline checkpoint, human source revisions, discovery entry versions, served identity, next action and waiting reason when work materially changes. Keep pipeline authorizations distinct.
 
 ## Decisions and evidence
 
@@ -16,8 +16,8 @@ None recorded. Link dated decisions/reviews and execution records when they actu
 
 ## Blockers and next action
 
-Complete [SETUP.md](SETUP.md), identify the testing objective and supply the relevant target/criteria. Keep missing answers on the affected ticket and index developer questions on the board. Do not request a decision already supplied within the same applicable scope.
+Complete [SETUP.md](SETUP.md), identify the learning/testing objective and establish its target/access. Keep questions on the originating discovery request or QA ticket and use that pipeline's index. Propose human-baseline changes to their owner. Missing intent blocks dependent judgments, not independent authorized observation. Do not repeat unanswered questions or decisions already supplied within the applicable scope.
 
 ## Continuity after interruption or transfer
 
-Read the complete active ticket, its decisions, developer responses and linked results before resuming. Confirm source/build identity and access on the current machine. Preserve prior observations and restart only affected preparation or checks with a stated reason. An optional local assistant note never replaces these shared records.
+Read the complete active request/ticket, actual responses/decisions and linked evidence before resuming. Confirm both contexts' relevant versions, served identity and current-machine access; undisclosed build identity remains Unknown. Respect claims, preserve observations and restart only affected work with a stated reason. Optional assistant notes never replace shared records.

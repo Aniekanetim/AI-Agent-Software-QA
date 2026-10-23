@@ -1,5 +1,15 @@
 # Working contract
 
+## Choose the pipeline and preserve context ownership
+
+Requests identify what to do; execution procedures identify how. Use [Product Discovery](Product%20Discovery/README.md) and its [workflow](Product%20Discovery/discovery-workflow.md) for learning objectives. Use the existing five-folder board and QA workflow for testing/defects. Do not force discovery requests through QA statuses or apply QA test/release gates as discovery completion states. An explicit QA ticket can link a discovery request; read both records and retain their separate authorization/checkpoints.
+
+Read relevant sources in both context stores. Root `Project Context/` is maintained by the human team and responsible owners; accepted applicable sources establish product expectations. `Product Discovery/Project Context/` is maintained by the agent and holds evidence-backed observations, inferences and gaps. During discovery or QA execution, do not edit files under the root `Project Context/`; propose a clarification on the originating request/ticket and let the human owner maintain the baseline. An explicit human assignment to edit a specified baseline document is a separate maintenance task, not implied authority from discovery or testing. Neither location alone establishes approval or freshness.
+
+The agent can update its discovery knowledge, tickets, evidence and shared progress within authorization. Keep observations, interpretations, review of capture accuracy and actual owner decisions distinct. Main-context revisions, discovery entry versions and served application identity are separate references. Missing intended behavior can permit observation but blocks dependent correctness judgments. No automatic copying or promotion occurs between stores.
+
+For hosted discovery, no application checkout is required. Follow the discovery access/session procedure, use only authorized roles/actions and keep credentials/session state out of committed records. Preserve sources and progress across interruption; do not repeat unchanged exploration, unanswered questions or approval requests. This package enables no discovery scheduler.
+
 ## Ticket-board intake
 
 For QA board check-ins, read [the board instructions](QA%20task%20management%20Board/README.md) and inspect ticket files in `QA task management Board/Ready for QA` and `QA task management Board/Retest`. Developers use Dev Todo and Rework; Tested-Ok holds completed tickets. The folder is the ticket's board status. Keep its ID, contents, dated notes and developer responses through moves; refresh incoming links and never overwrite or duplicate a ticket.
@@ -12,7 +22,7 @@ Use the existing workflow below for all ticket work. Folder placement and develo
 
 ## AI-led QA with human review
 
-Read `unified_project_context.md`, `Project Context/README.md`, the relevant requirements/evidence and `QA/Quality assurance/qa-workflow.md` before work. If present, read the ignored `mental_model/continuity.md` for assistant continuity; essential team facts must remain in shared records. Its absence on a fresh copy is not a blocker.
+Read `unified_project_context.md`, `Project Context/README.md`, `Product Discovery/Project Context/README.md`, the relevant requirements/discoveries/evidence and `QA/Quality assurance/qa-workflow.md` before QA work. Discovery follows its own procedure above. If present, read the ignored `mental_model/continuity.md` for assistant continuity; essential team facts must remain in shared records. Its absence on a fresh copy is not a blocker.
 
 The AI agent performs the QA workflow; the human QA engineer reviews and approves its scoped decisions end to end. This applies across functional and non-functional testing types. Adoption of this operating model does not authorize any project test execution.
 
@@ -44,10 +54,10 @@ At G5, follow [release sign-off and handoff](QA/Quality%20assurance/release-sign
 
 ## Context and scope protection
 
-Use [Project Context](Project%20Context/README.md) for shared business, product, design and technical information. The index identifies source owners, states, applicable revisions and known gaps. Acceptance criteria stay in the PRD; business rules have one canonical location in `Project Context/business/business-rules.md`. A technical reference describes implementation; it does not override accepted requirements. Record context Git revision or immutable source version, relevant BR/AC IDs and any applicable design handoff in the ticket/test basis, separately from the served build identity. Do not retroactively assign new AC IDs or context revisions to historical executions.
+Use the [human context index](Project%20Context/README.md) to locate owners, source states, applicable revisions and known gaps. Acceptance criteria stay with human product requirements; business rules have a canonical human source in `Project Context/business/business-rules.md` or its linked authority. The [discovery context](Product%20Discovery/Project%20Context/README.md) supplies practical learning without overriding those sources. Record each context's applicable revision/entry versions, BR/AC and OBS IDs, and any design handoff separately from the served build identity. Do not retroactively assign new IDs or revisions to historical executions.
 
 When a necessary answer is missing, inaccessible or contradictory, follow the board's [clarification procedure](QA%20task%20management%20Board/README.md#clarification-comments-and-developer-visibility). Append a concrete question to the existing ticket, identify checked sources/revisions and affected checks, record Waiting on and next action, and link it in the board's unanswered-developer-question index. Keep the ticket in its current folder. Do not invent a requirement, manufacture a defect from uncertainty, repeat the unanswered question or treat a developer response as human execution approval. Continue only independent, already authorized work. On a response, preserve the conversation, resolve the source with its responsible owner, link any canonical update/decision, and resume from the affected checkpoint; changed criteria return to the affected review gate.
 
-After a material requirement clarification, approval, build/flow change, execution, defect update or blocker, update the detailed evidence/review record, shared context, traceability and ignored personal mental model. Shared context must stand alone; the personal mental model is not team authority. Keep project records concise and linked from the README, tickets and run handoff.
+After a material clarification, approval, build/flow change, execution, defect update or blocker, update the detailed evidence/review record, agent-managed discoveries where affected, shared progress and traceability; update an ignored personal note only if used. Propose any necessary human-baseline change to its owner instead of editing root Project Context. Shared records must stand alone; the personal mental model is not team authority. Keep records concise and linked from requests, tickets and handoffs.
 
 Never copy another project's private accounts, credentials, approvals or execution outcomes into this project. Verify access to the named target and observe the agreed environment/data limits. Read `SETUP.md` on first adoption and `automation/README.md` before arranging check-ins. This package starts unconfigured, with no live tickets, test outcomes or active schedule. Recheck setup and source/build identity after moving machines.

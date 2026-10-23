@@ -2,6 +2,8 @@
 
 **Package state:** not configured. No schedule ID or target chat is included, and packaging this workflow does not create or change an automation.
 
+This procedure schedules QA-board work only. Product Discovery is an independent request-driven pipeline; no discovery polling is configured. Reading its context during QA does not authorize exploration. Any future discovery schedule needs an explicit separate request, target, cadence and scope; do not repurpose existing project check-ins automatically.
+
 ## Activate for a real project
 
 1. Finish [project setup](../SETUP.md) and open the actual QA root in a local agent chat.

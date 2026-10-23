@@ -5,11 +5,16 @@ Template: replace `<QA_PROJECT_ROOT>` with the actual QA root before a manual ch
 ```text
 Work in <QA_PROJECT_ROOT>.
 Read AGENTS.md, unified_project_context.md, Project Context/README.md,
+Product Discovery/Project Context/README.md,
 QA task management Board/README.md and QA/Quality assurance/qa-workflow.md.
 Inspect Ready for QA and Retest under QA task management Board.
 Follow the board's AI check-in procedure and existing human-reviewed workflow.
 Consult the relevant context sources and record applicable source/design revisions
-and rule/acceptance-criteria IDs separately from the served build identity.
+and rule/acceptance-criteria IDs, discovery OBS IDs/entry versions and the served
+build identity separately. Humans maintain root Project Context; do not edit it.
+Use discoveries for setup/investigation, not as automatically accepted requirements.
+For a ticket's learning gap, link an explicit discovery request and its separate
+authorization/checkpoint. An empty QA board does not start a discovery crawl.
 For missing or conflicting information, comment on the existing ticket for the
 developer, index its unanswered question in the board README, and wait only on
 dependent work. Read actual responses before resuming; retain the conversation

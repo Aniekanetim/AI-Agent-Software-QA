@@ -4,6 +4,8 @@
 
 **Basis:** <source/criterion IDs and context/design revision>. **Target:** <build identity and normal browser URL>. **Setup:** <required UI-visible data/account state or separate preparation reference>.
 
+**Discovery references:** <relevant OBS IDs/versions or None used; journeys inform setup, while expected behavior comes from the agreed human test basis>.
+
 | TC ID | Scenario | Test case | Preconditions | Steps | Test data | Expected result |
 | --- | --- | --- | --- | --- | --- | --- |
 | <stable ID> | <high-level behavior> | <specific behavior being checked> | <starting UI/data/account state> | 1. <browser action><br>2. <action><br>3. <observable checkpoint> | <exact relevant values> | <observable outcome and persistence/recovery where relevant> |

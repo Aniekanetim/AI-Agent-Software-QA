@@ -4,6 +4,8 @@
 
 **Basis:** <contract/rule/criterion and source revision>. **API base URL:** <actual address>. **Target:** <build identity>. **Client:** <Postman or selected runner>. **Access:** <role and credential source; no secret values>.
 
+**Discovery references:** <relevant OBS IDs/versions or None used; observed interfaces do not replace the accepted contract or test basis>.
+
 | TC ID | Scenario | Test case | Preconditions | Steps | Test data | Expected result |
 | --- | --- | --- | --- | --- | --- | --- |
 | <stable ID> | <high-level behavior> | <specific request/business rule> | <starting record/auth state> | 1. Send <METHOD and full URL> using Payload A.<br>2. Read <exact endpoint or returned field>.<br>3. Confirm <business outcome>. | Payload A; <exact parameters/headers> | <status, relevant response and saved-state outcome> |

@@ -1,5 +1,7 @@
 # Business requirements
 
+**Maintenance:** Human team/owner. Agents read this baseline and propose changes on the originating request/ticket; exploration notes belong in the separate discovery context.
+
 **Owner:** not assigned. **State:** template; no supplied baseline. **Applicable revision/date:** not supplied.
 
 ## Business problem and users

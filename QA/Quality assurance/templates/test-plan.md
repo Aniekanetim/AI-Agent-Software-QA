@@ -8,6 +8,7 @@
 | Testing objective and types | <UI, API, usability, performance, accessibility, security or combination> |
 | Target build and environment | <exact identity and location> |
 | Test basis | <source sections, context/design revisions, rule/criterion IDs> |
+| Discovery references | <OBS IDs/entry versions and request, or None used; observations are not requirement authority> |
 | Human reviewer and current gate | <reviewer; G1/G2; Pending unless decided> |
 
 ## Scope and risk selection

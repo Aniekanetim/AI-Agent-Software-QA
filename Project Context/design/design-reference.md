@@ -1,5 +1,7 @@
 # Design reference
 
+**Maintenance:** Human design/product owner. Agents retain implemented-screen observations in discovery context and request missing/changed approved references through the originating conversation.
+
 **Owner:** not assigned. **State:** template; no approved design supplied. **Applicable revision/date:** not supplied.
 
 ## Design sources

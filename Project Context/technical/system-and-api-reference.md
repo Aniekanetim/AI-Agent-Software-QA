@@ -1,5 +1,7 @@
 # System and API reference
 
+**Maintenance:** Human technical owner/team. Agents retain observed interfaces in discovery context and propose clarifications; captured requests do not automatically become an approved contract here.
+
 **Owner:** not assigned. **State:** template; no architecture or API contract supplied. **Applicable source/revision/date:** not supplied.
 
 ## Components and dependencies

@@ -6,4 +6,8 @@ mental_model/
 **/.env.*
 !**/.env.example
 **/*.log
+# Reusable browser authentication state is local access material, not product context.
+**/.auth/
+**/storageState*.json
+**/storage-state*.json
 # Decide explicitly which project evidence to retain; do not hide results by default.
