@@ -1,6 +1,16 @@
 # Package notes
 
-**Version:** 1.4.0. **Created:** 22 October 2026. **Updated:** 27 October 2026. **State:** reusable workflow package; no configured product, live discovery or QA execution history.
+**Version:** 1.4.1. **Created:** 22 October 2026. **Updated:** 27 October 2026. **State:** reusable workflow package; no configured product, live discovery or QA execution history.
+
+## Version 1.4.1: Postman selection verification
+
+Corrected a completeness-audit finding: after verifying account A and selecting account B, onboarding and login guidance could still reuse A's capability record. The fresh pre-execution check already rejected the mismatch, but preparation could incorrectly appear ready. Identity and collection/environment access now require evidence matching the selected account, region and credential source in onboarding, login guidance and execution. Local-only checks cannot certify cloud identity.
+
+Login guidance distinguishes verified reuse (`required: false`), unresolved verification (`null`) and a current missing/expired credential (`true`). A changed selection, wrong identity, unknown response, unavailable command or harness restriction asks for the affected check or selection correction rather than automatic sign-in. Resource-only changes retain a valid identity check. Older resource receipts lacking region/credential binding need a targeted refresh; existing installations, answers and historical runs remain intact. See [the Postman guide](../automation/postman/README.md).
+
+Regression coverage reproduces the original account switch, region/credential changes, old resource reuse after switching accounts, local/cloud transitions, unavailable identity checks, expired sessions and legacy resource receipts. These are synthetic adapter checks; live Postman Cloud access still requires the adopting project's actual authorized account.
+
+Local validation passed TypeScript and all 46 helper tests. The account/configuration checks first reproduced the old failures before the correction passed. All 241 local Markdown file links resolved, and Git whitespace checks passed. Native Postman/browser execution remains subject to the existing local harness restrictions; the package CI runs those fixture checks separately. This patch does not configure a product, connect live accounts or activate a schedule.
 
 ## Version 1.4.0: tool reuse and Postman CLI
 

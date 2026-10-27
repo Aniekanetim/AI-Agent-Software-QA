@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, mkdirSync, writeFileSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { contained, privatePath, load, save, revision, requireText, digest, evidence, verifyEvidence, assertNonsecret, type Evidence } from '../shared/store.js';
-import { probe, selectedCommand, runProcess, readRecord, saveRecord, readinessIssues, isolatedPostmanEnvironment, type Runner, type ToolRecord } from '../tools/registry.js';
+import { probe, selectedCommand, runProcess, readRecord, saveRecord, readinessIssues, isolatedPostmanEnvironment, type Runner, type ToolRecord, type Command } from '../tools/registry.js';
 import { currentHarness, harnessKey } from '../tools/runtime.js';
 
 export const settingsPath = '.local/postman-settings.json';
@@ -30,12 +30,52 @@ function cloudEnvironment(configuration: PostmanSettings): NodeJS.ProcessEnv {
   else if (!env.POSTMAN_API_KEY?.trim()) throw new Error('POSTMAN_API_KEY is missing or empty in this harness. Keep the key outside project records.');
   return env;
 }
+function cloudBinding(configuration: PostmanSettings) {
+  return { accountId: configuration.accountId, region: configuration.region, credential: configuration.credential };
+}
+function matchesCloudReceipt(root: string, record: ToolRecord | null, operation: string, configuration: PostmanSettings, expected: Record<string, unknown> = {}): boolean {
+  return (record?.capabilities[operation]?.evidence ?? []).some(ref => {
+    try {
+      // Binding receipts are complete files; a pointer to unrelated evidence is not identity proof.
+      if (ref.pointer) return false;
+      verifyEvidence(root, ref);
+      const receipt = JSON.parse(readFileSync(contained(root, ref.path), 'utf8'));
+      const age = Date.now() - Date.parse(receipt.checkedAt);
+      return Number.isFinite(age) && age >= -60_000 && age <= 86_400_000 &&
+        harnessKey(receipt.harness) === harnessKey(record!.harness) &&
+        Object.entries({ ...cloudBinding(configuration), ...expected }).every(([key, value]) => receipt[key] === value);
+    } catch { return false; }
+  });
+}
+/** Reuse cloud evidence only for the identity and credential selection that produced it. */
+export function capabilityIssues(root: string, record: ToolRecord | null, required: string[], configuration = settings(root)): string[] {
+  const issues = readinessIssues(root, record, required);
+  if (configuration?.mode !== 'cloud' || !required.includes('identity')) return issues;
+  if (record?.authentication !== 'connected' || record.account !== configuration.accountId || !matchesCloudReceipt(root, record, 'identity', configuration)) {
+    issues.push('identity: verify the selected Postman account, region and credential source with postman check.');
+  }
+  for (const operation of required) {
+    const resource = /^(collection|environment):(.+)$/.exec(operation);
+    if (resource && !matchesCloudReceipt(root, record, operation, configuration, { kind: resource[1], reference: resource[2], access: 'read' })) {
+      issues.push(`${operation}: verify access for the selected account, region and credential source.`);
+    }
+  }
+  return issues;
+}
+function retainIdentityCheck(root: string, record: ToolRecord, configuration: PostmanSettings, source: string): void {
+  const path = `.local/postman/identity-${harnessKey(record.harness)}.json`;
+  save(root, path, { ...cloudBinding(configuration), observedAccount: record.account ?? null, authentication: record.authentication, harness: record.harness, source, checkedAt: new Date().toISOString() }, revision(root, path));
+  record.capabilities.identity!.evidence = [evidence(root, path)];
+  // This is a fresh attempt, even when it establishes that authentication is missing.
+  record.capabilities.identity!.checkedAt = new Date().toISOString();
+}
 export async function inspect(root: string, source: string, runner: Runner = runProcess, mode?: 'local' | 'cloud'): Promise<ToolRecord> {
   const record = await probe(root, 'postman', source, runner); if (!record.compatible || !record.command) return record;
   const configured = settings(root), configuration = mode === 'local' ? null : configured;
+  if (configuration?.mode === 'cloud') { delete record.account; record.capabilities.identity = { status: 'unverified', evidence: [] }; }
   let env: NodeJS.ProcessEnv;
   try { env = configuration?.mode === 'cloud' ? cloudEnvironment(configuration) : localEnvironment(root); }
-  catch { record.authentication = 'needsAuthentication'; record.capabilities.identity = { status: 'unverified', evidence: [] }; record.diagnostic = 'The selected environment credential is missing or empty. Supply it through the harness secret facility; do not repeat installation.'; saveRecord(root, record); return record; }
+  catch { record.authentication = 'needsAuthentication'; record.capabilities.identity = { status: 'unverified', evidence: [] }; record.diagnostic = 'The selected environment credential is missing or empty. Supply it through the harness secret facility; do not repeat installation.'; if (configuration?.mode === 'cloud') retainIdentityCheck(root, record, configuration, source); saveRecord(root, record); return record; }
   const help = await runner(record.command, ['collection', 'run', '--help'], { cwd: root, env });
   const helpText = (help.stdout + '\n' + help.stderr).replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '');
   const flags = { collectionRun: help.code === 0 && /postman\s+collection\s+run|--reporters\b/.test(helpText), localJsonReport: /--reporters\b/.test(helpText), cliSummary: record.version === '1.79.0' && /--disable-unicode\b/.test(helpText), noReportEvents: /--no-report-events\b/.test(helpText), fileBoundary: /--no-insecure-file-read\b/.test(helpText) };
@@ -49,16 +89,18 @@ export async function inspect(root: string, source: string, runner: Runner = run
       const result = await runner(record.command, ['whoami', '--json'], { cwd: root, env });
       let identity: any; try { identity = JSON.parse(result.stdout); } catch { /* No raw credential diagnostics are retained. */ }
       const id = identity?.user?.id ?? identity?.account?.id ?? identity?.id;
+      if (id != null) record.account = String(id);
       if (result.code === 0 && id != null && String(id) === configuration.accountId && !identity?.guest && !identity?.isGuest && identity?.authenticated !== false && identity?.type !== 'guest') {
         record.account = String(id); record.authentication = 'connected';
-        const path = `.local/postman/identity-${harnessKey(record.harness)}.json`; save(root, path, { accountId: record.account, region: configuration.region, credential: configuration.credential, harness: record.harness, source, checkedAt: new Date().toISOString() }, revision(root, path));
-        record.capabilities.identity = { status: 'verified', evidence: [evidence(root, path)] };
+        record.capabilities.identity = { status: 'verified', evidence: [] };
       } else {
-        record.authentication = result.code === 0 && id != null ? 'denied' : 'needsAuthentication';
+        const missingAuthentication = !result.error && result.code !== 0 && /\b(?:not (?:logged|signed) in|session (?:has )?expired|authentication (?:is )?required|(?:missing|invalid|expired) (?:api key|credentials))\b/i.test(`${result.stdout}\n${result.stderr}`);
+        record.authentication = result.error ? 'unverified' : result.code === 0 && id != null ? 'denied' : missingAuthentication ? 'needsAuthentication' : 'unverified';
         record.capabilities.identity = { status: record.authentication === 'denied' ? 'denied' : 'unverified', evidence: [] };
-        record.diagnostic = record.authentication === 'denied' ? 'The CLI identity differs from the selected account. Confirm account selection; do not silently switch accounts.' : 'Verify the selected credential source and region, then sign in only if necessary. Raw output suppressed.';
+        record.diagnostic = record.authentication === 'denied' ? 'The CLI identity differs from the selected account. Confirm account selection; do not silently switch accounts.' : record.authentication === 'unverified' ? 'Identity could not be established from this tool invocation/response. Resolve access or command compatibility before assuming authentication is missing. Raw output suppressed.' : 'Verify the selected credential source and region, then sign in only if necessary. Raw output suppressed.';
       }
     } else { record.capabilities.identity = { status: 'unsupported', evidence: [] }; record.diagnostic = 'This CLI cannot verify identity through whoami --json. Use a documented version-compatible check before cloud work.'; }
+    retainIdentityCheck(root, record, configuration, source);
     if (record.authentication === 'connected') {
       for (const [kind, references] of [['collection', configuration.collections], ['environment', configuration.environments]] as const) for (const reference of references) {
         const name = `${kind}:${reference}`;
@@ -66,7 +108,7 @@ export async function inspect(root: string, source: string, runner: Runner = run
         let resource: any; try { resource = JSON.parse(result.stdout); } catch { /* Help text or an unknown response is not resource access. */ }
         if (result.code === 0 && resource && typeof resource === 'object' && !Array.isArray(resource) && Object.keys(resource).length > 0 && !resource.error && !resource.errors) {
           const path = `.local/postman/access/${digest(JSON.stringify([record.harness, kind, reference])).slice(0, 32)}.json`;
-          save(root, path, { kind, reference, accountId: record.account, access: 'read', checkedAt: new Date().toISOString(), source, harness: record.harness }, revision(root, path));
+          save(root, path, { kind, reference, ...cloudBinding(configuration), access: 'read', checkedAt: new Date().toISOString(), source, harness: record.harness }, revision(root, path));
           record.capabilities[name] = { status: 'verified', evidence: [evidence(root, path)] };
         } else {
           record.capabilities[name] = { status: result.error === 'denied' ? 'denied' : 'unverified', evidence: [] };
@@ -77,13 +119,22 @@ export async function inspect(root: string, source: string, runner: Runner = run
   }
   saveRecord(root, record); return record;
 }
-export function loginInstructions(root: string) {
+export interface LoginGuidance {
+  required: boolean | null; action: 'local' | 'reuse' | 'check' | 'login' | 'configureCredential' | 'resolveIdentity';
+  next: string; executable?: Command; args?: string[];
+}
+export function loginInstructions(root: string): LoginGuidance {
   const configuration = settings(root);
-  if (!configuration || configuration.mode === 'local') return { required: false, next: 'Local-file operation needs no Postman login. Verify the selected harness and collection capability.' };
+  if (!configuration || configuration.mode === 'local') return { required: false, action: 'local', next: 'Local-file operation needs no Postman login. Verify the selected harness and collection capability.' };
   const current = readRecord(root, 'postman');
-  if (current?.authentication === 'connected' && !readinessIssues(root, current, ['identity']).length) return { required: false, next: 'Reuse the verified selected account. Revalidate identity before cloud execution.' };
-  return { required: true, executable: selectedCommand(root, 'postman'), args: ['login', ...(configuration.region === 'eu' ? ['--region', 'eu'] : [])],
-    next: configuration.credential === 'environment' ? 'Configure the authorized POSTMAN_API_KEY through the harness/CI secret facility. Do not paste it into project records or command arguments. Run postman check afterwards.' : 'Complete browser sign-in interactively using this selected executable, then run postman check. This helper does not start login or create an account.' };
+  if (!capabilityIssues(root, current, ['identity'], configuration).length) return { required: false, action: 'reuse', next: 'Reuse the verified selected account. Revalidate identity before cloud execution.' };
+  const checkedSelection = current && !readinessIssues(root, current, ['version']).length && matchesCloudReceipt(root, current, 'identity', configuration, { authentication: current.authentication, observedAccount: current.account ?? null });
+  if (checkedSelection && current.authentication === 'needsAuthentication') {
+    if (configuration.credential === 'environment') return { required: true, action: 'configureCredential', next: 'Configure the authorized POSTMAN_API_KEY through the harness/CI secret facility. Do not paste it into project records or command arguments. Run postman check afterwards.' };
+    return { required: true, action: 'login', executable: selectedCommand(root, 'postman'), args: ['login', ...(configuration.region === 'eu' ? ['--region', 'eu'] : [])], next: 'Complete browser sign-in interactively using this selected executable, then run postman check. This helper does not start login or create an account.' };
+  }
+  if (checkedSelection && current.authentication === 'denied') return { required: null, action: 'resolveIdentity', next: 'The observed CLI account differs from the selected identity or is not eligible. Confirm account selection, then run postman check; do not switch accounts or sign in automatically.' };
+  return { required: null, action: 'check', next: 'Run postman check for the selected account, region and credential source. Changed, stale, unavailable or unsupported verification does not establish a need to sign in. Resolve the reported capability gap first.' };
 }
 export interface RunRequest {
   id: string; source: string; authorizationReference: string;
@@ -158,7 +209,7 @@ export async function runCollection(root: string, request: RunRequest, runner: R
     if (request.collection.kind === 'cloud') required.push(`collection:${request.collection.reference}`);
     if (request.environment?.kind === 'cloud') required.push(`environment:${request.environment.reference}`);
   }
-  const issues = readinessIssues(root, record, required); if (issues.length) throw new Error(issues.join('; '));
+  const issues = capabilityIssues(root, record, required); if (issues.length) throw new Error(issues.join('; '));
   const command = selectedCommand(root, 'postman', false);
   const work = privatePath(root, `.local/postman/work/${request.id}`); mkdirSync(work, { recursive: true });
   const reportFile = resolve(work, 'raw-report.json'), configuration = settings(root);
