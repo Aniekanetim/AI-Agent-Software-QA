@@ -56,6 +56,14 @@ test('a version scan cannot refresh old browser or API operation evidence', asyn
   assert(!registry.status(f.root, 'postman', ['localCollectionRun']).reusable);
 });
 
+test('npm .bin discovery selects the package entry with its browser-engine context before shell shims', () => {
+  const f = fixture(), bin = resolve(f.root, 'node_modules/.bin'); mkdirSync(bin, { recursive: true });
+  put(f.root, 'node_modules/@playwright/cli/package.json', { name: '@playwright/cli', version: '0.1.22', bin: { 'playwright-cli': 'entry.cjs' } });
+  put(f.root, 'node_modules/@playwright/cli/entry.cjs', '// Synthetic CLI entry'); put(f.root, 'node_modules/.bin/playwright-cli', '#!/bin/sh\nexit 99');
+  const choices = registry.candidates(f.root, 'playwrightCli', bin);
+  assert.equal(choices[0]?.packageRoot, resolve(f.root, 'node_modules/@playwright/cli')); assert.equal(choices[0]?.executable, process.execPath);
+});
+
 test('a harness denial preserves the installed selection without falling back or reinstalling', async () => {
   const f = await prepared(); let calls = 0;
   const denied: registry.Runner = async () => { calls++; return { code: null, stdout: '', stderr: '', error: 'denied' }; };

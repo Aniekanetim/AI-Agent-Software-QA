@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, realpathSync, statSync, mkdirSync } from 'node:fs';
-import { resolve, dirname, delimiter, isAbsolute } from 'node:path';
+import { resolve, dirname, delimiter, isAbsolute, basename } from 'node:path';
 import { createRequire } from 'node:module';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -56,16 +56,16 @@ export function candidates(root: string, tool: NativeTool, searchPath = process.
   if (tool === 'playwrightLibrary' || tool === 'playwrightTest') { const item = packageCommand(root, tool); return item ? [item] : []; }
   for (const dir of searchPath.split(delimiter).filter(Boolean)) {
     const folder = resolve(dir.replace(/^"|"$/g, ''));
-    for (const suffix of process.platform === 'win32' ? ['.exe', ''] : ['']) {
-      const file = resolve(folder, definition.name + suffix);
-      if (existsSync(file)) { try { result.push(makeCommand(file, [], 'path')); } catch { /* A directory or shell wrapper is not a callable native tool. */ } }
-    }
-    if (definition.packageName) for (const base of [folder, resolve(folder, '..', 'lib')]) {
+    if (definition.packageName) for (const base of [folder, resolve(folder, '..', 'lib'), ...(basename(folder) === '.bin' ? [resolve(folder, '..', '..')] : [])]) {
       const manifest = resolve(base, 'node_modules', definition.packageName, 'package.json');
       if (existsSync(manifest)) {
         // Standard npm shims resolve to the actual package entry; never execute shell text.
         const command = packageCommand(base, tool, 'path'); if (command) result.push(command);
       }
+    }
+    for (const suffix of process.platform === 'win32' ? ['.exe', ''] : ['']) {
+      const file = resolve(folder, definition.name + suffix);
+      if (existsSync(file)) { try { result.push(makeCommand(file, [], 'path')); } catch { /* A directory or shell wrapper is not a callable native tool. */ } }
     }
   }
   if (tool === 'github') { try { const file = localGh(root); if (existsSync(file)) result.push(makeCommand(file, [], 'bundled')); } catch { /* Optional platform installer. */ } }
