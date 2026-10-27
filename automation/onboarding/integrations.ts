@@ -6,7 +6,7 @@ import { readConnections } from '../email/email.js';
 import { validateSettings } from '../github/github.js';
 import { readHarness, currentHarness, type ExecutionContext } from '../tools/runtime.js';
 import { readRecord, readinessIssues } from '../tools/registry.js';
-import { settings as postmanSettings } from '../postman/postman.js';
+import { settings as postmanSettings, capabilityIssues as postmanCapabilityIssues } from '../postman/postman.js';
 
 /** Revalidates configured capabilities; absence is not silently converted into a configured service. */
 export function integrationIssues(root: string): string[] {
@@ -66,7 +66,7 @@ export function integrationIssues(root: string): string[] {
   const postman = postmanSettings(root);
   if (postman && readHarness(root)) {
     const required = ['version', 'collectionRun', ...(postman.mode === 'local' ? ['localCollectionRun'] : ['identity', ...postman.collections.map(id => `collection:${id}`), ...postman.environments.map(id => `environment:${id}`)])];
-    issues.push(...readinessIssues(root, readRecord(root, 'postman'), required).map(i => `Postman: ${i}`));
+    issues.push(...postmanCapabilityIssues(root, readRecord(root, 'postman'), required, postman).map(i => `Postman: ${i}`));
   }
   return issues;
 }

@@ -9,6 +9,7 @@ import * as registry from '../tools/registry.js';
 import * as postman from '../postman/postman.js';
 import { selectBinding, readConnections, type Binding, type Inventory } from '../email/email.js';
 import { packageHarness } from './context.js';
+import { integrationIssues } from '../onboarding/integrations.js';
 
 function fixture() {
   const root = resolve('output/toolchain-fixtures', randomUUID()); mkdirSync(root, { recursive: true });
@@ -193,8 +194,95 @@ test('older identity commands require targeted access work, not installation', a
   put(f.root, postman.settingsPath, { schemaVersion: 1, mode: 'cloud', reporting: 'cloudAllowed', region: 'us', credential: 'session', accountId: 'selected-account', collections: [], environments: [], source: 'Synthetic cloud choice' });
   const old: registry.Runner = async (command, args) => args[0] === 'whoami' ? { code: 1, stdout: '', stderr: 'Unsupported command' } : fakeRunner()(command, args);
   const record = await postman.inspect(f.root, 'Synthetic older CLI', old);
-  assert.equal(record.accessible, true); assert.equal(record.capabilities.identity?.status, 'unsupported'); assert.equal(postman.loginInstructions(f.root).required, true);
+  assert.equal(record.accessible, true); assert.equal(record.capabilities.identity?.status, 'unsupported'); assert.equal(postman.loginInstructions(f.root).required, null);
+  assert(!Object.hasOwn(postman.loginInstructions(f.root), 'args'));
   assert.equal(registry.selectedCommand(f.root, 'postman').stamp, f.command.stamp);
+});
+
+function cloudSettings(accountId = 'selected-account'): postman.PostmanSettings {
+  return { schemaVersion: 1, mode: 'cloud', reporting: 'cloudAllowed', region: 'us', credential: 'session', accountId, collections: ['shared-collection'], environments: ['shared-environment'], source: 'Synthetic cloud selection' };
+}
+const postmanIssues = (root: string) => integrationIssues(root).filter(issue => issue.startsWith('Postman:'));
+
+test('switching Postman accounts invalidates onboarding and login reuse until the new identity is verified', async () => {
+  const f = await prepared(), configuration = cloudSettings(); put(f.root, postman.settingsPath, configuration);
+  put(f.root, '.local/unrelated-answer.json', { answer: 'Keep the previous onboarding answer' });
+  const answer = store.revision(f.root, '.local/unrelated-answer.json'), selection = store.revision(f.root, '.local/tool-selections.json');
+  await postman.inspect(f.root, 'Synthetic verified original account', fakeRunner());
+  assert.deepEqual(postmanIssues(f.root), []); assert.equal(postman.loginInstructions(f.root).required, false);
+  put(f.root, postman.settingsPath, { ...configuration, accountId: 'other-account' });
+  assert(postmanIssues(f.root).some(issue => /identity|account/i.test(issue)));
+  assert.equal(postman.status(f.root, ['collection:shared-collection']).reusable, false);
+  assert.equal(postman.status(f.root, ['version']).reusable, true);
+  const pending = postman.loginInstructions(f.root); assert.equal(pending.required, null); assert(!Object.hasOwn(pending, 'args'));
+  assert.equal(registry.readRecord(f.root, 'postman')?.account, 'selected-account');
+  const wrong = await postman.inspect(f.root, 'Synthetic current CLI still on old account', fakeRunner());
+  assert.equal(wrong.authentication, 'denied'); assert.equal(postman.loginInstructions(f.root).required, null);
+  const other: registry.Runner = async (command, args, options) => args[0] === 'whoami' && !args.includes('--help') ? { code: 0, stdout: '{"user":{"id":"other-account"}}', stderr: '' } : fakeRunner()(command, args, options);
+  await postman.inspect(f.root, 'Synthetic correct new account and resources', other);
+  assert.deepEqual(postmanIssues(f.root), []); assert.equal(postman.loginInstructions(f.root).required, false);
+  assert.equal(postman.status(f.root, ['collection:shared-collection']).reusable, true);
+  assert.equal(store.revision(f.root, '.local/unrelated-answer.json'), answer); assert.equal(store.revision(f.root, '.local/tool-selections.json'), selection);
+});
+
+for (const change of [{ region: 'eu' as const }, { credential: 'environment' as const }]) test(`Postman ${Object.keys(change)[0]} changes require a targeted check without assuming login is needed`, async () => {
+  const f = await prepared(), configuration = cloudSettings(); put(f.root, postman.settingsPath, configuration);
+  await postman.inspect(f.root, 'Synthetic original verification', fakeRunner());
+  put(f.root, postman.settingsPath, { ...configuration, ...change });
+  assert(postmanIssues(f.root).length > 0);
+  const pending = postman.loginInstructions(f.root); assert.equal(pending.required, null); assert(!Object.hasOwn(pending, 'args'));
+  assert.equal(registry.selectedCommand(f.root, 'postman').stamp, f.command.stamp);
+});
+
+test('resource access from a previous Postman account cannot pass onboarding after identity alone is reverified', async () => {
+  const f = await prepared(), configuration = cloudSettings(); put(f.root, postman.settingsPath, configuration);
+  await postman.inspect(f.root, 'Synthetic account A with shared resources', fakeRunner());
+  put(f.root, postman.settingsPath, { ...configuration, accountId: 'other-account', collections: [], environments: [] });
+  const other: registry.Runner = async (command, args, options) => args[0] === 'whoami' && !args.includes('--help') ? { code: 0, stdout: '{"user":{"id":"other-account"}}', stderr: '' } : fakeRunner()(command, args, options);
+  await postman.inspect(f.root, 'Synthetic account B identity only', other);
+  put(f.root, postman.settingsPath, { ...configuration, accountId: 'other-account' });
+  const issues = postmanIssues(f.root);
+  assert(issues.some(issue => issue.includes('collection:shared-collection'))); assert(issues.some(issue => issue.includes('environment:shared-environment')));
+  assert.equal(postman.loginInstructions(f.root).required, false);
+  await postman.inspect(f.root, 'Synthetic account B shared resource access', other); assert.deepEqual(postmanIssues(f.root), []);
+  put(f.root, postman.settingsPath, { ...configuration, accountId: 'other-account', source: 'Synthetic updated explanation only' });
+  assert.deepEqual(postmanIssues(f.root), []); assert.equal(postman.loginInstructions(f.root).required, false);
+});
+
+test('local Postman checks do not certify cloud identity and confirmed expired authentication gives login guidance', async () => {
+  const f = await prepared(), configuration = cloudSettings(); put(f.root, postman.settingsPath, configuration);
+  await postman.inspect(f.root, 'Synthetic cloud verification', fakeRunner());
+  await postman.inspect(f.root, 'Synthetic local-only verification', fakeRunner(), 'local');
+  assert(postmanIssues(f.root).length > 0); assert.equal(postman.loginInstructions(f.root).required, null);
+  put(f.root, postman.settingsPath, { ...configuration, mode: 'local', reporting: 'localOnly', collections: [], environments: [] });
+  assert.equal(postman.status(f.root, ['identity']).reusable, false); assert.equal(postman.loginInstructions(f.root).required, false);
+  put(f.root, postman.settingsPath, configuration);
+  const expired: registry.Runner = async (command, args, options) => args[0] === 'whoami' && !args.includes('--help') ? { code: 1, stdout: '', stderr: 'Synthetic session expired' } : fakeRunner()(command, args, options);
+  await postman.inspect(f.root, 'Synthetic expired session check', expired);
+  assert.equal(postman.loginInstructions(f.root).required, true);
+  put(f.root, postman.settingsPath, { ...configuration, region: 'eu' });
+  assert.equal(postman.loginInstructions(f.root).required, null);
+});
+
+test('unknown identity responses and harness-denied identity checks do not trigger Postman login', async () => {
+  const f = await prepared(); put(f.root, postman.settingsPath, cloudSettings());
+  for (const result of [{ code: 0, stdout: '{"unexpected":"identity format"}', stderr: '' }, { code: null, stdout: '', stderr: '', error: 'denied' as const }, { code: 1, stdout: '', stderr: 'Synthetic network connection failed' }]) {
+    const runner: registry.Runner = async (command, args, options) => args[0] === 'whoami' && !args.includes('--help') ? result : fakeRunner()(command, args, options);
+    const record = await postman.inspect(f.root, 'Synthetic unavailable identity', runner);
+    assert.equal(record.authentication, 'unverified'); assert(postmanIssues(f.root).length > 0);
+    const guidance = postman.loginInstructions(f.root); assert.equal(guidance.required, null); assert.equal(guidance.action, 'check'); assert(!Object.hasOwn(guidance, 'args'));
+  }
+});
+
+test('legacy Postman resource evidence needs only a resource refresh while matching identity remains reusable', async () => {
+  const f = await prepared(); put(f.root, postman.settingsPath, cloudSettings());
+  const record = await postman.inspect(f.root, 'Synthetic original verification', fakeRunner());
+  const operation = 'collection:shared-collection', ref = record.capabilities[operation]!.evidence[0]!;
+  const receipt = JSON.parse(readFileSync(store.contained(f.root, ref.path), 'utf8')); delete receipt.region; delete receipt.credential;
+  record.capabilities[operation]!.evidence = [put(f.root, ref.path, receipt)]; registry.saveRecord(f.root, record);
+  assert.deepEqual(postmanIssues(f.root), [`Postman: ${operation}: verify access for the selected account, region and credential source.`]);
+  assert.equal(postman.loginInstructions(f.root).action, 'reuse');
+  await postman.inspect(f.root, 'Synthetic targeted resource refresh', fakeRunner()); assert.deepEqual(postmanIssues(f.root), []);
 });
 
 test('reselecting the same mailbox preserves its existing access evidence', () => {

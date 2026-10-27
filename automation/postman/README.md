@@ -46,9 +46,17 @@ npm run qa -- postman check --source actual-access-check-reference
 npm run qa -- postman login-instructions
 ```
 
-The latter returns the selected executable and browser-login arguments only when needed. The agent guides the user through interactive login, then checks again. It never automatically registers accounts, creates guest workspaces or logs out an existing session. CI uses authorized secret references. Current identity verification uses `whoami --json`; an older CLI without this capability needs a documented compatible check before cloud execution. Unrecognized identity responses remain unverified. A Postman desktop/MCP connection does not establish CLI authentication.
+The latter reports whether authentication is known to be required and identifies the next action:
 
-Resource selection and identity are distinct. After verifying identity, the check verifies read access to each selected cloud collection/environment through nonmutating CLI get commands. Resource content is discarded; only nonsecret access evidence is retained. A permission/command-compatibility failure reopens that resource capability without requesting a new installation or login. Access is checked again before a cloud run because permissions can change.
+| `required` | Action |
+| --- | --- |
+| `false` | Local files need no login, or the selected cloud identity has current matching verification. |
+| `null` | Verification is missing, stale or for different settings, or identity cannot be established. Follow `action` and `next`; do not assume login is needed. |
+| `true` | A current check of the selected settings found missing/expired authentication. Use the supplied browser-login arguments, or configure the selected environment credential through the secret facility. |
+
+Changing the account, region or credential source reopens the affected identity/resource checks immediately. Run `postman check` before proposing sign-in: the desired account may already be connected. A confirmed account mismatch asks the user to resolve the selection; an unsupported/denied command remains a capability gap. Neither automatically requests login. The agent guides necessary interactive login, then checks again. It never automatically registers accounts, creates guest workspaces or logs out an existing session. CI uses authorized secret references. Current identity verification uses `whoami --json`; an older CLI without this capability needs a documented compatible check before cloud execution. Unrecognized identity responses remain unverified. A Postman desktop/MCP connection does not establish CLI authentication.
+
+Resource selection and identity are distinct. After verifying identity, the check verifies read access to each selected cloud collection/environment through nonmutating CLI get commands. Resource content is discarded; only nonsecret access evidence is retained. Both onboarding and execution match that evidence to the selected account, region and credential source. Adding a resource requires its access check without discarding a valid identity check; changing only the settings explanation does not invalidate access. Version 1.4.0 resource receipts without the full binding need one targeted refresh. Existing answers, selections and historical runs remain intact. A permission/command-compatibility failure reopens that resource capability without requesting a new installation or login. Access is checked again before a cloud run because permissions can change.
 
 ## Execute an authorized collection
 

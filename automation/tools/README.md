@@ -34,6 +34,8 @@ npm run qa -- tools status --tool postman --requires version,collectionRun,local
 
 Native tool IDs are `playwrightCli`, `playwrightMcp`, `playwrightLibrary`, `playwrightTest`, `github` and `postman`. Scan checks versions without installing anything, signing in or running product tests. Version compatibility is preliminary; operation-specific checks establish readiness.
 
+For Postman, `tools status --tool postman --requires identity` or a selected `collection:<id>` / `environment:<id>` also checks the current account, region and credential binding. A version-only status remains an installation check and does not establish cloud readiness.
+
 The resolver preserves an existing selection, otherwise searches PATH and standard npm package locations before using bundled dependencies or the project-local GitHub CLI. Library/Test retain the suite's project dependencies. Existing installations are not upgraded, removed or replaced automatically. A selected executable that fails remains selected until the relevant choice is explicitly changed.
 
 For an explicit path, use `tools select --input .local/tool-choice.json`:
