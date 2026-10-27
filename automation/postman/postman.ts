@@ -39,7 +39,8 @@ export async function inspect(root: string, source: string, runner: Runner = run
   try { env = configuration?.mode === 'cloud' ? cloudEnvironment(configuration) : localEnvironment(root); }
   catch { record.authentication = 'needsAuthentication'; record.capabilities.identity = { status: 'unverified', evidence: [] }; record.diagnostic = 'The selected environment credential is missing or empty. Supply it through the harness secret facility; do not repeat installation.'; saveRecord(root, record); return record; }
   const help = await runner(record.command, ['collection', 'run', '--help'], { cwd: root, env });
-  const flags = { collectionRun: help.code === 0 && /--reporters\b/.test(help.stdout), localJsonReport: /--reporter-json-export\b/.test(help.stdout) || /--reporters\b/.test(help.stdout), noReportEvents: /--(?:no-)?report-events\b/.test(help.stdout), fileBoundary: /--no-insecure-file-read\b/.test(help.stdout) };
+  const helpText = (help.stdout + '\n' + help.stderr).replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '');
+  const flags = { collectionRun: help.code === 0 && /--reporters\b/.test(helpText), localJsonReport: /--reporter-json-export\b/.test(helpText) || /--reporters\b/.test(helpText), noReportEvents: /--(?:no-)?report-events\b/.test(helpText), fileBoundary: /--no-insecure-file-read\b/.test(helpText) };
   const file = `.local/postman/capabilities-${harnessKey(record.harness)}.json`;
   save(root, file, { version: record.version, flags, harness: record.harness, source, checkedAt: new Date().toISOString() }, revision(root, file));
   for (const [name, supported] of Object.entries(flags)) record.capabilities[name] = { status: help.code !== 0 ? (help.error === 'denied' ? 'denied' : 'unverified') : supported ? 'verified' : 'unsupported', evidence: supported && help.code === 0 ? [evidence(root, file)] : [] };
