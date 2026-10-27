@@ -10,8 +10,9 @@ This context contains what the agent has learned from authorized discovery. It h
 | [Product](product/README.md) | Feature maps, journeys, states, permissions and candidate expectations |
 | [Design](design/README.md) | Implemented screen/interaction inventory and links to relevant supplied designs |
 | [Technical](technical/README.md) | Observed routes/interfaces, data meanings, available version information and access/setup observations |
+| [Decisions](decisions/README.md) | Supplied decision statements, inferred rationale, discrepancies and unresolved owner questions |
 
-Create only files needed by actual learning. Use descriptive names and stable OBS IDs; choose the next unused OBS number across all four domains and retain it through moves. Search existing entries before adding a claim. Update the relevant domain index when adding/moving knowledge files; link cross-cutting entries rather than copying them. Keep complete PRDs, BRDs, accepted AC IDs and owner decisions in the human context or its linked canonical sources.
+Create only files needed by actual learning. Use descriptive names and stable OBS IDs; choose the next unused OBS number across all five domains and retain it through moves. Search existing entries before adding a claim. Update the relevant domain index when adding/moving knowledge files; link cross-cutting entries rather than copying them. Keep complete PRDs, BRDs, accepted AC IDs and owner decisions in the human context or its linked canonical sources.
 
 ## Knowledge-entry format
 

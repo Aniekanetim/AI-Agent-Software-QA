@@ -26,6 +26,8 @@ Keep the source template unconfigured. A project's active tickets, requirements,
 
 Follow [SETUP.md](../SETUP.md). Identify the learning/testing objective, actual owners, target, source/build identity where exposed, available requirements/designs, roles and access/data limits. Humans maintain root Project Context; agents read it and propose changes, while maintaining their discoveries in `Product Discovery/Project Context/`. Do not fill missing intent from the current application response. Record both stores' relevant versions separately from the served identity.
 
+Run [guided onboarding](../Onboarding/onboarding-workflow.md) before assigned work: inspect existing setup, show the roadmap and ask one focused missing decision at a time. Establish all five context domains through provide/discover/combined routes. Select browser/visibility, actual provider/account/mailbox and optional GitHub repositories. Install the pinned helpers with `npm ci --ignore-scripts --cache .local/npm-cache`; verify actual tool/access capabilities. No testing-category selection is required: each ticket determines coverage. Preserve private progress under ignored `.local/`, actual sources and recoverable saves. [Settings](../Onboarding/settings.md) remain available later.
+
 For learning, create a real discovery request using its template. Explain questions/actions, reasons, expected knowledge, limits and exact next authorization; then explore within recorded scope. A hosted URL needs no local application checkout. Use authorized accounts/registration or human-assisted sign-in, excluding secrets/session state from Git. Record gaps on the originating request or existing linked QA question. Human owners publish accepted baseline changes; discovery completion is not a test pass.
 
 Create a real build/feature ticket in Ready for QA only from the user's testing request. Preserve the five status folders and unique ticket IDs. Do not populate queues with example incidents, previous project results or template files. The board supplies the next work; the workflow determines how it is performed and reviewed.
@@ -43,6 +45,8 @@ At G5, prepare release notes, completion/exit-criteria evidence, a scoped sign-o
 ## 5. Arrange optional check-ins
 
 Use [manual QA check-ins or native scheduling setup](../automation/README.md) when requested. The five-folder board and QA gates apply independently of the scheduler. Discovery remains explicitly request-driven, with no schedule activated by this package. Do not expand a QA-board check-in into discovery polling or a crawl without separate authorization.
+
+Configured [GitHub PR intake](../automation/github/README.md) can create linked assignments. Matching automatic regression requires an actual reviewed policy for the exact scope; settings do not manufacture permission. Preserve tested-head/build identity, deduplication, findings decisions and final handoff. The inactive CI example requires project-specific configuration; it is not an already running service.
 
 Do not claim background monitoring merely because the repository was cloned. Record the actual project root, owning agent/chat, cadence, timezone and activation state. Recheck local paths, tools, ownership and source/build identity when moving machines; follow [portability instructions](portability.md).
 

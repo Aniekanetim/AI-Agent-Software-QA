@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "host": "github.com",
+  "account": "REPLACE_WITH_SELECTED_VERIFIED_ACCOUNT",
+  "source": "REPLACE_WITH_ACTUAL_REPOSITORY_SELECTION_REFERENCE",
+  "repositories": [
+    {
+      "repository": "YOUR_ORGANIZATION/YOUR_REPOSITORY",
+      "branches": ["main"],
+      "labels": ["qa-ready"],
+      "includeDrafts": false,
+      "reporting": "localOnly"
+    }
+  ]
+}

@@ -1,6 +1,26 @@
 # Package notes
 
-**Version:** 1.2.0. **Created:** 22 October 2026. **Updated:** 23 October 2026. **State:** reusable workflow package; no configured product, live discovery or QA execution history.
+**Version:** 1.3.0. **Created:** 22 October 2026. **Updated:** 27 October 2026. **State:** reusable workflow package; no configured product, live discovery or QA execution history.
+
+## Version 1.3.0: guided onboarding and task-driven integrations
+
+Added resumable [onboarding](../Onboarding/README.md), a focused five-domain context interview, shared settings navigation, revision-checked response persistence/recovery and scoped readiness/handoff. The agent reuses supplied information; tasks determine QA coverage rather than an onboarding category menu. The five-folder board, independent Product Discovery, human baseline and AI knowledge store remain separate.
+
+The pinned Node.js toolchain includes Playwright library/Test 1.64.1, CLI 0.1.22 and MCP 0.0.83, MCP SDK 1.32.2 and HTML email parsing. Browser setup handles the different engine revisions required by those components. Native MCP/in-app connection readiness is separate from a local server rehearsal. The optional GitHub CLI installer pins official v2.102.0 assets and validates their published archive checksums. No installed binaries or credentials are distributed.
+
+Email setup explicitly discovers providers/accounts, presents Gmail/Workspace first, selects an actual mailbox/environment and verifies listing versus full-message access. AgentMail REST, optional direct Gmail token transport and a host-connector bridge support correlated OTP/link retrieval, redacted receipts and separate application-outcome evidence. Host OAuth connections and direct token refresh remain with the actual provider/host; the package is not a credential vault. Sending and cleanup are not enabled by onboarding.
+
+GitHub intake creates deduplicated linked assignments. Regression policy approval binds exact scope/content; PR head, actual served commit/build, suite evidence and run key stay distinct. Running/uncertain executions, dispatches and comments are retained rather than blindly repeated. A process exit is not a product verdict. An inactive adoption example supports reviewed PR-based CI; the portable repo's own CI only tests helpers and a synthetic loopback fixture.
+
+Operational state stays ignored under `.local/`. A v1.2 copy has no runtime schema to migrate: inspect/preserve its documents and introduce onboarding deliberately. Unknown/corrupt runtime schemas are preserved for explicit migration. Moving machines requires installation and fresh access/context checks; it does not transfer authentication, schedule activation or approval scope.
+
+## Version 1.3.0 validation and limits
+
+Implementation validation uses synthetic isolated fixtures and mocked mail/GitHub responses; those records are ignored and are not live tasks, user approvals or product results. Type checking and all 22 helper tests pass locally and after `npm ci` in a fresh copy whose path contains spaces. All 201 relative Markdown links/anchors resolve across 47 documents, including after relocation. Five QA status folders and both empty live queues are preserved. Git excludes private state/session/environment paths while intended shared evidence remains visible. Tests cover focused prompts/extra answers, pause/resume, interrupted-save recovery and conflict merging, baseline ownership, settings, evidence readiness, multiple Gmail accounts, metadata-only access failure, HTML messages, pagination, stale/ambiguous/expired verification attempts, changed bindings, PR deduplication/revisions, exact policy/build checks and uncertain-run recovery. The official Windows/macOS archive layouts were inspected; platform layout/checksum selection is covered by helper tests, separately from an actual installed executable launch.
+
+Local browser installation was attempted but this managed execution environment denied child-process creation (`EPERM`). Consequently no successful local browser launch, CLI/MCP browser rehearsal, native host connection, downloaded GitHub CLI launch or unattended session is claimed. `npm run test:browsers` is provided for actual synthetic rehearsals in a permitted host. The package CI runs those separately from helper tests; inspect its actual run for results. No live Gmail/AgentMail inbox, application login, product test, PR regression, outgoing message or new product schedule was exercised during implementation.
+
+Hash/reference checks cannot prove a human's identity, substantive requirement completeness or truth of an entered observation. Working-contract compliance and actual review/evidence remain necessary. Pattern checks are limited and do not replace evidence redaction. The source payroll projects and their existing automation remain separate from this package.
 
 ## Source and purpose
 

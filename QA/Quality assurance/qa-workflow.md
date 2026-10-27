@@ -44,7 +44,7 @@ Activities can overlap and repeat. For example, a failed readiness check returns
 
 ## Start with the testing request
 
-Establish the testing objective and types. If they are missing, ask: **“What kind of testing are we doing?”** Reuse a stated choice or existing approval.
+Read the task, applicable context, changes and risks. Determine the relevant testing activities and explain the proposed coverage. Ask only about material missing requirements, limits or decisions; do not require the human to select a testing category. [Onboarding](../../Onboarding/README.md) prepares the project, while this task determines the work.
 
 Then identify the product flow, source requirements, target build/environment, data, risks, measurable criteria and operating limits. Consult the context index and record the applicable source revisions. Resolve contradictions before judging behavior; if a necessary answer is missing, record a ticket clarification and waiting checkpoint. Continue independent work only within the existing authorization. Derive expected results from the agreed requirements, independently of the application's current response. After a clarification, preserve the answer/source update and return to the affected gate if scope or criteria changed.
 
@@ -60,6 +60,8 @@ The workflow supports functional and non-functional objectives. API and browser 
 | Security | Authorized checks against the agreed target | Threat/risk focus, permitted actions, data boundaries and stop conditions |
 
 A cycle can combine or change testing types. Preserve its current progress and evidence, revise the affected method/criteria, and return to the affected review point. Supporting a type does not mean executing it automatically.
+
+Configured GitHub intake can supply a linked PR assignment. A reusable regression policy may carry an already reviewed G1/G2 execution scope: read its exact approved content, suite revisions, target, command and limits; verify current eligibility/build and reuse that authorization only while it still matches. Its initial briefing must explain every covered action/pass criterion and rationale. Do not request the same unchanged approval on every run, weaken expectations or infer approval from a configuration file. Material changes return to the affected gate. Actual findings, G3 confirmation and G5 sign-off/handoff remain separate required decisions. [GitHub controls](../../automation/github/README.md)
 
 ## Project review gates
 

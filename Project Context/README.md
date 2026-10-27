@@ -4,6 +4,8 @@ This is the human-maintained product baseline. Business, product, design and tec
 
 The agent's observations and inferences belong in the separate [discovery context](../Product%20Discovery/Project%20Context/README.md). Read relevant sources in both stores. The agent may use discovery knowledge for navigation/setup/investigation but cannot treat the current application response as intended behavior.
 
+[Guided onboarding](../Onboarding/context-interview.md) accounts for business, product, technical, design and decisions using provided sources, authorized discovery or both. An explicitly authorized agent may transcribe an actual human answer into a named baseline document as a separate maintenance action, preserving source/owner/state. Onboarding or exploration alone does not grant that authority or approve the content.
+
 **State:** unconfigured, human-maintained template. No product requirements or owners are established by this package. Human owners populate the baseline from actual sources; agents record missing answers on the originating request/ticket rather than completing these files from inference.
 
 ## Project identity

@@ -8,6 +8,12 @@ Project Context/README.md, Product Discovery/README.md,
 Product Discovery/Project Context/README.md, QA task management Board/README.md and
 QA/Quality assurance/qa-workflow.md from this QA root.
 Use this AI-led, human-reviewed workflow for the named project.
+Start Onboarding/onboarding-workflow.md. Inspect preparation, present its roadmap,
+ask one focused missing decision at a time, save clear extra answers and preserve
+pause/resume/settings/recovery. Let me provide context, choose discovery or combine
+both; account for all five domains without inventing knowledge. Offer the bundled
+browser methods/visibility, GitHub and provider/account/mailbox choices. Verify
+actual access separately from saved preferences. Keep private state ignored.
 Inspect actual setup and the supplied learning/testing objective. Read relevant
 sources in both contexts. Humans maintain root Project Context; the agent maintains
 Product Discovery/Project Context. Do not edit the human baseline during execution.
@@ -18,8 +24,9 @@ keep credentials/session state out of committed records. Separate observations
 from inference; missing intent is not a confirmed product failure.
 For a testing objective only, inspect Ready for QA/Retest and follow QA below.
 Identify missing target, objective, requirements, owners or tool access without
-inventing them. Ask the testing type only for a QA objective when it is missing;
-do not ask for a testing type or require test criteria for a discovery-only request.
+inventing them. Each task determines the relevant testing activities from its
+requirements, changes and risks; do not require a testing-category selection.
+Discovery-only requests retain learning criteria rather than product test verdicts.
 For ticket-specific gaps, comment on that existing ticket and expose the developer
 question through the board index. Discovery-origin questions stay on their request
 and discovery index. Link existing conversations instead of repeating them. Propose
@@ -38,4 +45,7 @@ separate; record Unknown when the target does not expose its version.
 An empty QA board does not start discovery. Resume only explicit eligible work;
 otherwise report readiness without inventing work or changing files.
 Do not activate a schedule unless I request one with the relevant project/cadence.
+Configured PR intake creates linked work without authorizing tests. Reuse only an
+actual matching reviewed regression policy; material changes return to the gate.
+Preserve actual findings review and sign-off. Never copy approvals from the master.
 ```

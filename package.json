@@ -1,0 +1,33 @@
+{
+  "name": "ai-agent-software-qa",
+  "version": "1.3.0",
+  "private": true,
+  "type": "module",
+  "description": "Task-driven AI QA with guided onboarding, discovery, browser, email and GitHub integrations.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "build": "tsc",
+    "test": "npm run build --silent && node .local/build/automation/tests/all.test.js",
+    "test:browsers": "npm run build --silent && node .local/build/automation/tests/browsers.js",
+    "qa": "npm run build --silent && node .local/build/automation/cli.js",
+    "browser:check": "npm run qa -- browser check",
+    "onboarding:status": "npm run qa -- onboarding status",
+    "settings": "npm run qa -- settings open"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@playwright/cli": "0.1.22",
+    "@playwright/mcp": "0.0.83",
+    "@playwright/test": "1.64.1",
+    "parse5": "8.0.1",
+    "playwright": "1.64.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "typescript": "7.0.2"
+  }
+}

@@ -16,7 +16,7 @@ None recorded. Link dated decisions/reviews and execution records when they actu
 
 ## Blockers and next action
 
-Complete [SETUP.md](SETUP.md), identify the learning/testing objective and establish its target/access. Keep questions on the originating discovery request or QA ticket and use that pipeline's index. Propose human-baseline changes to their owner. Missing intent blocks dependent judgments, not independent authorized observation. Do not repeat unanswered questions or decisions already supplied within the applicable scope.
+Complete [guided onboarding](Onboarding/README.md) through [SETUP.md](SETUP.md). Establish initial context through provide/discover/combined, actual tools/access/mailbox choices and operating preferences. No adopting-project preparation has occurred in this master. Version 1.3.0 package validation is recorded in [package notes](docs/package-notes.md), separately from product outcomes. Tasks later determine testing coverage. Keep questions on their original onboarding decision, discovery request or QA ticket; cross-link rather than repeat them. Missing intent blocks dependent judgments, not independent authorized observation.
 
 ## Continuity after interruption or transfer
 

@@ -1,5 +1,6 @@
 # Tool caches and disposable diagnostics, not authoritative QA evidence.
 output/
+.local/
 mental_model/
 **/node_modules/
 **/.env

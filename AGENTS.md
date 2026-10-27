@@ -1,5 +1,17 @@
 # Working contract
 
+## Onboard before assigned work
+
+For new adoption, read [guided onboarding](Onboarding/onboarding-workflow.md), inspect existing preparation and show its roadmap. Prepare project/context/access/tools/operating preferences rather than asking the user to select a testing category. Use one focused missing question at a time across onboarding, authentication, mail selection and settings; retain clear extra answers, actual prompt/response references and interrupted-save recovery. Do not pretend helper JSON was displayed to a human. Respect pause/resume, Back, Cancel and Close settings.
+
+Establish all five context domains through provide/discover/combined routes. Discovery remains independent. Human-source transcription into named baseline documents needs explicit maintenance authorization; observations remain in the AI store. Never treat an empty template or inferred behavior as an approved requirement.
+
+Offer in-app browser, Playwright CLI, Playwright MCP or an evidence-based recommendation; library/Test stay available for scripted suites. Record actual method/visibility/context and capability evidence. Separate a local MCP server rehearsal from connection to the current host. Recheck sessions/access; tool installation and saved choices are not operational readiness.
+
+Discover provider/account metadata through actual host integrations, including its integration directory if Gmail is not exposed initially. Present Gmail/Workspace prominently and let the user select the actual account/mailbox; reuse a valid selection. AgentMail, other providers, human assistance and later setup remain choices. Do not open message bodies merely to identify accounts. Bind scope/environment, verify required content access, correlate OTP/link attempts and retain redacted evidence without secrets. Outbound mail/cleanup needs its own authorization.
+
+Select actual GitHub repositories and verify identity/access. Polling or event intake identifies assignments; it does not authorize execution. A reusable regression policy requires the full informed briefing and actual approval for its exact command/suite/target/reporting scope. Match fresh PR identity to actual tested build, deduplicate unchanged revisions and preserve uncertainty. Retain G3 findings and G5 sign-off decisions. A preference is not an active connection/schedule/trigger. Keep the master unconfigured; see [automation](automation/README.md).
+
 ## Choose the pipeline and preserve context ownership
 
 Requests identify what to do; execution procedures identify how. Use [Product Discovery](Product%20Discovery/README.md) and its [workflow](Product%20Discovery/discovery-workflow.md) for learning objectives. Use the existing five-folder board and QA workflow for testing/defects. Do not force discovery requests through QA statuses or apply QA test/release gates as discovery completion states. An explicit QA ticket can link a discovery request; read both records and retain their separate authorization/checkpoints.
@@ -26,7 +38,7 @@ Read `unified_project_context.md`, `Project Context/README.md`, `Product Discove
 
 The AI agent performs the QA workflow; the human QA engineer reviews and approves its scoped decisions end to end. This applies across functional and non-functional testing types. Adoption of this operating model does not authorize any project test execution.
 
-At a new testing cycle, establish the testing type. If it is missing, ask what kind of testing is being done. Reuse an explicit answer or existing scoped approval; do not ask redundant questions. Then plan the work, analyze requirements and risks, design cases/exploration tasks, and prepare the scripts, data and environment. Derive expected behavior from the agreed test basis, independently of the implementation. The workflow is adaptive: a request can combine or switch testing types without starting an unrelated project. Preserve current progress and evidence; revise only the affected scope/method/criteria and obtain any newly required approval.
+At a new testing cycle, read the task and applicable context, changes and risks, then determine the testing activities and coverage. Ask only for material missing intent, access, limits or decisions; do not routinely ask the human to classify testing. Plan, analyze, design and prepare scripts, data and environment. Derive expected behavior from the agreed test basis independently of the implementation. Activities can combine or change as the task requires. Preserve progress/evidence, revise only affected scope/method/criteria and obtain any newly required approval.
 
 Use the seven testing activities in the workflow: planning, monitoring/control, analysis, design, implementation, execution and completion. Activities are iterative; monitoring/control runs throughout. Test implementation means preparing tests, not changing product code. Follow our G1–G5 review policy: scope/analysis, design/readiness and execution authorization, findings, fix/retest, and completion/handoff.
 

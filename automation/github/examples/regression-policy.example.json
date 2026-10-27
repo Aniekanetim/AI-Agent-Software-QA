@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "REPLACE_WITH_REVIEWED_POLICY_ID",
+  "revision": "REPLACE_WITH_ACTUAL_REVISION",
+  "approval": {
+    "path": "REPLACE_WITH_ACTUAL_APPROVAL_RECORD",
+    "sha256": "REPLACE_WITH_ACTUAL_HASH"
+  },
+  "repositories": [
+    {
+      "repository": "YOUR_ORGANIZATION/YOUR_REPOSITORY",
+      "branches": ["main"],
+      "labels": ["qa-ready"],
+      "includeDrafts": false,
+      "reporting": "localOnly"
+    }
+  ],
+  "allowForks": false,
+  "allowMergeCommit": false,
+  "suiteId": "REPLACE_WITH_REVIEWED_SUITE",
+  "suiteEvidence": [
+    {
+      "path": "REPLACE_WITH_ACTUAL_SUITE_OR_MANIFEST",
+      "sha256": "REPLACE_WITH_ACTUAL_HASH"
+    }
+  ],
+  "command": {
+    "executable": "REPLACE_WITH_TRUSTED_EXECUTABLE",
+    "args": ["REPLACE_WITH_REVIEWED_ARGUMENTS"]
+  },
+  "timeoutMs": 300000,
+  "targetId": "REPLACE_WITH_REVIEWED_TARGET"
+}

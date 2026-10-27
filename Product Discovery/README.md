@@ -4,6 +4,8 @@ Product Discovery builds practical knowledge of an application through authorize
 
 **Package state:** unconfigured. No target, live requests, observations, authorizations or discovery schedule are included.
 
+[Onboarding](../Onboarding/README.md) can request this pipeline when the user chooses discover or combined context establishment. It links the specific missing questions and its own preparation checkpoint; the discovery request still has independent scope/authorization and writes only learned knowledge to its AI context. Completing learning is not onboarding completion, test authorization or a product pass.
+
 ## Two context stores
 
 | Location | Maintainer | Use |

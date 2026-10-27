@@ -8,6 +8,11 @@ Read AGENTS.md, unified_project_context.md, Project Context/README.md,
 Product Discovery/Project Context/README.md,
 QA task management Board/README.md and QA/Quality assurance/qa-workflow.md.
 Inspect Ready for QA and Retest under QA task management Board.
+Read relevant saved project settings/capability evidence. If GitHub PR polling is
+actually configured and authorized, run its intake, deduplicate revisions and then
+inspect the board. Determine testing activities from each task/context/risks rather
+than asking for a routine testing-category selection. Reuse only an actual matching
+reviewed regression policy; preserve all remaining human gates and build checks.
 Follow the board's AI check-in procedure and existing human-reviewed workflow.
 Consult the relevant context sources and record applicable source/design revisions
 and rule/acceptance-criteria IDs, discovery OBS IDs/entry versions and the served
@@ -35,7 +40,7 @@ Do not fix product code, act as a developer or publish externally without the
 applicable authorization. A folder move, fix claim or silence is not approval.
 Avoid duplicate tickets, repeated unchanged execution and repeated unanswered
 questions or approval requests. If no ticket is actionable, leave files unchanged
-and keep the check-in brief. Report meaningful findings, movements or decisions
+and remain quiet unless periodic reports were explicitly requested. Report meaningful findings, movements or decisions
 needed. Update detailed records and shared progress when work materially changes.
 Preserve unrelated local work. If version control/publication is configured and
 authorized, commit only coherent changes for the actionable ticket; do not invent

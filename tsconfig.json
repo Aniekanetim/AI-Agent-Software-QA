@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "target": "ES2022", "module": "NodeNext", "moduleResolution": "NodeNext",
+    "strict": true, "noUncheckedIndexedAccess": true, "esModuleInterop": true,
+    "skipLibCheck": true, "types": ["node"], "rootDir": ".", "outDir": ".local/build",
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["automation/**/*.ts"],
+  "exclude": ["node_modules", ".local", "output", "automation/github/examples"]
+}

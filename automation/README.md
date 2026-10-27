@@ -1,4 +1,10 @@
-# Native board check-ins
+# Tools, intake and check-ins
+
+The runtime helpers support [guided onboarding](../Onboarding/README.md), [browser capabilities](browser/README.md), [email/mailbox verification](email/README.md) and [GitHub intake/regression](github/README.md). Install with `npm ci --ignore-scripts --cache .local/npm-cache`; `npm run qa -- help` lists commands. The agent's actual conversation and human decisions remain essential. Installed tooling, saved preferences and verified access are distinct states.
+
+Choose on-demand, scheduled, event-driven or combined operation during onboarding or settings. Each task determines testing coverage. The five-folder board and G1–G5 remain the work/execution model; discovery remains independent. Matching reviewed regression policy can authorize automatic runs, but neither intake nor a scheduler invents test authority.
+
+## Native board check-ins
 
 **Package state:** not configured. No schedule ID or target chat is included, and packaging this workflow does not create or change an automation.
 
@@ -31,3 +37,11 @@ Developer check-ins remain their own routine against Dev Todo/Rework and the una
 ## Move to another machine
 
 Follow [portability instructions](../docs/portability.md). Verify the new root, target chat and tool access. Do not copy machine-level automation TOML, an old thread ID or credentials to simulate setup. Before arranging replacement ownership, identify any old schedule that could operate on the same project; change or pause it only with the relevant user authorization and record the result.
+
+## GitHub triggers and readiness records
+
+After a repository/PR policy is selected, a native check-in can run `github check-in` and then inspect the existing board; this polls eligible PRs and deduplicates them. A GitHub event can invoke `github event` through a configured runner. CLI availability alone cannot wake the agent. The [inactive CI example](github/examples/qa-regression.example.yml) needs explicit project adoption, trusted QA code, actual target identity and reviewed authorization before enabling.
+
+Store the desired mode/source in `.local/operation-preferences.json`. For scheduled operation, record the actual scheduler id/state/root/source/evidence in `.local/schedule-record.json` after inspecting the real scheduler result. For events, retain triggerReference and triggerEvidence. These are evidence-backed records, not a scheduler implementation. A saved cadence or a dispatched workflow is not proof of completed execution. Verify unattended browser/email capabilities in the actual scheduled context and record first-run observations.
+
+Stay quiet when monitored state is unchanged or nonactionable unless periodic updates were explicitly requested. Report meaningful progress, failures or human decisions needed. No adopting-project schedule, discovery poller or PR-regression trigger is activated in this master; its own package CI only tests helpers and a synthetic fixture.

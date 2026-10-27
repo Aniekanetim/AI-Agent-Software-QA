@@ -22,6 +22,8 @@ Keep a QA-origin question and responses on its original ticket and question inde
 
 The live board starts empty. Existing project evidence remains separate; it is not automatically new queued work. `.gitkeep` files retain empty folders in Git and are not tickets. Templates below are reference material, not queued work.
 
+Configured [GitHub PR intake](../automation/github/README.md) may create linked Ready for QA assignments. It deduplicates repository/PR/head and preserves revision history and current folder. It does not execute tests or change the five statuses. The agent determines coverage from the ticket/context/risks; onboarding does not impose a testing-category choice. Existing reviewed regression policy applies only to matching scope/revision/target; other work follows the usual gates.
+
 ## Create and maintain a ticket
 
 Use a unique ID and a descriptive filename: `QA-001-feature-verification.md` for a testing assignment, or `BUG-001-duplicate-record-on-retry.md` for a bug. Choose the next unused number across all five folders. Preserve the ID and filename through moves. One ticket exists in one folder at a time.

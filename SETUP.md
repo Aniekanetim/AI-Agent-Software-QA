@@ -1,6 +1,6 @@
 # Adopt the workflow for a project
 
-Choose one QA root for each project. All links, discovery records and board folders resolve from that root. The package uses Markdown; execution tools depend on the learning or testing objective. Discovery and QA are separate procedures, connected through explicit requests and two context stores.
+Choose one QA root for each project. All links, discovery records and board folders resolve from that root. Start [guided onboarding](Onboarding/README.md): it prepares context, access and tools; later tasks determine testing coverage. Discovery and QA remain separate procedures connected through explicit requests and two context stores.
 
 When starting from the public repository URL, follow [agent repository adoption](docs/adopt-from-repository.md). Record the workflow source/revision in shared progress, separately from the application target. A fork or template repository can serve directly as the project-specific QA root.
 
@@ -13,6 +13,8 @@ When merging, inspect existing AGENTS.md, records and folder names first. Preser
 In Codex, open the QA root as the primary project directory so its AGENTS.md is discovered. For a local application, provide its folder/setup as needed. For a hosted application, supply its URL and authorized access; an application checkout/start command is optional. [Official project guidance](https://learn.chatgpt.com/docs/projects) explains primary-folder instruction discovery and that conversation sync does not transfer files.
 
 ## 2. Supply the actual project context
+
+Onboarding offers **provide context**, **discover context** or **combine both**, reusing any supplied choice. Account for business, product, technical, design and decisions through sourced knowledge, justified non-applicability or original owner questions. Use the [focused context interview](Onboarding/context-interview.md), not a repetitive questionnaire. Initial context establishment is mandatory; complete product knowledge is not assumed.
 
 Humans maintain [root Project Context](Project%20Context/README.md): identity, business goals, owners, requirements/designs, environments and data limits. Keep acceptance criteria with product requirements and use stable rule/criterion IDs. Agents do not populate these files from exploration or edit them during discovery/testing.
 
@@ -35,7 +37,9 @@ Update [shared progress](unified_project_context.md) with actual setup facts/gap
 
 For discovery, establish browser/network access, authorized journeys/roles/actions, a writable QA root and evidence/data limits. Follow the [authentication/session procedure](Product%20Discovery/discovery-workflow.md#authentication-and-sessions): dedicated accounts, authorized registration or human-assisted sign-in. Credentials/session state stay out of committed records. An unavailable role limits only dependent coverage.
 
-Missing tools are readiness blockers, not product defects. Restore application dependencies only when local execution requires them. This package bundles no runtimes, browsers or connectors.
+Missing tools are readiness blockers, not product defects. Install Node.js 22+, Git and the pinned helpers with `npm ci --ignore-scripts --cache .local/npm-cache`; run `npm run check` and `npm test`. The package includes browser/email/GitHub adapters and reproducible dependencies. Browser binaries and actual host connections require adopting-machine setup. Restore application dependencies only when local execution requires them.
+
+Choose browser interaction/visibility using the [browser guide](automation/browser/README.md). Discover email providers and explicitly select the actual account/mailbox using the [email guide](automation/email/README.md). Prepare selected GitHub repositories through the [GitHub guide](automation/github/README.md). Verify actual required capabilities; configuration, authentication and a successful task-specific run are distinct states. Store operational metadata under ignored `.local/`; never commit credentials, full OTPs or reusable links.
 
 ## 4. Create the appropriate request
 
@@ -55,9 +59,11 @@ For an existing ticket, use its recorded approvals only when the target, criteri
 
 ## 6. Enable optional scheduling
 
-Follow [automation setup](automation/README.md) for requested QA-board check-ins. Select the actual root/chat, cadence and timezone; confirm the saved schedule and first runs. This package activates no automation and does not alter other projects' schedules. Discovery polling needs a separate explicit request; this release does not configure it.
+Follow [automation setup](automation/README.md) for requested QA-board check-ins or PR intake. Select the actual root/chat, cadence/timezone, repositories and reporting permissions; inspect the actual scheduler/trigger result. Reviewed reusable policies can authorize matching regression runs; changed scope returns to the affected gate. This package activates no product automation and does not alter other projects' schedules. Discovery polling needs a separate explicit request.
 
 ## Ready to use
+
+Provide the [onboarding handoff](Onboarding/templates/onboarding-handoff.md) with actual context coverage, capabilities, remaining dependencies, review and first eligible work. `onboarding status` revalidates saved references but cannot judge their substantive accuracy. [Settings](Onboarding/settings.md) remain available; preserve answers and reopen only affected checks.
 
 - The agent can read the working contract, shared progress, both context indexes and the applicable procedure without another chat.
 - Humans maintain the baseline; the agent maintains discoveries. Missing intent remains an explicit gap.

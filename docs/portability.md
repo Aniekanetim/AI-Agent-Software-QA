@@ -24,7 +24,9 @@ On the destination:
 6. Perform a manual board check-in. Review pending claims/owners so two workers do not process the same ticket.
 7. Configure native scheduling for the correct local project/chat only when requested. Coordinate any existing schedule rather than assuming file transfer moved or disabled it.
 
-The portable folder contains workflow instructions and templates. It does not contain runtime installations, browser binaries, machine-level scheduler configuration, connector authentication, employer evidence or chat history.
+The distribution includes workflow instructions/templates, TypeScript helpers and a pinned dependency lockfile. It excludes installed node_modules, downloaded browser/CLI binaries, private state, machine-level scheduler configuration, connector authentication, employer evidence and chat history. On a new machine use `npm ci --ignore-scripts --cache .local/npm-cache`, then reverify the selected tools/access in that execution context. Native MCP/in-app connections and GitHub/email authentication require actual setup there.
+
+Private `.local/` state is not transferred by a Git clone. Back it up only through an appropriate secure project transfer if needed; exclude tokens, browser session state and reusable verification links. Preserve canonical human/AI context separately. Existing machine/root capability records fail revalidation after relocation. Unsupported state schemas are preserved for explicit migration, not reset. [Onboarding state/recovery](../automation/onboarding/README.md)
 
 Discovery requests resume independently of the QA board. No discovery schedule is transferred or activated. Flag affected discoveries for refresh when their source/application conditions change; never automatically rewrite the human baseline from observations.
 
