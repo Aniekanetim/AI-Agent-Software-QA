@@ -52,3 +52,7 @@ Prepare a private BrowserReport matching the [type](tools.ts): schemaVersion 1, 
 ## Scripted testing
 
 Author task-specific suites with [Playwright Test](https://playwright.dev/docs/intro) under the adopting project's reviewed test location. Give expected behavior an independent accepted source. Preserve failures, tested revisions and result artifacts. A snapshot, host walkthrough or successful capability rehearsal cannot be reported as a passing Playwright regression suite.
+
+## Existing setup and calling harness
+
+Use [shared tool discovery](../tools/README.md) before setup. Reuse verified compatible installations, identities and mailbox selections. A version/configuration check does not establish the required operation through this harness. Retain old evidence after moving hosts; reverify only affected capabilities. Missing or expired access does not require reinstalling a working tool.

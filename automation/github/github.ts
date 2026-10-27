@@ -3,13 +3,13 @@ import { promisify } from 'node:util';
 import { readdirSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { localGh } from './install.js';
+import { selectedCommand, runProcess } from '../tools/registry.js';
 import { contained, load, save, revision, replace, digest, requireText, verifyEvidence, withLock, assertNonsecret, type Evidence } from '../shared/store.js';
 
 const exec = promisify(execFile);
 export type GhRunner = (args: string[]) => Promise<string>;
 export const runGh: GhRunner = async args => {
-  let executable = 'gh'; try { const local = localGh(process.cwd()); if (existsSync(local)) executable = local; } catch { /* Other platforms can reuse their verified system installation. */ }
-  try { return (await exec(executable, args, { windowsHide: true, timeout: 30_000, maxBuffer: 8_000_000 })).stdout; }
+  try { const result = await runProcess(selectedCommand(process.cwd(), 'github'), args); if (result.code !== 0) throw new Error(); return result.stdout; }
   catch { throw new Error('GitHub CLI access failed. Check installation, selected host/account and repository permissions; credential output is suppressed.'); }
 };
 export interface RepositoryRule { repository: string; branches: string[]; labels: string[]; includeDrafts: boolean; reporting: 'localOnly' | 'comment'; workflow?: string }

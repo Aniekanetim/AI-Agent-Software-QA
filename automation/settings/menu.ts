@@ -13,6 +13,7 @@ export const areas = [
   { id: 'browser', label: 'Browser and visibility', files: ['.local/browser-preferences.json'], stage: 'tools' },
   { id: 'schedule', label: 'Check-in schedule', files: ['.local/operation-preferences.json'], stage: 'operation' },
   { id: 'reporting', label: 'Reporting and evidence preferences', files: ['.local/reporting-settings.json'], stage: 'operation' },
+  { id: 'postman', label: 'API tools and Postman', files: ['.local/postman-settings.json'], stage: 'tools' },
 ] as const;
 interface Menu { schemaVersion: 1; open: boolean; area: string | null; questionId: string | null; source: string | null }
 const path = '.local/settings-menu.json';
@@ -33,7 +34,7 @@ export function openMenu(root: string, source: string) {
   return showMenu(root);
 }
 export function chooseArea(root: string, selection: string) {
-  if (['close', 'Close settings', '10'].includes(selection)) { closeMenu(root); return showMenu(root); }
+  if (['close', 'Close settings', String(areas.length + 1)].includes(selection)) { closeMenu(root); return showMenu(root); }
   const area = areas.find((a, i) => a.id === selection || a.label === selection || String(i + 1) === selection); if (!area) throw new Error('Choose an actual settings area.');
   withLock(root, 'conversation', () => {
     const current = menuState(root); if (!current.value.open) throw new Error('Open settings only from an actual user request.');

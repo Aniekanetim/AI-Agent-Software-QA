@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { load, save, revision, digest, requireText, withLock, type Evidence, verifyEvidence } from '../shared/store.js';
+import { currentHarness, readHarness } from '../tools/runtime.js';
+import { recordHost } from '../tools/registry.js';
 
 export interface Account { provider: string; accountId: string | null; mailboxId: string; address: string; connectionReference: string; authentication: 'connected' | 'needsAuthentication' | 'denied' | 'unverified' }
 export interface Inventory { schemaVersion: 1; harness: string; executionContext: 'interactive' | 'scheduled'; source: string; providers: { id: string; name: string; available: boolean; connectionReference?: string }[]; accounts: Account[] }
@@ -29,6 +31,8 @@ export function selectBinding(root: string, binding: Binding, inventory: Invento
   if (binding.transport !== 'human' && !inventory.accounts.some(a => a.provider === binding.provider && a.accountId === binding.accountId && a.mailboxId === binding.mailboxId && a.address.toLowerCase() === binding.address.toLowerCase() && a.connectionReference === binding.connectionReference)) throw new Error('The selected mailbox must match actual account metadata; connection availability alone is insufficient.');
   withLock(root, 'email-connections', () => {
     const current = readConnections(root), old = current.value.bindings.find(b => b.id === binding.id);
+    const stable = (b: Binding) => JSON.stringify([b.provider, b.accountId, b.mailboxId, b.address.toLowerCase(), b.connectionReference, b.environment, b.transport, b.scope]);
+    if (old && stable(old) === stable(binding) && old.verification && inventory.accounts.some(a => a.connectionReference === binding.connectionReference && a.mailboxId === binding.mailboxId && a.authentication === 'connected')) return;
     const actual = inventory.accounts.find(a => a.provider === binding.provider && a.mailboxId === binding.mailboxId && a.connectionReference === binding.connectionReference);
     const selected = { ...binding, authentication: actual?.authentication ?? 'unverified' as Account['authentication'], verification: undefined };
     current.value.bindings = [...current.value.bindings.filter(b => b.id !== binding.id), selected];
@@ -48,7 +52,13 @@ export async function verifyBinding(root: string, id: string, adapter: MailAdapt
     const message = await adapter.read(messageId); if (message.id !== messageId || message.mailboxId !== binding.mailboxId || typeof message.text !== 'string') throw new Error('Full-message access was not established.'); bodyReadAt = new Date().toISOString();
   }
   binding.authentication = 'connected'; binding.verification = { context, listedAt: new Date().toISOString(), bodyReadAt, evidence };
-  withLock(root, 'email-connections', () => save(root, connectionsPath, current.value, current.revision)); return binding;
+  withLock(root, 'email-connections', () => save(root, connectionsPath, current.value, current.revision));
+  if (readHarness(root)) {
+    currentHarness(root, context);
+    recordHost(root, { tool: `email:${binding.id}`, source: binding.choiceSource, version: 'provider-managed', available: true, accessible: true, compatible: true, authentication: 'connected', account: binding.address, connectionReference: binding.connectionReference,
+      capabilities: { account: { status: 'verified', evidence }, listMessages: { status: 'verified', evidence }, readMessage: { status: bodyReadAt ? 'verified' : 'unverified', evidence: bodyReadAt ? evidence : [] } } });
+  }
+  return binding;
 }
 export interface VerificationAttempt { schemaVersion: 1; id: string; bindingId: string; bindingDigest: string; recipient: string; sender: string; subjectContains: string; triggerTime: string; expiresAt: string; source: string }
 export function beginVerification(root: string, bindingId: string, recipient: string, sender: string, subjectContains: string, source: string, durationMs = 300_000, now = Date.now()): VerificationAttempt {

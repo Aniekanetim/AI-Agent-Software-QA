@@ -15,6 +15,9 @@ npm run qa -- help
 
 | Private record | Purpose |
 | --- | --- |
+| `.local/harness.json` | Actual calling harness/profile/version, machine/root and interactive/scheduled/ci context; bound through tools bind |
+| `.local/tool-selections.json` | Verified executable selections; use tools commands, not raw conversation writes |
+| `.local/postman-settings.json` | Local/cloud mode, selected account/resources, region, credential source and reporting; no secret values |
 | `.local/project.json` | Name, `environments` array, `owners` array and actual `source`; references to the applicable project sources |
 | `.local/context-settings.json` | `route`: provide/discover/combined, actual `source`, source/request references |
 | `.local/browser-preferences.json` | method: cli/mcp/inApp/recommend; visibility: headed/headless; fallback: cli/mcp/null; actual source |

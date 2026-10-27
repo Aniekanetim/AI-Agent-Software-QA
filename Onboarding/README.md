@@ -21,7 +21,7 @@ The commands support the agent's conversation; they do not conduct a standalone 
 
 1. Establish the project, environments and responsible people.
 2. Choose **provide context**, **discover context** or **combine both**.
-3. Prepare browser automation and connect GitHub where applicable.
+3. Verify existing tools; prepare missing browser, API and GitHub capabilities where applicable.
 4. Discover email integrations and select verification mailboxes.
 5. Establish application access.
 6. Build and review initial project/product understanding.
@@ -32,10 +32,13 @@ The sequence follows dependencies. A staging-only project does not need an appli
 
 ## Choose and verify integrations
 
+Start with [shared tool discovery](../automation/tools/README.md). The agent inspects existing installations, saved selections and native connections through the actual calling harness. Working setup is reused; only missing choices or capabilities need preparation. Version checks, authenticated identity and successful operations remain separate.
+
 | Area | Choices and next step |
 | --- | --- |
 | Browser interaction | Harness in-app browser, Playwright CLI, Playwright MCP, or a recommendation based on actual checks. Record visibility/fallback. [Browser guide](../automation/browser/README.md) |
 | Scripted suites | Playwright library and Playwright Test are bundled independently of the interaction preference. Other task-specific tools can be added when needed. |
+| API tools | Postman CLI is bundled. Reuse a compatible accessible installation; local collections need no Postman login. Cloud work needs selected account/resources and reporting authorization. [Postman guide](../automation/postman/README.md) |
 | Email | Google — Gmail / Google Workspace first, other discovered providers, AgentMail, human-assisted verification or later. Then select the actual account/mailbox. [Email guide](../automation/email/README.md) |
 | GitHub | Reuse compatible CLI/access or install the pinned CLI locally, authenticate and select repositories. [GitHub guide](../automation/github/README.md) |
 | Check-ins | On demand, scheduled, PR-based or combined. A saved choice does not activate an actual scheduler or workflow. [Automation guide](../automation/README.md) |

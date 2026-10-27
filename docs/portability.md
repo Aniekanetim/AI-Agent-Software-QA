@@ -33,3 +33,7 @@ Discovery requests resume independently of the QA board. No discovery schedule i
 ## Maintain the master
 
 Keep the master unconfigured. When a process improvement is accepted, update its workflow/templates with the reason and version, then deliberately adopt the change in active projects. Do not silently rewrite an ongoing run's test basis or historical outcome.
+
+## Existing tools and API readiness
+
+Follow [shared tool discovery](../automation/tools/README.md) before setup questions. Reuse existing tools and connections when actual access through this harness is verified. Moving hosts requires targeted capability checks, preserving earlier answers and historical evidence. [Postman CLI](../automation/postman/README.md) supports local collections without account login; cloud resources require selected identity/access and explicit reporting scope.

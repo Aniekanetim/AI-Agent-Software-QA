@@ -9,7 +9,7 @@ export function requireText(value: unknown, label = 'Value'): asserts value is s
   if (typeof value !== 'string' || !value.trim() || /\0/.test(value)) throw new Error(`${label} is required.`);
 }
 export function assertNonsecret(value: unknown): void {
-  if (typeof value === 'string' && /-----BEGIN [A-Z ]*PRIVATE KEY-----|\bgh[pousr]_[A-Za-z0-9]{25,}|\bgithub_pat_[A-Za-z0-9_]{25,}|Authorization:\s*Bearer\s+\S+/i.test(value)) throw new Error('Secret-bearing material cannot be saved in reusable records.');
+  if (typeof value === 'string' && /-----BEGIN [A-Z ]*PRIVATE KEY-----|\bgh[pousr]_[A-Za-z0-9]{25,}|\bgithub_pat_[A-Za-z0-9_]{25,}|\bPMAK-[A-Za-z0-9-]{12,}|Authorization:\s*Bearer\s+\S+/i.test(value)) throw new Error('Secret-bearing material cannot be saved in reusable records.');
   if (value && typeof value === 'object') for (const [key, child] of Object.entries(value)) {
     if (/^(password|apiKey|accessToken|refreshToken|otp|cookie|sessionToken)$/i.test(key)) throw new Error('Use a secure credential reference, not secret values.');
     assertNonsecret(child);

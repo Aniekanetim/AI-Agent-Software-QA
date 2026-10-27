@@ -5,7 +5,7 @@ export const stages = ['project', 'contextRoute', 'tools', 'email', 'access', 'u
 export type Stage = typeof stages[number];
 export const labels: Record<Stage, string> = {
   project: 'Establish the project, environments and owners', contextRoute: 'Choose how context is established',
-  tools: 'Prepare browser automation and GitHub', email: 'Discover providers and select verification mailboxes',
+  tools: 'Verify existing tools and prepare missing browser, API and GitHub capabilities', email: 'Discover providers and select verification mailboxes',
   access: 'Establish application access', understanding: 'Build and review initial project/product understanding',
   operation: 'Configure check-ins, PR triggers and reporting', handoff: 'Verify readiness and explain how work begins',
 };

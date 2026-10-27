@@ -26,6 +26,10 @@ Record the actual choice/source in `.local/context-settings.json`. Follow the fi
 
 ## 3. Prepare the tools and access needed now
 
+Follow [shared tool discovery](../automation/tools/README.md) before setup questions. Identify the actual calling harness/profile and interactive, scheduled or CI context from available metadata. Inspect saved selections, existing installations and native integration/account inventories. Run only missing harmless capability checks. Reuse working setup and clear earlier choices; explain a missing installation, harness restriction, incompatibility or expired connection separately. A new harness requires targeted verification, not a fresh interview.
+
+For [Postman CLI](../automation/postman/README.md), reuse an accessible compatible executable. Local collection checks require no Postman account; cloud resources require the selected account, resource access and reporting scope. Guide login only when required. Preserve application API authentication separately. Tools can be deferred with dependent-work limits; tasks still determine testing coverage.
+
 Present browser choices and visibility before preparing the selected method. Preserve compatible installations. The bundle includes MCP, CLI, library and Test, but a host MCP connection must be registered and exercised through that host. Record the actual provider and context of a rehearsal. Do not copy authentication between sessions by assumption.
 
 For GitHub, inspect the CLI, verify the actual identity and selected repositories, and establish board mapping, PR filters, execution targets and reporting permissions. Guide authentication through the host's interactive sign-in. Never print tokens. Defer repository-dependent capabilities for a staging-only project without access.
