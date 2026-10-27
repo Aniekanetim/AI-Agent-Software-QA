@@ -27,6 +27,8 @@ The installer downloads both Chromium engine revisions needed by the pinned stab
 
 The rehearsal serves a random loopback-only synthetic draft, fills a form, uploads a synthetic attachment, saves and reloads/reopens it. It uses no product URL, email, funds or real account. Library checks a second browser context; CLI/MCP check reload recovery. Reports under `.local/browser-reports/` retain provider/version/machine/root/context, visibility and evidence. This is tool verification, not product testing or execution of a user's regression suite.
 
+`npm run test:browsers` exercises the library fixture through an actual Playwright Test worker/assertion/reporter, then runs the CLI and MCP rehearsals. Its compiled config/spec are under `.local/build/automation/browser`; reports stay private. The synthetic Playwright Test case verifies the bundled runner, not a project's business regression suite.
+
 Omit `--headless` for headed checks. Use `--context scheduled` only from the actual unattended execution context; a flag entered in an interactive session is not proof that a scheduler can operate. A denied/failed probe records denied/unverified operations, and readiness remains incomplete. Resolve the host restriction; do not bypass it.
 
 Package CI pins Ubuntu 22.04 for Linux because the latest hosted image rejected MCP's Chromium sandbox startup. A new host must pass its own rehearsal; a Linux result is specific to its recorded image. The procedure does not automatically disable sandboxing or change host security settings to obtain a pass.

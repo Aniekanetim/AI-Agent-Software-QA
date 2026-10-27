@@ -12,7 +12,7 @@
     "check": "tsc --noEmit",
     "build": "tsc",
     "test": "npm run build --silent && node .local/build/automation/tests/all.test.js",
-    "test:browsers": "npm run build --silent && node .local/build/automation/tests/browsers.js",
+    "test:browsers": "npm run build --silent && node node_modules/@playwright/test/cli.js test --config .local/build/automation/browser/playwright.config.js && node .local/build/automation/tests/browsers.js",
     "qa": "npm run build --silent && node .local/build/automation/cli.js",
     "browser:check": "npm run qa -- browser check",
     "onboarding:status": "npm run qa -- onboarding status",
