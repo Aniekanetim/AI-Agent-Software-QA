@@ -2,7 +2,9 @@ name: Package checks
 on:
   push:
     branches: [main, 'codex/**']
+    paths: ['automation/**/*.ts', '.github/workflows/**', 'package.json', 'package-lock.json', 'tsconfig.json']
   pull_request:
+    paths: ['automation/**/*.ts', '.github/workflows/**', 'package.json', 'package-lock.json', 'tsconfig.json']
 permissions:
   contents: read
 jobs:
@@ -10,19 +12,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-22.04, windows-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: '22'
       - run: npm ci --ignore-scripts --cache .local/npm-cache
       - run: npm run check
       - run: npm test
+      - run: npm run qa -- github install --source package-ci-pinned-tool-verification
       - run: npm run qa -- browser install
       - if: runner.os == 'Linux'
         run: npx --no-install playwright install-deps chromium

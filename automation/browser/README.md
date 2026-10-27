@@ -29,6 +29,8 @@ The rehearsal serves a random loopback-only synthetic draft, fills a form, uploa
 
 Omit `--headless` for headed checks. Use `--context scheduled` only from the actual unattended execution context; a flag entered in an interactive session is not proof that a scheduler can operate. A denied/failed probe records denied/unverified operations, and readiness remains incomplete. Resolve the host restriction; do not bypass it.
 
+Package CI pins Ubuntu 22.04 for Linux because the latest hosted image rejected MCP's Chromium sandbox startup. A new host must pass its own rehearsal; a Linux result is specific to its recorded image. The procedure does not automatically disable sandboxing or change host security settings to obtain a pass.
+
 ## Connect MCP to the actual agent host
 
 ```shell
