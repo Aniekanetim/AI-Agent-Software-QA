@@ -8,7 +8,7 @@ import { evidence, contained } from '../shared/store.js';
 import { runCollection, type RunRequest } from '../postman/postman.js';
 import { runProcess, type Runner } from '../tools/registry.js';
 
-// Only synthetic/harmless help diagnostics are printed; product runners suppress raw output.
+// Only known synthetic fixture output is printed; product runners suppress raw output.
 const fixtureRunner: Runner = async (command, args, options) => {
   const result = await runProcess(command, args, options);
   if (args[0] === 'collection' && !args.includes('--help')) console.log(JSON.stringify({ syntheticLoopbackOnly: true, code: result.code, output: (result.stdout + '\n' + result.stderr).replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '').slice(0, 7000) }));

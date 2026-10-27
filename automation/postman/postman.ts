@@ -59,6 +59,20 @@ export async function inspect(root: string, source: string, runner: Runner = run
         record.diagnostic = record.authentication === 'denied' ? 'The CLI identity differs from the selected account. Confirm account selection; do not silently switch accounts.' : 'Verify the selected credential source and region, then sign in only if necessary. Raw output suppressed.';
       }
     } else { record.capabilities.identity = { status: 'unsupported', evidence: [] }; record.diagnostic = 'This CLI cannot verify identity through whoami --json. Use a documented version-compatible check before cloud work.'; }
+    if (record.authentication === 'connected') {
+      for (const [kind, references] of [['collection', configuration.collections], ['environment', configuration.environments]] as const) for (const reference of references) {
+        const name = `${kind}:${reference}`;
+        const result = await runner(record.command, [kind, 'get', reference, '--json'], { cwd: root, env });
+        if (result.code === 0) {
+          const path = `.local/postman/access/${digest(JSON.stringify([record.harness, kind, reference])).slice(0, 32)}.json`;
+          save(root, path, { kind, reference, accountId: record.account, access: 'read', checkedAt: new Date().toISOString(), source, harness: record.harness }, revision(root, path));
+          record.capabilities[name] = { status: 'verified', evidence: [evidence(root, path)] };
+        } else {
+          record.capabilities[name] = { status: result.error === 'denied' ? 'denied' : 'unverified', evidence: [] };
+          record.diagnostic = 'Selected cloud resource access failed. Check resource permissions or documented CLI command compatibility; do not reinstall or assume login is the cause. Raw resource content/diagnostics suppressed.';
+        }
+      }
+    }
   }
   saveRecord(root, record); return record;
 }
@@ -138,7 +152,11 @@ export async function runCollection(root: string, request: RunRequest, runner: R
   const cloud = request.collection.kind === 'cloud' || request.environment?.kind === 'cloud';
   const record = await inspect(root, request.source, runner, cloud ? 'cloud' : 'local');
   const required = ['version', 'collectionRun'];
-  if (cloud) required.push('identity');
+  if (cloud) {
+    required.push('identity');
+    if (request.collection.kind === 'cloud') required.push(`collection:${request.collection.reference}`);
+    if (request.environment?.kind === 'cloud') required.push(`environment:${request.environment.reference}`);
+  }
   const issues = readinessIssues(root, record, required); if (issues.length) throw new Error(issues.join('; '));
   const command = selectedCommand(root, 'postman', false);
   const work = privatePath(root, `.local/postman/work/${request.id}`); mkdirSync(work, { recursive: true });

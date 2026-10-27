@@ -48,7 +48,7 @@ npm run qa -- postman login-instructions
 
 The latter returns the selected executable and browser-login arguments only when needed. The agent guides the user through interactive login, then checks again. It never automatically registers accounts, creates guest workspaces or logs out an existing session. CI uses authorized secret references. Current identity verification uses `whoami --json`; an older CLI without this capability needs a documented compatible check before cloud execution. Unrecognized identity responses remain unverified. A Postman desktop/MCP connection does not establish CLI authentication.
 
-Resource selection and identity are distinct: a collection run may still fail for insufficient collection/environment permissions. Preserve that as an execution/access error. Do not infer access to every selected resource merely from a valid account identity.
+Resource selection and identity are distinct. After verifying identity, the check verifies read access to each selected cloud collection/environment through nonmutating CLI get commands. Resource content is discarded; only nonsecret access evidence is retained. A permission/command-compatibility failure reopens that resource capability without requesting a new installation or login. Access is checked again before a cloud run because permissions can change.
 
 ## Execute an authorized collection
 
@@ -94,6 +94,8 @@ Changed local inputs invalidate their approved evidence. Each execution ID retai
 The adapter distinguishes passed assertions, failed assertions, execution errors and incomplete evidence. Zero exit status without a supported assertion summary is not a pass. For v2.1 HTTP collections, the adapter uses JSON reporting when the detected CLI exposes it. The pinned 1.79.0 CLI instead exposes a CLI table; a strict version-specific reader extracts its request/assertion counts and rejects missing or ambiguous tables. Its YAML export requires sign-in, so it is not requested for account-free local runs. v3 YAML and other unsupported protocol/reporter combinations stay incomplete when a supported assertion summary is unavailable. Exit status alone never establishes a pass.
 
 Local runs remove Postman credentials from the child environment, use a separate private home/profile and execute a byte-for-byte v2.1 copy. They preserve approved scripts/metadata, the source file and the user's session. The requested working directory preserves relative test-file resolution. Cloud runs require explicit reporting scope because results can upload automatically. Disabling API Catalog events does not by itself disable cloud run-result uploads.
+
+The pinned CLI can print a login reminder about publishing to Postman Cloud even when a local collection completed successfully. The adapter uses the actual assertion summary and exit status; that cloud-publishing reminder is not a local login requirement.
 
 Raw reports can contain secrets and request/response bodies. They are private temporary material under `.local/postman/work/`, deleted after normal completion; only nonsecret counts and execution metadata are retained. After a process interruption, inspect that ignored directory for residual temporary material before sharing evidence. Redact any additional manually retained evidence. No tool pattern checker guarantees complete secret detection.
 

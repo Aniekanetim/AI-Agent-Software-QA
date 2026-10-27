@@ -65,7 +65,7 @@ export function integrationIssues(root: string): string[] {
   }
   const postman = postmanSettings(root);
   if (postman && readHarness(root)) {
-    const required = ['version', 'collectionRun', ...(postman.mode === 'local' ? ['localCollectionRun'] : ['identity'])];
+    const required = ['version', 'collectionRun', ...(postman.mode === 'local' ? ['localCollectionRun'] : ['identity', ...postman.collections.map(id => `collection:${id}`), ...postman.environments.map(id => `environment:${id}`)])];
     issues.push(...readinessIssues(root, readRecord(root, 'postman'), required).map(i => `Postman: ${i}`));
   }
   return issues;

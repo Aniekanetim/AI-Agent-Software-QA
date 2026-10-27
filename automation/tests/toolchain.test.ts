@@ -31,6 +31,7 @@ function fakeRunner(failed = 0, requestFailed = 0, assertions = 2): registry.Run
     if (args[0] === '--version') return version(_command, args);
     if (args.includes('--help')) return { code: 0, stdout: '--reporters --reporter-json-export --report-events --no-insecure-file-read --json', stderr: '' };
     if (args[0] === 'whoami') return { code: 0, stdout: JSON.stringify({ user: { id: 'selected-account' } }), stderr: '' };
+    if (args[1] === 'get') return { code: 0, stdout: '{"syntheticResource":"content suppressed"}', stderr: '' };
     const file = args[args.indexOf('--reporter-json-export') + 1]!;
     writeFileSync(file, JSON.stringify({ run: { stats: { assertions: { total: assertions, failed }, requests: { total: 1, failed: requestFailed } }, failures: [] }, body: 'PMAK-synthetic-sensitive-material' }));
     return { code: failed || requestFailed ? 1 : 0, stdout: 'Raw output may contain sensitive data', stderr: '' };
@@ -163,6 +164,11 @@ test('cloud mode requires selected resources, exact identity and separate report
   put(f.root, postman.settingsPath, { schemaVersion: 1, mode: 'cloud', reporting: 'cloudAllowed', region: 'us', credential: 'session', accountId: 'selected-account', collections: [r.collection.reference], environments: [], source: 'Synthetic cloud resource selection' });
   assert.throws(() => postman.validateRun(f.root, r), /authorization/); r.cloudReportingAuthorization = 'Synthetic explicit reporting scope'; postman.validateRun(f.root, r);
   const record = await postman.inspect(f.root, 'Synthetic cloud check', fakeRunner()); assert.equal(record.authentication, 'connected'); assert.equal(postman.loginInstructions(f.root).required, false);
+  assert.equal(record.capabilities[`collection:${r.collection.reference}`]?.status, 'verified');
+  const restricted: registry.Runner = async (command, args) => args[1] === 'get' ? { code: 1, stdout: '', stderr: 'Synthetic resource permission denied' } : fakeRunner()(command, args);
+  const noAccess = await postman.inspect(f.root, 'Synthetic restricted resource', restricted);
+  assert.equal(noAccess.authentication, 'connected'); assert.equal(noAccess.capabilities[`collection:${r.collection.reference}`]?.status, 'unverified');
+  assert.equal(postman.loginInstructions(f.root).required, false);
   const wrong: registry.Runner = async (command, args) => args[0] === 'whoami' && !args.includes('--help') ? { code: 0, stdout: '{"user":{"id":"different-account"}}', stderr: '' } : fakeRunner()(command, args);
   assert.equal((await postman.inspect(f.root, 'Synthetic mismatched account', wrong)).authentication, 'denied');
   const local = await postman.runCollection(f.root, request(f.root), fakeRunner()); assert.equal(local.outcome, 'passed'); assert.equal(local.reporting, 'localOnly');
