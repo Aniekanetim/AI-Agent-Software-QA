@@ -7,7 +7,7 @@ import { platform, arch } from 'node:os';
 import { chromium } from 'playwright';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { contained, requireText, evidence, verifyEvidence, save, revision, type Evidence } from '../shared/store.js';
+import { contained, requireText, evidence, verifyEvidence, save, revision, assertNonsecret, type Evidence } from '../shared/store.js';
 import { startFixture } from './fixture.js';
 
 export type BrowserMethod = 'cli' | 'mcp' | 'inApp' | 'recommend';
@@ -96,16 +96,27 @@ export async function rehearse(root: string, provider: 'library' | 'cli' | 'mcpS
       const transport = new StdioClientTransport({ command: process.execPath, args: [binary(root, '@playwright/mcp'), '--isolated', '--executable-path', selectedExecutable, ...(headless ? ['--headless'] : [])], cwd: root, stderr: 'pipe' });
       client = new Client({ name: 'qa-capability-rehearsal', version: '1.3.0' }); await client.connect(transport);
       const tools = await client.listTools();
-      if (!tools.tools.some(t => t.name === 'browser_navigate') || !tools.tools.some(t => t.name === 'browser_run_code')) throw new Error('The MCP server lacks the required rehearsal tools.');
-      const nav = await client.callTool({ name: 'browser_navigate', arguments: { url: fixture.url } }); if (nav.isError) throw new Error('MCP navigation failed.');
-      const result = await client.callTool({ name: 'browser_run_code', arguments: { code } }); trace = JSON.stringify(result);
-      if (result.isError || !trace.includes('SYNTHETIC_OK')) throw new Error('MCP did not confirm the synthetic outcome.');
+      for (const name of ['browser_navigate', 'browser_type', 'browser_click', 'browser_file_upload', 'browser_wait_for', 'browser_snapshot']) if (!tools.tools.some(t => t.name === name)) throw new Error(`The pinned MCP server did not expose ${name}.`);
+      const call = async (name: string, args: Record<string, unknown>) => {
+        const result = await client!.callTool({ name, arguments: args }); const text = JSON.stringify(result); trace += `${name}: ${text}\n`;
+        if (result.isError) throw new Error(`Synthetic MCP ${name} failed: ${text.slice(0, 1500)}`); return text;
+      };
+      await call('browser_navigate', { url: fixture.url });
+      await call('browser_type', { target: '#name', text: 'Synthetic QA', element: 'Synthetic Name field' });
+      await call('browser_click', { target: '#file', element: 'Synthetic attachment input' });
+      await call('browser_file_upload', { paths: [attachment] });
+      await call('browser_click', { target: 'button', element: 'Save synthetic draft' });
+      await call('browser_wait_for', { text: 'Saved Synthetic QA' });
+      await call('browser_navigate', { url: fixture.url });
+      const recovered = await call('browser_snapshot', {});
+      if (!recovered.includes('Recovered Synthetic QA synthetic.txt')) throw new Error('MCP did not show the recovered synthetic draft.');
     }
     const tracePath = `.local/rehearsal/${provider}-${context}.txt`; writeFileSync(contained(root, tracePath), trace);
     const report: BrowserReport = { schemaVersion: 1, provider, executionContext: context, visibility: headless ? 'headless' : 'headed', root: realpathSync(root), platform: platform(), arch: arch(), nodeMajor: Number(process.versions.node.split('.')[0]), version: provider === 'cli' ? toolVersions['@playwright/cli']! : provider === 'mcpServer' ? toolVersions['@playwright/mcp']! : toolVersions.playwright!, checkedAt: new Date().toISOString(), operations: Object.fromEntries(['navigate', 'interact', 'inspect', 'upload', 'recover'].map(name => [name, { status: 'verified', evidence: [evidence(root, tracePath)] }])) };
     const path = `.local/browser-reports/${provider}-${context}.json`; save(root, path, report, revision(root, path)); return report;
   } catch (error: any) {
-    const report: BrowserReport = { schemaVersion: 1, provider, executionContext: context, visibility: headless ? 'headless' : 'headed', root: realpathSync(root), platform: platform(), arch: arch(), nodeMajor: Number(process.versions.node.split('.')[0]), version: provider === 'cli' ? toolVersions['@playwright/cli']! : provider === 'mcpServer' ? toolVersions['@playwright/mcp']! : toolVersions.playwright!, checkedAt: new Date().toISOString(), limitation: error.code === 'EPERM' ? 'This execution environment denied child-process creation. Rehearse in a permitted host; do not treat installation/configuration as readiness.' : 'Capability rehearsal failed; inspect local tool/browser installation and retry after resolving the cause.', operations: Object.fromEntries(['navigate', 'interact', 'inspect', 'upload', 'recover'].map(name => [name, { status: error.code === 'EPERM' ? 'denied' as const : 'unverified' as const, evidence: [] }])) };
+    let diagnostic = String(error.message ?? 'Unknown fixture error').slice(0, 1800); try { assertNonsecret(diagnostic); } catch { diagnostic = 'Sensitive diagnostic suppressed.'; }
+    const report: BrowserReport = { schemaVersion: 1, provider, executionContext: context, visibility: headless ? 'headless' : 'headed', root: realpathSync(root), platform: platform(), arch: arch(), nodeMajor: Number(process.versions.node.split('.')[0]), version: provider === 'cli' ? toolVersions['@playwright/cli']! : provider === 'mcpServer' ? toolVersions['@playwright/mcp']! : toolVersions.playwright!, checkedAt: new Date().toISOString(), limitation: error.code === 'EPERM' ? 'This execution environment denied child-process creation. Rehearse in a permitted host; do not treat installation/configuration as readiness.' : `Synthetic capability rehearsal failed: ${diagnostic}`, operations: Object.fromEntries(['navigate', 'interact', 'inspect', 'upload', 'recover'].map(name => [name, { status: error.code === 'EPERM' ? 'denied' as const : 'unverified' as const, evidence: [] }])) };
     const path = `.local/browser-reports/${provider}-${context}.json`; save(root, path, report, revision(root, path)); return report;
   } finally {
     await client?.close().catch(() => {}); await browser?.close().catch(() => {});
