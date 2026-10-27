@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { bindHarness } from '../tools/runtime.js';
 import { evidence, contained } from '../shared/store.js';
-import { runCollection, type RunRequest } from '../postman/postman.js';
-import { runProcess, type Runner } from '../tools/registry.js';
+import { runCollection, localEnvironment, type RunRequest } from '../postman/postman.js';
+import { runProcess, selectedCommand, probe, type Runner } from '../tools/registry.js';
 
 // Only synthetic/harmless help diagnostics are printed; product runners suppress raw output.
 const fixtureRunner: Runner = async (command, args, options) => {
@@ -29,6 +29,10 @@ try {
       `pm.test("Synthetic assertion", function () { pm.expect(pm.response.json().status).to.eql("${fail ? 'deliberate-failure' : 'ok'}"); });`,
     ] } }] }] }));
     const request: RunRequest = { id: `fixture-${randomUUID()}`, source: 'Package synthetic integration check', authorizationReference: 'Maintainer authorized this loopback fixture; not product execution approval', collection: { kind: 'file', reference: path, format: 'v2.1' }, approvedInputs: [evidence(root, path)], target: { environment: 'synthetic-loopback', baseUrl: url, build: 'synthetic-v1', source: 'Actual local fixture server' }, timeoutMs: 30_000 };
+    await probe(root, 'postman', 'Actual synthetic CLI reporter inspection');
+    const output = contained(root, `.local/postman/fixtures/reporter-${request.id}`); mkdirSync(output, { recursive: true });
+    const observed = await runProcess(selectedCommand(root, 'postman'), ['collection', 'run', contained(root, path), '--output', output, '--no-report-events', '--timeout', '30000'], { cwd: root, env: localEnvironment(root), timeout: 45000 });
+    console.log(JSON.stringify({ syntheticReporterProbe: true, code: observed.code, stdout: observed.stdout.slice(0, 7000), stderr: observed.stderr.slice(0, 2000), files: readdirSync(output).map(name => ({ name, sample: name.includes('summary') ? readFileSync(resolve(output, name), 'utf8').slice(0, 12_000) : 'Synthetic execution detail omitted' })) }));
     const result = await runCollection(root, request, fixtureRunner);
     assert.equal(result.outcome, fail ? 'failed' : 'passed'); assert.equal(result.assertions?.total, 2); assert.equal(result.assertions.failed, fail ? 1 : 0);
     console.log(`Postman CLI: ${fail ? 'intentional assertion failure retained' : 'passing assertions verified'}; synthetic loopback only`);
