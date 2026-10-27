@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, realpathSync, statSync, mkdirSync } from 'node:fs';
-import { resolve, dirname, delimiter, isAbsolute, basename } from 'node:path';
+import { resolve, dirname, delimiter, isAbsolute, basename, sep } from 'node:path';
 import { createRequire } from 'node:module';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -70,6 +70,10 @@ export function candidates(root: string, tool: NativeTool, searchPath = process.
   }
   if (tool === 'github') { try { const file = localGh(root); if (existsSync(file)) result.push(makeCommand(file, [], 'bundled')); } catch { /* Optional platform installer. */ } }
   const bundled = packageCommand(root, tool); if (bundled) result.push(bundled);
+  // npm prepends this framework's .bin to PATH. It is still a fallback, not a pre-existing user installation.
+  const frameworkModules = resolve(root, 'node_modules') + sep;
+  for (const item of result) if (item.origin === 'path' && [item.executable, ...item.prefix].some(path => path.startsWith(frameworkModules))) item.origin = 'bundled';
+  result.sort((a, b) => Number(a.origin === 'bundled') - Number(b.origin === 'bundled'));
   return result.filter((item, index) => result.findIndex(other => other.stamp === item.stamp) === index);
 }
 export interface ProcessResult { code: number | null; stdout: string; stderr: string; error?: 'denied' | 'missing' | 'timeout' | 'launchFailed' }

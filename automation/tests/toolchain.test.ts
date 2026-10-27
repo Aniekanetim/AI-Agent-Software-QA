@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync, existsSync, realpathSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { resolve, dirname, delimiter } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import * as store from '../shared/store.js';
 import { bindHarness, currentHarness, harnessKey } from '../tools/runtime.js';
@@ -64,6 +64,18 @@ test('npm .bin discovery selects the package entry with its browser-engine conte
   put(f.root, 'node_modules/@playwright/cli/entry.cjs', '// Synthetic CLI entry'); put(f.root, 'node_modules/.bin/playwright-cli', '#!/bin/sh\nexit 99');
   const choices = registry.candidates(f.root, 'playwrightCli', bin);
   assert.equal(choices[0]?.packageRoot, resolve(f.root, 'node_modules/@playwright/cli')); assert.equal(choices[0]?.executable, process.execPath);
+});
+
+test('npm launcher PATH order does not hide an existing external tool behind the bundled fallback', () => {
+  const f = fixture();
+  for (const prefix of ['', 'external/']) {
+    put(f.root, `${prefix}node_modules/@playwright/cli/package.json`, { name: '@playwright/cli', version: '0.1.22', bin: { 'playwright-cli': 'entry.cjs' } });
+    put(f.root, `${prefix}node_modules/@playwright/cli/entry.cjs`, '// Synthetic package');
+  }
+  const bin = resolve(f.root, 'node_modules/.bin'); mkdirSync(bin, { recursive: true });
+  const choices = registry.candidates(f.root, 'playwrightCli', [bin, resolve(f.root, 'external')].join(delimiter));
+  assert.equal(choices[0]?.packageRoot, resolve(f.root, 'external/node_modules/@playwright/cli'));
+  assert.equal(choices[0]?.origin, 'path');
 });
 
 test('a harness denial preserves the installed selection without falling back or reinstalling', async () => {
