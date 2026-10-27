@@ -212,6 +212,8 @@ test('switching Postman accounts invalidates onboarding and login reuse until th
   assert.deepEqual(postmanIssues(f.root), []); assert.equal(postman.loginInstructions(f.root).required, false);
   put(f.root, postman.settingsPath, { ...configuration, accountId: 'other-account' });
   assert(postmanIssues(f.root).some(issue => /identity|account/i.test(issue)));
+  assert.equal(postman.status(f.root, ['collection:shared-collection']).reusable, false);
+  assert.equal(postman.status(f.root, ['version']).reusable, true);
   const pending = postman.loginInstructions(f.root); assert.equal(pending.required, null); assert(!Object.hasOwn(pending, 'args'));
   assert.equal(registry.readRecord(f.root, 'postman')?.account, 'selected-account');
   const wrong = await postman.inspect(f.root, 'Synthetic current CLI still on old account', fakeRunner());
@@ -219,6 +221,7 @@ test('switching Postman accounts invalidates onboarding and login reuse until th
   const other: registry.Runner = async (command, args, options) => args[0] === 'whoami' && !args.includes('--help') ? { code: 0, stdout: '{"user":{"id":"other-account"}}', stderr: '' } : fakeRunner()(command, args, options);
   await postman.inspect(f.root, 'Synthetic correct new account and resources', other);
   assert.deepEqual(postmanIssues(f.root), []); assert.equal(postman.loginInstructions(f.root).required, false);
+  assert.equal(postman.status(f.root, ['collection:shared-collection']).reusable, true);
   assert.equal(store.revision(f.root, '.local/unrelated-answer.json'), answer); assert.equal(store.revision(f.root, '.local/tool-selections.json'), selection);
 });
 
@@ -251,6 +254,9 @@ test('local Postman checks do not certify cloud identity and confirmed expired a
   await postman.inspect(f.root, 'Synthetic cloud verification', fakeRunner());
   await postman.inspect(f.root, 'Synthetic local-only verification', fakeRunner(), 'local');
   assert(postmanIssues(f.root).length > 0); assert.equal(postman.loginInstructions(f.root).required, null);
+  put(f.root, postman.settingsPath, { ...configuration, mode: 'local', reporting: 'localOnly', collections: [], environments: [] });
+  assert.equal(postman.status(f.root, ['identity']).reusable, false); assert.equal(postman.loginInstructions(f.root).required, false);
+  put(f.root, postman.settingsPath, configuration);
   const expired: registry.Runner = async (command, args, options) => args[0] === 'whoami' && !args.includes('--help') ? { code: 1, stdout: '', stderr: 'Synthetic session expired' } : fakeRunner()(command, args, options);
   await postman.inspect(f.root, 'Synthetic expired session check', expired);
   assert.equal(postman.loginInstructions(f.root).required, true);

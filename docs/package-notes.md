@@ -4,7 +4,7 @@
 
 ## Version 1.4.1: Postman selection verification
 
-Corrected a completeness-audit finding: after verifying account A and selecting account B, onboarding and login guidance could still reuse A's capability record. The fresh pre-execution check already rejected the mismatch, but preparation could incorrectly appear ready. Identity and collection/environment access now require evidence matching the selected account, region and credential source in onboarding, login guidance and execution. Local-only checks cannot certify cloud identity.
+Corrected a completeness-audit finding: after verifying account A and selecting account B, onboarding and login guidance could still reuse A's capability record. The fresh pre-execution check already rejected the mismatch, but preparation could incorrectly appear ready. Identity and collection/environment access now require evidence matching the selected account, region and credential source in onboarding, tool status, login guidance and execution. Local-only checks cannot certify cloud identity. Version-only status remains an installation check.
 
 Login guidance distinguishes verified reuse (`required: false`), unresolved verification (`null`) and a current missing/expired credential (`true`). A changed selection, wrong identity, unknown response, unavailable command or harness restriction asks for the affected check or selection correction rather than automatic sign-in. Resource-only changes retain a valid identity check. Older resource receipts lacking region/credential binding need a targeted refresh; existing installations, answers and historical runs remain intact. See [the Postman guide](../automation/postman/README.md).
 

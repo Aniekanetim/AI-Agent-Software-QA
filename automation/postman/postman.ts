@@ -49,18 +49,26 @@ function matchesCloudReceipt(root: string, record: ToolRecord | null, operation:
 }
 /** Reuse cloud evidence only for the identity and credential selection that produced it. */
 export function capabilityIssues(root: string, record: ToolRecord | null, required: string[], configuration = settings(root)): string[] {
-  const issues = readinessIssues(root, record, required);
-  if (configuration?.mode !== 'cloud' || !required.includes('identity')) return issues;
+  const operations = [...required];
+  const cloudRequested = operations.some(name => name === 'identity' || name === 'cloudCollectionRun' || /^(?:collection|environment):/.test(name));
+  if (configuration?.mode === 'cloud' && cloudRequested && !operations.includes('identity')) operations.push('identity');
+  const issues = readinessIssues(root, record, operations);
+  if (cloudRequested && configuration?.mode !== 'cloud') issues.push('Select the Postman cloud account/resources before claiming cloud readiness.');
+  if (configuration?.mode !== 'cloud' || !operations.includes('identity')) return issues;
   if (record?.authentication !== 'connected' || record.account !== configuration.accountId || !matchesCloudReceipt(root, record, 'identity', configuration)) {
     issues.push('identity: verify the selected Postman account, region and credential source with postman check.');
   }
-  for (const operation of required) {
+  for (const operation of operations) {
     const resource = /^(collection|environment):(.+)$/.exec(operation);
     if (resource && !matchesCloudReceipt(root, record, operation, configuration, { kind: resource[1], reference: resource[2], access: 'read' })) {
       issues.push(`${operation}: verify access for the selected account, region and credential source.`);
     }
   }
   return issues;
+}
+export function status(root: string, required: string[]) {
+  const record = readRecord(root, 'postman'), issues = capabilityIssues(root, record, required);
+  return { tool: 'postman', reusable: !issues.length, issues, record, next: issues.length ? 'Recheck only the affected Postman selection/capability; do not reinstall or assume login is needed.' : 'Reuse the verified capabilities. Recheck live access before dependent task execution.' };
 }
 function retainIdentityCheck(root: string, record: ToolRecord, configuration: PostmanSettings, source: string): void {
   const path = `.local/postman/identity-${harnessKey(record.harness)}.json`;

@@ -58,7 +58,10 @@ async function main() {
     else if (action === 'select') {
       const v = input<{ tool: registry.NativeTool; executable: string; prefix?: string[]; source: string }>();
       output(await registry.probe(root, v.tool, v.source, registry.runProcess, registry.makeCommand(v.executable, v.prefix)));
-    } else if (action === 'status') output(registry.status(root, option('tool') as registry.ToolId, (options.get('requires') ?? 'version').split(',')));
+    } else if (action === 'status') {
+      const tool = option('tool') as registry.ToolId, required = (options.get('requires') ?? 'version').split(',');
+      output(tool === 'postman' ? postman.status(root, required) : registry.status(root, tool, required));
+    }
     else if (action === 'import-host') output(registry.recordHost(root, input()));
     else throw new Error('Unknown tools command.');
     return;
