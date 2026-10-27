@@ -10,7 +10,7 @@ Reuse a compatible GitHub CLI installation. If it is unavailable, the optional l
 npm run qa -- github install --source <actual-install-instruction>
 ```
 
-Authenticate through an interactive terminal using the installed executable with `auth login --hostname github.com --web`, or reuse the actual authorized host connection. Never print `gh auth token` or store it in project settings. The helpers prefer the locally installed executable if present; otherwise they use PATH.
+Authenticate through an interactive terminal using the installed executable with `auth login --hostname github.com --web`, or reuse the actual authorized host connection. Never print `gh auth token` or store it in project settings. The helpers reuse the verified executable selection; otherwise they inspect PATH before the project-local fallback. Authenticate only when required access is missing or expired.
 
 ```shell
 npm run qa -- github check --repository owner/repository

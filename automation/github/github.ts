@@ -2,7 +2,6 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { readdirSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { localGh } from './install.js';
 import { selectedCommand, runProcess } from '../tools/registry.js';
 import { contained, load, save, revision, replace, digest, requireText, verifyEvidence, withLock, assertNonsecret, type Evidence } from '../shared/store.js';
 

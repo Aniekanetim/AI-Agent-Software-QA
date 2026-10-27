@@ -120,6 +120,13 @@ test('execution errors and missing assertions are not reported as passing API te
   assert.equal(postman.summarize(report(0, 0), 0).outcome, 'incomplete');
 });
 
+test('version-specific CLI tables retain assertion failures and reject missing or ambiguous summaries', () => {
+  const table = '             executed    failed\n requests       1          0\n test-scripts   1          0\n assertions     2          1\n';
+  assert.equal(postman.summarize(postman.cliSummary(table), 1).outcome, 'failed');
+  assert.equal(postman.summarize(postman.cliSummary(table.replace('2          1', '2          0')), 0).outcome, 'passed');
+  assert.equal(postman.cliSummary(table + table), null); assert.equal(postman.cliSummary('Command completed successfully'), null);
+});
+
 test('changed approved inputs block execution and an interrupted run is not repeated automatically', async () => {
   const f = await prepared(), r = request(f.root);
   put(f.root, r.collection.reference, 'Changed collection'); await assert.rejects(postman.runCollection(f.root, r, fakeRunner()), /evidence/);

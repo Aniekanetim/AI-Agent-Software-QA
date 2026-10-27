@@ -91,7 +91,7 @@ Changed local inputs invalidate their approved evidence. Each execution ID retai
 
 ## Results and reporting
 
-The adapter distinguishes passed assertions, failed assertions, execution errors and incomplete evidence. Zero exit status without a supported assertion summary is not a pass. JSON v2.1 HTTP collections support the structured result path. v3 YAML and other protocol/reporter combinations are not silently converted: if a structured summary is unavailable, the result stays incomplete and needs separately reviewed evidence/another supported adapter.
+The adapter distinguishes passed assertions, failed assertions, execution errors and incomplete evidence. Zero exit status without a supported assertion summary is not a pass. For v2.1 HTTP collections, the adapter uses JSON reporting when the detected CLI exposes it. The pinned 1.79.0 CLI instead exposes a CLI table; a strict version-specific reader extracts its request/assertion counts and rejects missing or ambiguous tables. Its YAML export requires sign-in, so it is not requested for account-free local runs. v3 YAML and other unsupported protocol/reporter combinations stay incomplete when a supported assertion summary is unavailable. Exit status alone never establishes a pass.
 
 Local runs remove Postman credentials from the child environment, use a separate private home/profile and execute an unlinked v2.1 copy. They preserve the approved source and the user's session. The requested working directory preserves relative test-file resolution. Cloud runs require explicit reporting scope because results can upload automatically. Disabling API Catalog events does not by itself disable cloud run-result uploads.
 

@@ -1,11 +1,9 @@
 import { existsSync, readFileSync, mkdirSync, writeFileSync, unlinkSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { resolve } from 'node:path';
 import { contained, privatePath, load, save, revision, requireText, digest, evidence, verifyEvidence, assertNonsecret, type Evidence } from '../shared/store.js';
 import { probe, selectedCommand, runProcess, readRecord, saveRecord, readinessIssues, isolatedPostmanEnvironment, type Runner, type ToolRecord } from '../tools/registry.js';
 import { currentHarness, harnessKey } from '../tools/runtime.js';
 
-export const postmanVersion = '1.79.0';
 export const settingsPath = '.local/postman-settings.json';
 export interface PostmanSettings {
   schemaVersion: 1; mode: 'local' | 'cloud'; reporting: 'localOnly' | 'cloudAllowed';
@@ -40,7 +38,7 @@ export async function inspect(root: string, source: string, runner: Runner = run
   catch { record.authentication = 'needsAuthentication'; record.capabilities.identity = { status: 'unverified', evidence: [] }; record.diagnostic = 'The selected environment credential is missing or empty. Supply it through the harness secret facility; do not repeat installation.'; saveRecord(root, record); return record; }
   const help = await runner(record.command, ['collection', 'run', '--help'], { cwd: root, env });
   const helpText = (help.stdout + '\n' + help.stderr).replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '');
-  const flags = { collectionRun: help.code === 0 && /--reporters\b/.test(helpText), localJsonReport: /--reporter-json-export\b/.test(helpText) || /--reporters\b/.test(helpText), noReportEvents: /--(?:no-)?report-events\b/.test(helpText), fileBoundary: /--no-insecure-file-read\b/.test(helpText) };
+  const flags = { collectionRun: help.code === 0 && /postman\s+collection\s+run|--reporters\b/.test(helpText), localJsonReport: /--reporters\b/.test(helpText), cliSummary: record.version === '1.79.0' && /--disable-unicode\b/.test(helpText), noReportEvents: /--no-report-events\b/.test(helpText), fileBoundary: /--no-insecure-file-read\b/.test(helpText) };
   const file = `.local/postman/capabilities-${harnessKey(record.harness)}.json`;
   save(root, file, { version: record.version, flags, harness: record.harness, source, checkedAt: new Date().toISOString() }, revision(root, file));
   for (const [name, supported] of Object.entries(flags)) record.capabilities[name] = { status: help.code !== 0 ? (help.error === 'denied' ? 'denied' : 'unverified') : supported ? 'verified' : 'unsupported', evidence: supported && help.code === 0 ? [evidence(root, file)] : [] };
@@ -86,6 +84,7 @@ export interface RunResult {
   harness: ToolRecord['harness']; version: string | null; executable: string; startedAt: string; completedAt?: string;
   collection: RunRequest['collection']; target: RunRequest['target']; source: string; authorizationReference: string; inputs: Evidence[];
   reporting: 'localOnly' | 'cloudAllowed'; exitCode: number | null;
+  reportFormat?: 'json' | 'cli-summary' | 'unavailable';
   assertions?: { total: number; failed: number }; requests?: { total: number; failed: number }; reason?: string;
 }
 export function validateRun(root: string, request: RunRequest): void {
@@ -118,6 +117,16 @@ export function summarize(report: any, exitCode: number | null): Pick<RunResult,
   if (exitCode !== 0 || requests.failed > 0 || (report.run.failures?.length ?? 0) > 0) return { ...result, outcome: 'executionError', reason: 'A request, script or CLI execution failed; investigate separately from a product assertion.' };
   return { ...result, outcome: assertions.total > 0 && requests.total > 0 ? 'passed' : 'incomplete', ...(assertions.total > 0 && requests.total > 0 ? {} : { reason: 'Requests and assertions are required for a passing test verdict.' }) };
 }
+export function cliSummary(text: string): unknown {
+  const plain = text.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '').replace(/[│┃┆┊|]/g, ' ');
+  // Only the observed 1.79.0 table is supported. Ambiguous/changed output stays incomplete.
+  if ((plain.match(/\bexecuted\s+failed\b/gi) ?? []).length !== 1) return null;
+  const rows = [...plain.matchAll(/^\s*(requests|assertions|test-scripts|prerequest-scripts)\s+(\d+)\s+(\d+)\s*$/gmi)];
+  const find = (name: string) => rows.filter(r => r[1]!.toLowerCase() === name);
+  if (find('requests').length !== 1 || find('assertions').length !== 1) return null;
+  const counts = (name: string) => ({ total: Number(find(name)[0]![2]), failed: Number(find(name)[0]![3]) });
+  return { run: { stats: { requests: counts('requests'), assertions: counts('assertions') }, failures: rows.some(row => row[1]!.toLowerCase() !== 'assertions' && Number(row[3]) > 0) ? [{ type: 'ExecutionFailure' }] : [] } };
+}
 export async function runCollection(root: string, request: RunRequest, runner: Runner = runProcess): Promise<RunResult> {
   validateRun(root, request); const identity = currentHarness(root), requestDigest = digest(JSON.stringify(request));
   const path = `.local/postman/runs/${request.id}.json`, previous = load<RunResult | null>(root, path, () => null);
@@ -128,7 +137,7 @@ export async function runCollection(root: string, request: RunRequest, runner: R
   }
   const cloud = request.collection.kind === 'cloud' || request.environment?.kind === 'cloud';
   const record = await inspect(root, request.source, runner, cloud ? 'cloud' : 'local');
-  const required = ['version', 'collectionRun', ...(request.collection.format === 'v2.1' ? ['localJsonReport'] : [])];
+  const required = ['version', 'collectionRun'];
   if (cloud) required.push('identity');
   const issues = readinessIssues(root, record, required); if (issues.length) throw new Error(issues.join('; '));
   const command = selectedCommand(root, 'postman', false);
@@ -146,8 +155,11 @@ export async function runCollection(root: string, request: RunRequest, runner: R
     } else collection = contained(root, collection);
   }
   const args = ['collection', 'run', collection, '--timeout', String(request.timeoutMs)];
-  if (request.collection.format === 'v2.1') args.push('--reporters', 'json', '--reporter-json-export', reportFile);
-  if (record.capabilities.noReportEvents?.status === 'verified') args.push('--report-events=false');
+  const json = request.collection.format === 'v2.1' && record.capabilities.localJsonReport?.status === 'verified';
+  const table = !json && request.collection.format === 'v2.1' && record.capabilities.cliSummary?.status === 'verified';
+  if (json) args.push('--reporters', 'json', '--reporter-json-export', reportFile);
+  else if (table) args.push('--disable-unicode');
+  if (record.capabilities.noReportEvents?.status === 'verified') args.push('--no-report-events');
   if (record.capabilities.fileBoundary?.status === 'verified') args.push('--no-insecure-file-read');
   if (request.environment) args.push('--environment', request.environment.kind === 'file' ? contained(root, request.environment.reference) : request.environment.reference);
   if (request.dataFile) args.push('--iteration-data', contained(root, request.dataFile));
@@ -157,7 +169,10 @@ export async function runCollection(root: string, request: RunRequest, runner: R
   try {
     const execution = await runner(command, args, { cwd: contained(root, request.workingDirectory ?? '.'), env, timeout: request.timeoutMs + 15_000 });
     result.exitCode = execution.code;
-    let report: unknown; try { report = JSON.parse(readFileSync(reportFile, 'utf8')); } catch { /* Raw stdout is neither a safe report nor a verdict. */ }
+    let report: unknown;
+    if (json) { try { report = JSON.parse(readFileSync(reportFile, 'utf8')); } catch { /* Missing report remains incomplete. */ } }
+    else if (table) report = cliSummary(execution.stdout);
+    result.reportFormat = json ? 'json' : table ? 'cli-summary' : 'unavailable';
     Object.assign(result, summarize(report, execution.code));
     if (execution.error) { result.outcome = 'executionError'; result.reason = `Tool execution: ${execution.error}. No product verdict was inferred.`; }
     result.state = 'completed'; result.completedAt = new Date().toISOString();
