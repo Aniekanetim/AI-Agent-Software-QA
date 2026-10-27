@@ -147,11 +147,11 @@ export async function runCollection(root: string, request: RunRequest, runner: R
   let collection = request.collection.reference;
   if (request.collection.kind === 'file') {
     if (request.collection.format === 'v2.1') {
-      const body = JSON.parse(readFileSync(contained(root, collection), 'utf8'));
+      const original = readFileSync(contained(root, collection));
+      const body = JSON.parse(original.toString('utf8'));
       if (body.info?.schema !== 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json') throw new Error('The collection is not the declared v2.1 format.');
-      // Run an unlinked copy without altering the approved source collection.
-      delete body.info._postman_id; delete body.info._exporter_id;
-      collection = resolve(work, 'collection.json'); writeFileSync(collection, JSON.stringify(body), { mode: 0o600 });
+      // Preserve approved scripts and metadata byte-for-byte; local profile isolation prevents session reuse.
+      collection = resolve(work, 'collection.json'); writeFileSync(collection, original, { mode: 0o600 });
     } else collection = contained(root, collection);
   }
   const args = ['collection', 'run', collection, '--timeout', String(request.timeoutMs)];
@@ -177,7 +177,7 @@ export async function runCollection(root: string, request: RunRequest, runner: R
     if (execution.error) { result.outcome = 'executionError'; result.reason = `Tool execution: ${execution.error}. No product verdict was inferred.`; }
     result.state = 'completed'; result.completedAt = new Date().toISOString();
     save(root, path, result, revision(root, path));
-    if (result.assertions && result.requests && !execution.error) {
+    if (result.assertions && result.requests && result.assertions.total > 0 && result.requests.total > 0 && !execution.error) {
       record.capabilities[cloud ? 'cloudCollectionRun' : 'localCollectionRun'] = { status: 'verified', evidence: [evidence(root, path)] };
       saveRecord(root, record);
     }

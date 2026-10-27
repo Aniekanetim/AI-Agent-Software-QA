@@ -112,7 +112,11 @@ test('local runs isolate Postman credentials and preserve the users existing env
 
 test('local Postman execution retains assertion outcomes, removes raw secrets and never mutates the approved collection', async () => {
   const f = await prepared(), first = request(f.root); const before = store.revision(f.root, first.collection.reference);
-  const pass = await postman.runCollection(f.root, first, fakeRunner()); assert.equal(pass.outcome, 'passed');
+  const preservingRunner: registry.Runner = async (command, args, options) => {
+    if (args[0] === 'collection' && !args.includes('--help')) assert.equal(store.digest(readFileSync(args[2]!)), first.approvedInputs[0]!.sha256);
+    return fakeRunner()(command, args, options);
+  };
+  const pass = await postman.runCollection(f.root, first, preservingRunner); assert.equal(pass.outcome, 'passed');
   const fail = await postman.runCollection(f.root, request(f.root), fakeRunner(1)); assert.equal(fail.outcome, 'failed'); assert.equal(fail.exitCode, 1);
   assert.equal(store.revision(f.root, first.collection.reference), before);
   const result = readFileSync(store.contained(f.root, `.local/postman/runs/${first.id}.json`), 'utf8'); assert(!result.includes('PMAK-'));

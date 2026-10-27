@@ -24,7 +24,7 @@ const url = `http://127.0.0.1:${address.port}`;
 try {
   for (const fail of [false, true]) {
     const path = `.local/postman/fixtures/${fail ? 'failure' : 'success'}.collection.json`; mkdirSync(resolve(contained(root, path), '..'), { recursive: true });
-    writeFileSync(contained(root, path), JSON.stringify({ info: { name: 'Synthetic package check', schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json' }, item: [{ name: 'Synthetic health check', request: { method: 'GET', url: `${url}/health` }, event: [{ listen: 'test', script: { type: 'text/javascript', exec: [
+    writeFileSync(contained(root, path), JSON.stringify({ info: { name: 'Synthetic package check', _postman_id: randomUUID(), schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json' }, item: [{ name: 'Synthetic health check', request: { method: 'GET', url: `${url}/health` }, event: [{ listen: 'test', script: { type: 'text/javascript', exec: [
       'pm.test("HTTP 200", function () { pm.response.to.have.status(200); });',
       `pm.test("Synthetic assertion", function () { pm.expect(pm.response.json().status).to.eql("${fail ? 'deliberate-failure' : 'ok'}"); });`,
     ] } }] }] }));
