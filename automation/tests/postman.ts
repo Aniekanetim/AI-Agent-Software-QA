@@ -3,7 +3,7 @@ import { createServer } from 'node:http';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { bindHarness } from '../tools/runtime.js';
+import { packageHarness } from './context.js';
 import { evidence, contained } from '../shared/store.js';
 import { runCollection, type RunRequest } from '../postman/postman.js';
 import { runProcess, type Runner } from '../tools/registry.js';
@@ -15,8 +15,7 @@ const fixtureRunner: Runner = async (command, args, options) => {
   return result;
 };
 
-const root = process.cwd(), ci = process.env.CI === 'true';
-bindHarness(root, { id: ci ? 'github-actions' : 'terminal', version: ci ? 'hosted-runner' : process.version, profile: ci ? process.env.RUNNER_OS ?? 'ci' : 'local-synthetic-check', executionContext: ci ? 'ci' : 'interactive', source: 'Actual package synthetic CLI execution context' });
+const root = process.cwd(); packageHarness(root);
 const server = createServer((_request, response) => { response.writeHead(200, { 'content-type': 'application/json' }); response.end('{"status":"ok"}'); });
 await new Promise<void>(done => server.listen(0, '127.0.0.1', done));
 const address = server.address(); if (!address || typeof address === 'string') throw new Error('Synthetic API did not bind.');

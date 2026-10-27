@@ -8,6 +8,7 @@ import { bindHarness, currentHarness, harnessKey } from '../tools/runtime.js';
 import * as registry from '../tools/registry.js';
 import * as postman from '../postman/postman.js';
 import { selectBinding, readConnections, type Binding, type Inventory } from '../email/email.js';
+import { packageHarness } from './context.js';
 
 function fixture() {
   const root = resolve('output/toolchain-fixtures', randomUUID()); mkdirSync(root, { recursive: true });
@@ -99,7 +100,15 @@ test('native connector records require evidence and remain specific to the actua
   assert.throws(() => registry.recordHost(f.root, { ...base, capabilities: { navigate: { status: 'verified', evidence: [] } } }), /evidence/);
   const ref = put(f.root, '.local/host-call.txt', 'Synthetic real-call fixture'); registry.recordHost(f.root, { ...base, capabilities: { navigate: { status: 'verified', evidence: [ref] } } });
   assert(registry.status(f.root, 'inAppBrowser', ['navigate']).reusable);
+  const expired = registry.readRecord(f.root, 'inAppBrowser')!; expired.authentication = 'needsAuthentication'; registry.saveRecord(f.root, expired);
+  assert(!registry.status(f.root, 'inAppBrowser', ['navigate']).reusable);
   put(f.root, ref.path, 'Different observation'); assert(!registry.status(f.root, 'inAppBrowser', ['navigate']).reusable);
+});
+
+test('package self-checks preserve an existing adopting harness identity', () => {
+  const f = fixture(); if (process.env.CI === 'true') bindHarness(f.root, { ...currentHarness(f.root), executionContext: 'ci' });
+  const before = store.revision(f.root, '.local/harness.json'); packageHarness(f.root);
+  assert.equal(store.revision(f.root, '.local/harness.json'), before);
 });
 
 test('local runs isolate Postman credentials and preserve the users existing environment', () => {

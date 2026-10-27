@@ -131,6 +131,7 @@ export function readinessIssues(root: string, record: ToolRecord | null, require
   if (!record.available) issues.push('Tool not found.');
   else if (!record.accessible) issues.push('This harness cannot invoke the tool; installation may already exist.');
   else if (!record.compatible) issues.push('Required command compatibility has not been established.');
+  if (required.some(name => name !== 'version') && !['notRequired', 'connected'].includes(record.authentication)) issues.push('Verify the affected account authentication; preserve the working installation.');
   const age = Date.now() - Date.parse(record.checkedAt);
   if (!Number.isFinite(age) || age < -60_000 || age > maxAgeMs) issues.push('Refresh the affected capability evidence.');
   if (record.command) { try { if (selectedCommand(root, record.tool as NativeTool, false).stamp !== record.command.stamp) issues.push('The executable selection changed.'); } catch { issues.push('Recheck the selected executable.'); } }
