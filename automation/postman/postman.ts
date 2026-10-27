@@ -13,7 +13,7 @@ export interface PostmanSettings {
 export function validateSettings(value: PostmanSettings): void {
   if (!value || value.schemaVersion !== 1 || !['local', 'cloud'].includes(value.mode) || !['localOnly', 'cloudAllowed'].includes(value.reporting) || !['us', 'eu'].includes(value.region) || !['session', 'environment'].includes(value.credential) || !Array.isArray(value.collections) || !Array.isArray(value.environments)) throw new Error('Use valid nonsecret Postman settings.');
   requireText(value.source);
-  for (const ref of [...value.collections, ...value.environments]) requireText(ref);
+  for (const ref of [...value.collections, ...value.environments]) if (typeof ref !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/.test(ref)) throw new Error('Select actual cloud resource IDs, not URLs, shell arguments or secret values.');
   if (value.mode === 'local' && value.reporting !== 'localOnly') throw new Error('Local mode does not authorize cloud reporting.');
   if (value.mode === 'cloud' && (!value.accountId?.trim() || value.reporting !== 'cloudAllowed')) throw new Error('Cloud runs need a selected account and explicit cloud-reporting preference.');
 }
@@ -63,7 +63,8 @@ export async function inspect(root: string, source: string, runner: Runner = run
       for (const [kind, references] of [['collection', configuration.collections], ['environment', configuration.environments]] as const) for (const reference of references) {
         const name = `${kind}:${reference}`;
         const result = await runner(record.command, [kind, 'get', reference, '--json'], { cwd: root, env });
-        if (result.code === 0) {
+        let resource: any; try { resource = JSON.parse(result.stdout); } catch { /* Help text or an unknown response is not resource access. */ }
+        if (result.code === 0 && resource && typeof resource === 'object' && !Array.isArray(resource) && Object.keys(resource).length > 0 && !resource.error && !resource.errors) {
           const path = `.local/postman/access/${digest(JSON.stringify([record.harness, kind, reference])).slice(0, 32)}.json`;
           save(root, path, { kind, reference, accountId: record.account, access: 'read', checkedAt: new Date().toISOString(), source, harness: record.harness }, revision(root, path));
           record.capabilities[name] = { status: 'verified', evidence: [evidence(root, path)] };

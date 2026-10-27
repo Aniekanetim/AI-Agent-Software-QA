@@ -169,6 +169,8 @@ test('cloud mode requires selected resources, exact identity and separate report
   const noAccess = await postman.inspect(f.root, 'Synthetic restricted resource', restricted);
   assert.equal(noAccess.authentication, 'connected'); assert.equal(noAccess.capabilities[`collection:${r.collection.reference}`]?.status, 'unverified');
   assert.equal(postman.loginInstructions(f.root).required, false);
+  const misleading: registry.Runner = async (command, args) => args[1] === 'get' ? { code: 0, stdout: 'Command help instead of a resource', stderr: '' } : fakeRunner()(command, args);
+  assert.equal((await postman.inspect(f.root, 'Synthetic non-resource response', misleading)).capabilities[`collection:${r.collection.reference}`]?.status, 'unverified');
   const wrong: registry.Runner = async (command, args) => args[0] === 'whoami' && !args.includes('--help') ? { code: 0, stdout: '{"user":{"id":"different-account"}}', stderr: '' } : fakeRunner()(command, args);
   assert.equal((await postman.inspect(f.root, 'Synthetic mismatched account', wrong)).authentication, 'denied');
   const local = await postman.runCollection(f.root, request(f.root), fakeRunner()); assert.equal(local.outcome, 'passed'); assert.equal(local.reporting, 'localOnly');
