@@ -19,7 +19,7 @@ export function permittedWrite(root: string, write: ProposedWrite, reply: Reply)
     // Discovery observations retain their own authority; they cannot write the root baseline.
   } else if (path.startsWith('.local/')) {
     privatePath(root, path);
-    if (!['project', 'context-settings', 'browser-preferences', 'github-settings', 'review-settings', 'verification-settings', 'operation-preferences', 'reporting-settings'].some(name => path === `.local/${name}.json`)) throw new Error('Use the dedicated state/evidence procedure for this destination.');
+    if (!['project', 'context-settings', 'browser-preferences', 'github-settings', 'review-settings', 'verification-settings', 'operation-preferences', 'reporting-settings', 'postman-settings'].some(name => path === `.local/${name}.json`)) throw new Error('Use the dedicated state/evidence procedure for this destination.');
     try { assertNonsecret(JSON.parse(write.content)); } catch { throw new Error('Canonical settings must be valid, nonsecret JSON.'); }
   } else throw new Error('Response writes must target authorized baseline documents, discovery knowledge or private canonical settings.');
   if (!reply.answers.some(a => a.path === write.path)) throw new Error('Every proposed write must be bound to a saved answer.');

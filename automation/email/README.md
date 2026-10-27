@@ -39,3 +39,7 @@ The code/link is returned **in memory** to the authorized application interactio
 After entering the code/following the link, observe the resulting application state and use `email outcome --input ...` with attemptId, outcome (verified/failed/blocked), evidence and actual source. Retrieval alone does not establish successful login or expected notification behavior. Retain redacted evidence; screenshot and trace capture must exclude full OTPs, reusable links, tokens and unrelated personal mail.
 
 Outbound messages, changing email addresses, cleanup and deletion require their own task scope. No mail cleanup is enabled by onboarding. [Gmail profile](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users/getProfile), [Gmail scopes](https://developers.google.com/workspace/gmail/api/auth/scopes), [AgentMail documentation](https://docs.agentmail.to/introduction)
+
+## Existing setup and calling harness
+
+Use [shared tool discovery](../tools/README.md) before setup. Reuse verified compatible installations, identities and mailbox selections. A version/configuration check does not establish the required operation through this harness. Retain old evidence after moving hosts; reverify only affected capabilities. Missing or expired access does not require reinstalling a working tool.

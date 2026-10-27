@@ -25,6 +25,7 @@ jobs:
       - run: npm ci --ignore-scripts --cache .local/npm-cache
       - run: npm run check
       - run: npm test
+      - run: npm run test:postman
       - run: npm run qa -- github install --source package-ci-pinned-tool-verification
       - run: npm run qa -- browser install
       - if: runner.os == 'Linux'

@@ -26,6 +26,8 @@ Update [shared progress](unified_project_context.md) with actual setup facts/gap
 
 ## 3. Verify tools for the chosen objective
 
+Start with [shared discovery and reuse](automation/tools/README.md). Record the actual calling harness from available metadata and inspect existing setup before asking tool questions. Reuse verified compatible tools; resolve only missing access/capabilities. A tool working in a personal terminal or CI does not prove it works through the adopting harness. The [Postman guide](automation/postman/README.md) covers local collections, conditional cloud login, selected resources and reporting.
+
 | Objective | Readiness to establish |
 | --- | --- |
 | UI/functional | Browser access, application setup, agreed journeys, assertions and isolated data; install Playwright or the selected tool only when needed |

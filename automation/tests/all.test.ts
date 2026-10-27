@@ -1,4 +1,5 @@
 import test from 'node:test';
+import './toolchain.test.js';
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync, renameSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
@@ -14,6 +15,7 @@ import { AgentMailAdapter, GmailAdapter, htmlText } from '../email/adapters.js';
 import * as gh from '../github/github.js';
 import { artifact, expectedChecksum, archiveDirectory } from '../github/install.js';
 import { validateReport, type BrowserReport } from '../browser/tools.js';
+import { bindHarness } from '../tools/runtime.js';
 
 function root() { const path = resolve('output/test-fixtures', randomUUID()); mkdirSync(path, { recursive: true }); return realpathSync(path); }
 function put(r: string, path: string, value: unknown) { const file = s.contained(r, path); mkdirSync(dirname(file), { recursive: true }); writeFileSync(file, typeof value === 'string' ? value : JSON.stringify(value)); return s.evidence(r, path); }
@@ -71,7 +73,7 @@ test('settings preserve current values and onboarding focus; cancel/close do not
   const r = root(); put(r, '.local/browser-preferences.json', { method: 'cli', visibility: 'headed' }); c.queueQuestions(r, [question('name', undefined, '/name')]); c.next(r); c.acknowledge(r, 'name', 'Synthetic display');
   menu.openMenu(r, 'Synthetic open'); menu.chooseArea(r, '7'); const before = s.revision(r, '.local/browser-preferences.json');
   menu.startEdit(r, { id: 'browser-edit', file: '.local/browser-preferences.json', pointer: '/method', prompt: 'Choose a browser?', source: 'Synthetic change' });
-  menu.presentEdit(r); c.acknowledge(r, 'browser-edit', 'Synthetic display'); menu.cancelEdit(r); menu.chooseArea(r, '10');
+  menu.presentEdit(r); c.acknowledge(r, 'browser-edit', 'Synthetic display'); menu.cancelEdit(r); menu.chooseArea(r, 'close');
   assert.equal(s.revision(r, '.local/browser-preferences.json'), before); assert.equal(c.next(r).action, 'wait');
 });
 test('settings save preserves unrelated fields and can recover a cleared answer focus', () => {
@@ -89,6 +91,7 @@ test('readiness requires all five domains and evidence, not folders or booleans'
 });
 test('scoped onboarding completion revalidates actual sources and does not survive evidence changes', () => {
   const r = root(), ref = put(r, '.local/source.md', '# Synthetic scoped context and onboarding handoff evidence; this is a fixture, not a human approval or product result.');
+  bindHarness(r, { id: 'synthetic-harness', version: '1', profile: 'test', executionContext: 'interactive', source: 'Synthetic harness setup' });
   put(r, '.local/project.json', { name: 'Fixture', environments: ['Synthetic'], owners: ['Fixture owner'], source: 'Synthetic actual reply reference' });
   put(r, '.local/context-settings.json', { route: 'provide', source: 'Synthetic choice' }); put(r, '.local/operation-preferences.json', { mode: 'onDemand', source: 'Synthetic choice' });
   for (const stage of stages.filter(s => s !== 'handoff')) c.recordCheck(r, stage, { status: 'verified', checkedAt: new Date().toISOString(), evidence: [ref], reason: null, nextAction: null });
@@ -201,7 +204,8 @@ test('regression records completed failures, preserves results per revision and 
 });
 test('browser connection reports require actual operations, evidence and machine/context match', () => {
   const r = root(), ref = put(r, '.local/browser-observation.md', 'Synthetic host capability evidence');
-  const report: BrowserReport = { schemaVersion: 1, provider: 'inApp', executionContext: 'interactive', visibility: 'hostManaged', root: r, platform: platform(), arch: arch(), nodeMajor: Number(process.versions.node.split('.')[0]), version: 'synthetic-host', checkedAt: new Date().toISOString(), operations: Object.fromEntries(['navigate', 'interact', 'inspect'].map(name => [name, { status: 'verified', evidence: [ref] }])) };
+  const harness = bindHarness(r, { id: 'synthetic-host', version: '1', profile: 'fixture', executionContext: 'interactive', source: 'Synthetic actual-host identity' });
+  const report: BrowserReport = { schemaVersion: 1, harness, provider: 'inApp', executionContext: 'interactive', visibility: 'hostManaged', root: r, platform: platform(), arch: arch(), nodeMajor: Number(process.versions.node.split('.')[0]), version: 'synthetic-host', checkedAt: new Date().toISOString(), operations: Object.fromEntries(['navigate', 'interact', 'inspect'].map(name => [name, { status: 'verified', evidence: [ref] }])) };
   assert.deepEqual(validateReport(r, report, 'interactive'), []); assert(validateReport(r, report, 'scheduled').length);
   put(r, ref.path, 'Changed evidence'); assert(validateReport(r, report, 'interactive').some(i => i.includes('changed')));
 });

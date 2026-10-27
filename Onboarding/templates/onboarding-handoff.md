@@ -38,3 +38,7 @@ Context route: <provide / discover / combined; actual choice reference>. Baselin
 Human response, source, date and method: Not recorded. Changes requested / accepted scope: Not decided. Delivered to / channel / actual receipt: Not recorded.
 
 Onboarding readiness is scoped preparation. It does not establish product-test passes, release sign-off, deployment authorization or an active schedule.
+
+## Tool reuse and remaining preparation
+
+Record the actual harness/profile/context, reused executable/connection selections, operation evidence and check dates. List only missing capabilities and the work they affect. Separate Postman local execution from cloud identity/resource/reporting access. Link the private operational records without copying credentials. Do not infer current harness readiness from another terminal or CI runner.

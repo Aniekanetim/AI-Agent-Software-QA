@@ -2,7 +2,7 @@
 
 A portable workflow for an AI QA agent to join a project, build product understanding and perform assigned QA work with human review. Guided onboarding prepares context, tools and access. Product Discovery learns how an application behaves. QA evaluates assigned work against an agreed test basis, investigates findings and proposes readiness. Humans maintain the product baseline and own scoped decisions; developers fix or refute reported defects.
 
-**Package version:** 1.3.0 — 27 October 2026. **Project state:** unconfigured. **Live tickets/discovery requests:** none. **Product schedules/PR regression:** not activated. Start with [SETUP.md](SETUP.md) and [guided onboarding](Onboarding/README.md).
+**Package version:** 1.4.0 — 27 October 2026. **Project state:** unconfigured. **Live tickets/discovery requests:** none. **Product schedules/PR regression:** not activated. Start with [SETUP.md](SETUP.md) and [guided onboarding](Onboarding/README.md).
 
 ## Use with your AI agent
 
@@ -31,7 +31,7 @@ criteria, reasons, alternatives, gaps and exact next authorization for my review
 Do not invent requirements, run unapproved exploration/tests or activate scheduling.
 ```
 
-An agent needs repository-reading and QA-file access plus the capabilities required by its tasks. The procedures are Markdown; optional executable helpers use Node.js 22+. Pinned dependencies include Playwright MCP, CLI, library/Test and email adapters, with GitHub CLI setup support. Native host connections and credentials remain project-specific. [Adoption instructions](docs/adopt-from-repository.md) explain URL-based use and limits.
+An agent needs repository-reading and QA-file access plus the capabilities required by its tasks. The procedures are Markdown; optional executable helpers use Node.js 22+. Pinned dependencies include Playwright MCP, CLI, library/Test and Postman CLI, with email adapters and GitHub CLI setup support. [Tool discovery](automation/tools/README.md) verifies and reuses existing installations/connections through the actual selected harness before offering missing setup. [Postman onboarding](automation/postman/README.md) separates local collection execution from authenticated cloud access/reporting. Native host connections and credentials remain project-specific. [Adoption instructions](docs/adopt-from-repository.md) explain URL-based use and limits.
 
 ## Fork, use as a template or clone
 
@@ -60,7 +60,9 @@ Open the clone as your QA project, follow SETUP.md and give your agent the [boot
 | [Release sign-off and handoff](QA/Quality%20assurance/release-signoff.md) | Release notes, completion evidence, scoped human decision and next-owner delivery/receipt controls |
 | [Quality Control](QA/Quality%20Control/README.md) | Separate suites, repeatable checks and actual results by target and testing type |
 | [Shared progress](unified_project_context.md) | Current checkpoint, decisions, blockers and next action |
-| [Automation](automation/README.md) | Browser/email/GitHub helpers, native check-ins and reviewed PR-regression integration |
+| [Tool discovery and reuse](automation/tools/README.md) | Actual harness access, existing executable/connection reuse and targeted capability verification |
+| [Postman CLI](automation/postman/README.md) | API collection execution, conditional authentication and assertion/result handling |
+| [Automation](automation/README.md) | Browser/API/email/GitHub helpers, native check-ins and reviewed PR-regression integration |
 | [Portability](docs/portability.md) | Adoption on another project or machine without inheriting credentials or stale approvals |
 
 ## Discovery and QA

@@ -4,13 +4,17 @@ import { contained, verifyEvidence } from '../shared/store.js';
 import { validatePreference, validateReport, type BrowserPreference, type BrowserReport } from '../browser/tools.js';
 import { readConnections } from '../email/email.js';
 import { validateSettings } from '../github/github.js';
+import { readHarness, currentHarness, type ExecutionContext } from '../tools/runtime.js';
+import { readRecord, readinessIssues } from '../tools/registry.js';
+import { settings as postmanSettings } from '../postman/postman.js';
 
 /** Revalidates configured capabilities; absence is not silently converted into a configured service. */
 export function integrationIssues(root: string): string[] {
   const issues: string[] = [];
   const read = (path: string) => JSON.parse(readFileSync(contained(root, path), 'utf8'));
   const present = (path: string) => existsSync(contained(root, path));
-  let executionContext: 'interactive' | 'scheduled' = 'interactive';
+  let executionContext: ExecutionContext = readHarness(root)?.executionContext ?? 'interactive';
+  try { currentHarness(root); } catch { issues.push('Identify this calling harness; preserve existing onboarding and verify only affected tools.'); }
   if (!present('.local/project.json')) issues.push('Identify the project, environments and responsible people in the canonical project record.');
   else { const project = read('.local/project.json'); if (!project.name || !project.source || !Array.isArray(project.environments) || !project.environments.length || !Array.isArray(project.owners) || !project.owners.length) issues.push('The project record needs environments, owners and its source.'); }
   if (!present('.local/context-settings.json')) issues.push('Record the context-establishment route.');
@@ -46,6 +50,7 @@ export function integrationIssues(root: string): string[] {
     if (binding.transport === 'human') continue;
     if (binding.authentication !== 'connected' || !binding.verification?.bodyReadAt || binding.verification.context !== executionContext) issues.push(`${binding.id}: full-message ${executionContext} access is not verified.`);
     for (const ref of binding.verification?.evidence ?? []) { try { verifyEvidence(root, ref); } catch { issues.push(`${binding.id}: email capability evidence changed.`); } }
+    if (readHarness(root)) issues.push(...readinessIssues(root, readRecord(root, `email:${binding.id}`), ['account', 'listMessages', 'readMessage']).map(i => `${binding.id}: ${i}`));
   }
   if (present('.local/github-settings.json')) {
     const settings = read('.local/github-settings.json');
@@ -55,7 +60,13 @@ export function integrationIssues(root: string): string[] {
       const path = `.local/github-access/${rule.repository.replace('/', '--')}.json`;
       if (!present(path)) issues.push(`${rule.repository}: repository access is not verified.`);
       else { const access = read(path); if (access.account !== settings.account || access.repository.toLowerCase() !== rule.repository.toLowerCase() || access.root !== realpathSync(root)) issues.push(`${rule.repository}: account/root access evidence differs.`); }
+      if (readHarness(root)) issues.push(...readinessIssues(root, readRecord(root, 'github'), [`repository:${rule.repository.toLowerCase()}`]).map(i => `${rule.repository}: ${i}`));
     }
+  }
+  const postman = postmanSettings(root);
+  if (postman && readHarness(root)) {
+    const required = ['version', 'collectionRun', ...(postman.mode === 'local' ? ['localCollectionRun'] : ['identity', ...postman.collections.map(id => `collection:${id}`), ...postman.environments.map(id => `environment:${id}`)])];
+    issues.push(...readinessIssues(root, readRecord(root, 'postman'), required).map(i => `Postman: ${i}`));
   }
   return issues;
 }

@@ -12,7 +12,9 @@ The pinned dependencies bundle four distinct tools. The host's in-app browser is
 
 Choose cli, mcp, inApp or recommend for interaction. A recommendation must compare actual available capabilities, then save the resolved choice. Save visibility and any explicitly accepted fallback. Playwright Test remains available regardless of that preference. Separate sessions do not automatically share site authentication.
 
-## Install and rehearse
+## Inspect existing setup, then rehearse
+
+Follow [shared tool discovery](../tools/README.md) first. Bind the actual harness and reuse compatible browser tools already accessible there. Restore framework dependencies only when missing. Install browser engines only when the selected tool lacks the required engine; a permissions/session problem is not a reason to reinstall. The commands below are available preparation steps, not a sequence to repeat on every onboarding.
 
 ```shell
 npm ci --ignore-scripts --cache .local/npm-cache
@@ -47,8 +49,12 @@ The `mcpServer` rehearsal starts a local stdio MCP client and proves that server
 
 Run `npm run qa -- browser fixture` in an owned terminal. It prints a synthetic loopback URL and attachment path and closes after five minutes. Through the actual selected host tools: navigate, inspect the page, fill Name, attach the file, save and reopen the same URL. Retain redacted tool-call/outcome evidence. Unsupported upload or session recovery stays unsupported; it is not converted into a pass.
 
-Prepare a private BrowserReport matching the [type](tools.ts): schemaVersion 1, provider inApp/harnessMcp, actual executionContext/visibility, real root/platform/arch/Node major, observed host version/date and per-operation status/evidence. Use navigate/interact/inspect as the initial minimum; a task can require upload/recover or further capabilities. Import with `browser import-report --input .local/native-report.json [--context scheduled]`. The agent must actually perform and explain those checks; the importer verifies references and identity, not whether a claimed observation is true.
+Include the actual bound `harness` identity in the report. Preserve old reports that lack this field and perform one targeted verification. Prepare a private BrowserReport matching the [type](tools.ts): schemaVersion 1, provider inApp/harnessMcp, actual executionContext/visibility, real root/platform/arch/Node major, observed host version/date and per-operation status/evidence. Use navigate/interact/inspect as the initial minimum; a task can require upload/recover or further capabilities. Import with `browser import-report --input .local/native-report.json [--context scheduled]`. The agent must actually perform and explain those checks; the importer verifies references and identity, not whether a claimed observation is true.
 
 ## Scripted testing
 
 Author task-specific suites with [Playwright Test](https://playwright.dev/docs/intro) under the adopting project's reviewed test location. Give expected behavior an independent accepted source. Preserve failures, tested revisions and result artifacts. A snapshot, host walkthrough or successful capability rehearsal cannot be reported as a passing Playwright regression suite.
+
+## Existing setup and calling harness
+
+Use [shared tool discovery](../tools/README.md) before setup. Reuse verified compatible installations, identities and mailbox selections. A version/configuration check does not establish the required operation through this harness. Retain old evidence after moving hosts; reverify only affected capabilities. Missing or expired access does not require reinstalling a working tool.

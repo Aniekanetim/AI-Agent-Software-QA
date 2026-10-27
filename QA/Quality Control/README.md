@@ -31,7 +31,7 @@ For usability, performance, accessibility and security, adapt the case/measureme
 
 ## Repeatable checks and evidence
 
-Use the project's approved tools. For Playwright, keep page objects, fixtures, assertions and test execution separate; record working directories, installation commands, browser version, viewport, workers and retry policy. For API work, provide actual payloads and a Postman collection or selected runner when agreed. Exported requests are not proof of collection execution.
+Use the project's approved tools. For Playwright, keep page objects, fixtures, assertions and test execution separate; record working directories, installation commands, browser version, viewport, workers and retry policy. For API work, provide actual payloads and a Postman collection or selected runner when agreed. Exported requests are not proof of collection execution. For collection-based work, use the [Postman CLI adapter](../../automation/postman/README.md) after [tool discovery/reuse](../../automation/tools/README.md). Retain actual assertions and distinguish failed checks from access/tool errors; a package capability rehearsal is not a product result.
 
 Preserve the smallest evidence that supports the claim: actual results, relevant records/requests/responses or measurements, source/cause checks and links. Screenshots, recordings, raw logs or JSON reports are included when required by the objective or useful to the finding; this package imposes no universal media deliverable. Redact secrets and unrelated personal data.
 

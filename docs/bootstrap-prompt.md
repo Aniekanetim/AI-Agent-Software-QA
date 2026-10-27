@@ -49,3 +49,7 @@ Configured PR intake creates linked work without authorizing tests. Reuse only a
 actual matching reviewed regression policy; material changes return to the gate.
 Preserve actual findings review and sign-off. Never copy approvals from the master.
 ```
+
+## Existing tools and API readiness
+
+Follow [shared tool discovery](../automation/tools/README.md) before setup questions. Reuse existing tools and connections when actual access through this harness is verified. Moving hosts requires targeted capability checks, preserving earlier answers and historical evidence. [Postman CLI](../automation/postman/README.md) supports local collections without account login; cloud resources require selected identity/access and explicit reporting scope.

@@ -11,6 +11,9 @@ import * as email from './email/email.js';
 import { AgentMailAdapter, GmailAdapter } from './email/adapters.js';
 import * as github from './github/github.js';
 import { installGh } from './github/install.js';
+import * as registry from './tools/registry.js';
+import { bindHarness, currentHarness, readHarness, harnessKey, type ExecutionContext } from './tools/runtime.js';
+import * as postman from './postman/postman.js';
 
 const args = process.argv.slice(2), options = new Map<string, string>();
 const positional: string[] = [];
@@ -35,9 +38,11 @@ async function currentPr(repository: string, number: number) {
   const raw = JSON.parse(await github.runGh(['api', `repos/${repository}/pulls/${number}`])); return github.normalizePr(repository, raw);
 }
 const help = {
+  tools: 'bind --input | scan --source [--tool] | select --input | status --tool [--requires operation,operation] | import-host --input',
+  postman: 'check --source | login-instructions | run --input : detects/reuses the CLI; local runs need no login; cloud operations need selected account/reporting scope',
   onboarding: 'start | roadmap-shown --source | status | next | queue --input | shown/not-shown --id --source | reply --input | recover | reconcile --input | pause/resume --source | clarify/defer --input | check/domains --input | finish --input',
   settings: 'open --source | show | choose --area | edit --input | present | save --input | cancel | back | close',
-  browser: 'versions | install | mcp-config | check --provider library/cli/mcpServer [--headless] [--context interactive/scheduled] | import-report --input | fixture',
+  browser: 'versions | install | mcp-config | check --provider library/cli/mcpServer [--headless] [--context interactive/scheduled/ci] | import-report --input | fixture',
   email: 'options --input | discover --provider gmailApi/agentmail --source | create-inbox --input | select --input | verify --input | begin --input | outcome --input',
   github: 'install --source | check --repository | check-in --source | event --repository --number --source | policy-digest --policy | run/dispatch --policy --target --repository --number --source | comment --policy --target --repository --number --body --source',
   evidence: '--path [--pointer] : calculate an evidence reference; no product verdict is inferred',
@@ -47,8 +52,26 @@ async function main() {
   const [area, action] = positional;
   if (!area || area === 'help') { output(help); return; }
   if (area === 'evidence') { output(store.evidence(root, option('path'), options.get('pointer'))); return; }
+  if (area === 'tools') {
+    if (action === 'bind') output(bindHarness(root, input()));
+    else if (action === 'scan') output(await registry.scan(root, option('source'), options.has('tool') ? [option('tool') as registry.NativeTool] : undefined));
+    else if (action === 'select') {
+      const v = input<{ tool: registry.NativeTool; executable: string; prefix?: string[]; source: string }>();
+      output(await registry.probe(root, v.tool, v.source, registry.runProcess, registry.makeCommand(v.executable, v.prefix)));
+    } else if (action === 'status') output(registry.status(root, option('tool') as registry.ToolId, (options.get('requires') ?? 'version').split(',')));
+    else if (action === 'import-host') output(registry.recordHost(root, input()));
+    else throw new Error('Unknown tools command.');
+    return;
+  }
+  if (area === 'postman') {
+    if (action === 'check') output(await postman.inspect(root, option('source')));
+    else if (action === 'login-instructions') output(postman.loginInstructions(root));
+    else if (action === 'run') { const result = await postman.runCollection(root, input()); output(result); if (result.outcome !== 'passed') process.exitCode = 1; }
+    else throw new Error('Unknown Postman command.');
+    return;
+  }
   if (area === 'onboarding') {
-    if (action === 'start') { output({ roadmap: labels, progress: readState(root).value, next: 'Read Onboarding/onboarding-workflow.md; inspect existing records and present the roadmap. Register only necessary missing decisions, one focused prompt at a time.' }); return; }
+    if (action === 'start') { output({ roadmap: labels, progress: readState(root).value, harness: readHarness(root), next: 'Inspect existing records. Bind the actual calling harness and discover/reuse tools before asking setup questions. Present the roadmap and register only missing decisions.' }); return; }
     if (action === 'status') { const state = readState(root).value; output({ state, readiness: readiness(root, state) }); return; }
     if (action === 'next') { output(conversation.next(root, options.get('repeat-source'))); return; }
     if (action === 'queue') conversation.queueQuestions(root, input());
@@ -80,11 +103,19 @@ async function main() {
     output(value); return;
   }
   if (area === 'browser') {
+    const browserContext = (): ExecutionContext => { const value = options.get('context') ?? currentHarness(root).executionContext; if (!['interactive', 'scheduled', 'ci'].includes(value)) throw new Error('Use interactive, scheduled or ci context.'); return value as ExecutionContext; };
     if (action === 'versions') output(browser.versions(root));
     else if (action === 'install') { await browser.installBrowsers(root); output({ installed: true, next: 'Run the selected actual capability rehearsal. Installation is not browser or host-connection verification.' }); }
     else if (action === 'mcp-config') output(browser.mcpConfiguration(root));
-    else if (action === 'check') { const provider = option('provider'); if (!['library', 'cli', 'mcpServer'].includes(provider)) throw new Error('Rehearse library, cli or mcpServer; native host tools require actual host observation.'); output(await browser.rehearse(root, provider as 'library' | 'cli' | 'mcpServer', options.has('headless'), context())); }
-    else if (action === 'import-report') { const report = input<browser.BrowserReport>(); if (!['inApp', 'harnessMcp'].includes(report.provider)) throw new Error('Only actual native-connection reports may be imported.'); const issues = browser.validateReport(root, report, context()); if (issues.length) throw new Error(issues.join('; ')); const path = `.local/browser-reports/${report.provider}-${context()}.json`; store.save(root, path, report, store.revision(root, path)); output({ saved: path }); }
+    else if (action === 'check') { const provider = option('provider'); if (!['library', 'cli', 'mcpServer'].includes(provider)) throw new Error('Rehearse library, cli or mcpServer; native host tools require actual host observation.'); output(await browser.rehearse(root, provider as 'library' | 'cli' | 'mcpServer', options.has('headless'), browserContext())); }
+    else if (action === 'import-report') {
+      const report = input<browser.BrowserReport>(); if (!['inApp', 'harnessMcp'].includes(report.provider)) throw new Error('Only actual native-connection reports may be imported.');
+      const issues = browser.validateReport(root, report, browserContext()); if (issues.length) throw new Error(issues.join('; '));
+      const path = `.local/browser-reports/${report.provider}-${browserContext()}.json`; store.save(root, path, report, store.revision(root, path));
+      store.save(root, `.local/browser-reports/history/${harnessKey(report.harness!)}/${report.provider}-${Date.now()}.json`, report, null);
+      registry.recordHost(root, { tool: report.provider === 'inApp' ? 'inAppBrowser' : 'harnessMcp', source: 'Actual host browser report', connectionReference: report.harness!.source, version: report.version, available: true, accessible: true, compatible: true, authentication: 'notRequired', capabilities: report.operations });
+      output({ saved: path });
+    }
     else if (action === 'fixture') {
       const fixture = await startFixture(); const file = store.contained(root, '.local/rehearsal/synthetic.txt'); mkdirSync(resolve(file, '..'), { recursive: true }); writeFileSync(file, 'Synthetic QA capability check only.');
       output({ synthetic: true, url: fixture.url, attachment: file, expiresInMinutes: 5, next: 'Use the chosen host browser to fill Name, attach this file, Save draft and reopen the same draft URL. Record actual tool calls and outcomes, then import its capability report.' });
@@ -113,7 +144,10 @@ async function main() {
     if (action === 'install') { output(await installGh(root, option('source'))); return; }
     if (action === 'check') {
       const access = await github.inspectConnection(option('repository')); const path = `.local/github-access/${access.repository.replace('/', '--')}.json`;
-      store.save(root, path, { ...access, root }, store.revision(root, path)); output(access); return;
+      store.save(root, path, { ...access, root, harness: currentHarness(root) }, store.revision(root, path));
+      const record = await registry.probe(root, 'github', options.get('source') ?? 'Actual GitHub identity/repository check');
+      if (record.compatible) { record.authentication = 'connected'; record.account = access.account; record.capabilities[`repository:${access.repository.toLowerCase()}`] = { status: 'verified', evidence: [store.evidence(root, path)] }; registry.saveRecord(root, record); }
+      output(access); return;
     }
     if (action === 'policy-digest') { output({ policyDigest: github.policyDigest(fromFile(option('policy'))) }); return; }
     const configuration = fromFile<github.GithubSettings>('.local/github-settings.json'); github.validateSettings(configuration);

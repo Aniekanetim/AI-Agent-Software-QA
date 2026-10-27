@@ -1,6 +1,24 @@
 # Package notes
 
-**Version:** 1.3.0. **Created:** 22 October 2026. **Updated:** 27 October 2026. **State:** reusable workflow package; no configured product, live discovery or QA execution history.
+**Version:** 1.4.0. **Created:** 22 October 2026. **Updated:** 27 October 2026. **State:** reusable workflow package; no configured product, live discovery or QA execution history.
+
+## Version 1.4.0: tool reuse and Postman CLI
+
+Added [shared discovery/readiness](../automation/tools/README.md) and [Postman CLI](../automation/postman/README.md). Onboarding inspects existing installations/selections and actual host connections before setup questions. Executable selection is used by browser CLI/MCP, GitHub and Postman execution. Library/Test retain the suite dependencies. Reports distinguish availability, harness invocation, compatibility, identity and operation evidence; they are bound to the actual harness/profile/version, machine/root and interactive/scheduled/CI context. Version scans retain operation-specific evidence and do not refresh its age. Old onboarding answers remain valid; legacy capability reports need targeted verification, not an interview restart.
+
+The pinned Postman CLI 1.79.0 platform package works without lifecycle scripts. The package does not run its global instruction-edit hook or initialize a user's Postman project. Local execution isolates Postman credentials/profile and runs an exact approved v2.1 copy; cloud resources require a selected identity and explicit reporting scope. API-target credentials remain separate. Execution preserves assertion failure versus tool/request errors, input evidence and per-run identity. Interrupted executions cannot be repeated blindly; raw reports are temporary private material. Unsupported structured reporters produce incomplete evidence rather than a passing verdict.
+
+The package CI includes a real loopback Postman passing assertion run and an intentional failing assertion run, in addition to helper and browser checks. The pinned CLI no longer exposes the JSON reporter flags documented for some versions; its YAML export requires sign-in. The adapter validates actual version/flags and reads the observed 1.79.0 CLI assertion table for account-free local execution. Unknown or ambiguous output remains incomplete. Cloud identity/resource/reporting behavior is covered with synthetic adapter tests; no live account connection is claimed.
+
+## Version 1.4.0 validation and handoff
+
+The [Windows/Linux verification run](https://github.com/Aniekanetim/AI-Agent-Software-QA/actions/runs/40491538700) passed for implementation revision `68de134172e28ae4e5454a2523c56259924d8262`. Each job restored dependencies with lifecycle scripts disabled, passed TypeScript and all 39 helper tests, executed the real Postman CLI against a synthetic loopback API (one passing collection and one retained assertion failure), verified pinned GitHub CLI installation, and passed Playwright Test plus CLI/MCP form/upload/save/recovery checks. Subsequent documentation-only changes do not change that implementation. Earlier failed CI attempts remain available; they exposed reporter-version differences, npm shim resolution and execution-context labeling, which were corrected before review.
+
+Local checks also passed TypeScript and all 39 helper tests. Documentation paths/anchors and empty live queues were checked. The five QA statuses, both context ownership models, existing human review gates and independent discovery pipeline remain intact. The master has no adopting-project accounts, live tickets, product results or active scheduler.
+
+This managed local harness denied native Postman startup with a registry-policy error; its process/Git restrictions were not weakened. CI success establishes execution on those runners, not current access through another harness. Native host inventories still require the actual host integration directory/calls; the package cannot enumerate every host universally. Real Postman Cloud login/resource/reporting, Gmail/AgentMail access and adopting-project execution require their own scoped configuration and verification. Pattern checks do not replace evidence redaction.
+
+For adoption, start with [shared discovery/reuse](../automation/tools/README.md), then [Postman setup and execution](../automation/postman/README.md). Preserve earlier onboarding answers and recheck only affected capabilities. Reuse a valid installation/session; authenticate only for required cloud access. Complete the ordinary project-specific handoff before assigned work. No production release or product-test sign-off is implied by these package checks.
 
 ## Version 1.3.0: guided onboarding and task-driven integrations
 

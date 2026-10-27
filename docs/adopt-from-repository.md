@@ -56,3 +56,7 @@ Do not claim background monitoring merely because the repository was cloned. Rec
 - Applicable instructions and human-context ownership are preserved; the agent can locate both contexts, discovery requests, board and QA records.
 - Actual setup sources are available or their specific gaps are recorded; no requirements/results/approvals are fabricated.
 - The agent can prepare the appropriate informed briefing. Discovery, testing, baseline changes and scheduling retain their separate authorization boundaries.
+
+## Existing tools and API readiness
+
+Follow [shared tool discovery](../automation/tools/README.md) before setup questions. Reuse existing tools and connections when actual access through this harness is verified. Moving hosts requires targeted capability checks, preserving earlier answers and historical evidence. [Postman CLI](../automation/postman/README.md) supports local collections without account login; cloud resources require selected identity/access and explicit reporting scope.

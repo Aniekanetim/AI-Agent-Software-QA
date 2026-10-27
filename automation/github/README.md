@@ -10,7 +10,7 @@ Reuse a compatible GitHub CLI installation. If it is unavailable, the optional l
 npm run qa -- github install --source <actual-install-instruction>
 ```
 
-Authenticate through an interactive terminal using the installed executable with `auth login --hostname github.com --web`, or reuse the actual authorized host connection. Never print `gh auth token` or store it in project settings. The helpers prefer the locally installed executable if present; otherwise they use PATH.
+Authenticate through an interactive terminal using the installed executable with `auth login --hostname github.com --web`, or reuse the actual authorized host connection. Never print `gh auth token` or store it in project settings. The helpers reuse the verified executable selection; otherwise they inspect PATH before the project-local fallback. Authenticate only when required access is missing or expired.
 
 ```shell
 npm run qa -- github check --repository owner/repository
@@ -60,3 +60,7 @@ For a separately approved workflow dispatch, use `github dispatch` with the same
 The portable repo's own [package checks](../../.github/workflows/package-checks.yml) only compile/test these helpers and rehearse a synthetic loopback fixture. They do not monitor another project's PRs, run its product tests or approve its releases.
 
 [GitHub CLI authentication](https://cli.github.com/manual/gh_auth_login), [workflow dispatch](https://cli.github.com/manual/gh_workflow_run), [PR events](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request)
+
+## Existing setup and calling harness
+
+Use [shared tool discovery](../tools/README.md) before setup. Reuse verified compatible installations, identities and mailbox selections. A version/configuration check does not establish the required operation through this harness. Retain old evidence after moving hosts; reverify only affected capabilities. Missing or expired access does not require reinstalling a working tool.

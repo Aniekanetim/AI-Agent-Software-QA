@@ -2,6 +2,10 @@
 
 ## Onboard before assigned work
 
+Before tool setup questions, follow [shared tool discovery](automation/tools/README.md). Inspect the actual calling harness, existing executable selections and native integrations. Reuse compatible working setup and supplied choices. Distinguish installation, harness access, command compatibility, authentication, resource permissions and actual operation evidence. Do not reinstall for a harness restriction or restart onboarding after switching hosts; reverify only affected capabilities and retain prior records. A version probe is not a completed browser/API operation.
+
+Use [Postman CLI](automation/postman/README.md) for applicable collection-based tasks. Local files need no Postman login. Cloud work needs selected identity/resources and explicit reporting scope; authenticate only when required. Keep Postman credentials separate from target-API credentials. Never use postman init as discovery, create accounts automatically, or assume MCP/desktop sign-in proves CLI access.
+
 For new adoption, read [guided onboarding](Onboarding/onboarding-workflow.md), inspect existing preparation and show its roadmap. Prepare project/context/access/tools/operating preferences rather than asking the user to select a testing category. Use one focused missing question at a time across onboarding, authentication, mail selection and settings; retain clear extra answers, actual prompt/response references and interrupted-save recovery. Do not pretend helper JSON was displayed to a human. Respect pause/resume, Back, Cancel and Close settings.
 
 Establish all five context domains through provide/discover/combined routes. Discovery remains independent. Human-source transcription into named baseline documents needs explicit maintenance authorization; observations remain in the AI store. Never treat an empty template or inferred behavior as an approved requirement.
