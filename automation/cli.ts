@@ -16,6 +16,7 @@ import { installGh } from './github/install.js';
 import * as registry from './tools/registry.js';
 import { bindHarness, currentHarness, readHarness, harnessKey, type ExecutionContext } from './tools/runtime.js';
 import * as postman from './postman/postman.js';
+import { assessCoverage, type CoverageSnapshot } from './coverage/coverage.js';
 
 const args = process.argv.slice(2), options = new Map<string, string>();
 const positional: string[] = [];
@@ -40,6 +41,7 @@ async function currentPr(repository: string, number: number) {
   const raw = JSON.parse(await github.runGh(['api', `repos/${repository}/pulls/${number}`])); return github.normalizePr(repository, raw);
 }
 const help = {
+  coverage: 'assess --input : read-only consistency/count check of a canonical-record snapshot; no execution, approval or product verdict',
   tools: 'bind --input | scan --source [--tool] | select --input | status --tool [--requires operation,operation] | import-host --input',
   postman: 'check --source | login-instructions | run --input : detects/reuses the CLI; local runs need no login; cloud operations need selected account/reporting scope',
   onboarding: 'start | roadmap-shown --source | status | next | queue --input | shown/not-shown --id --source | reply --input | recover | reconcile --input | pause/resume --source | clarify/defer --input | check/domains --input | finish --input',
@@ -54,6 +56,12 @@ async function main() {
   const [area, action] = positional;
   if (!area || area === 'help') { output(help); return; }
   if (area === 'evidence') { output(store.evidence(root, option('path'), options.get('pointer'))); return; }
+  if (area === 'coverage') {
+    if (action !== 'assess') throw new Error('Use coverage assess --input.');
+    const assessment = assessCoverage(root, input<CoverageSnapshot>()); output(assessment);
+    if (assessment.status === 'needsReview') process.exitCode = 1;
+    return;
+  }
   if (area === 'tools') {
     if (action === 'bind') output(bindHarness(root, input()));
     else if (action === 'scan') output(await registry.scan(root, option('source'), options.has('tool') ? [option('tool') as registry.NativeTool] : undefined));

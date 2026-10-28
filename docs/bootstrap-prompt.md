@@ -4,7 +4,7 @@ Open the project-specific QA root and paste this prompt into its agent chat. The
 
 ```text
 Read AGENTS.md, README.md, SETUP.md, unified_project_context.md,
-Project Context/README.md, Product Discovery/README.md,
+Project Context/README.md, QA Process Context/README.md, Product Discovery/README.md,
 Product Discovery/Project Context/README.md, QA task management Board/README.md and
 QA/Quality assurance/qa-workflow.md from this QA root.
 Use this AI-led, human-reviewed workflow for the named project.
@@ -53,3 +53,7 @@ Preserve actual findings review and sign-off. Never copy approvals from the mast
 ## Existing tools and API readiness
 
 Follow [shared tool discovery](../automation/tools/README.md) before setup questions. Reuse existing tools and connections when actual access through this harness is verified. Moving hosts requires targeted capability checks, preserving earlier answers and historical evidence. [Postman CLI](../automation/postman/README.md) supports local collections without account login; cloud resources require selected identity/access and explicit reporting scope.
+
+## Maintain the testing foundation
+
+Before QA preparation/resumption, read relevant [QA Process Context](../QA%20Process%20Context/README.md) records. Establish actual owners and reuse existing strategies/matrices/data procedures. Keep positive/negative/edge perspectives, design techniques and exploration explicit; preserve scoped coverage, original results and the existing human gates. A discovery-only adoption does not require an approved test suite or start a QA run.

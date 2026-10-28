@@ -13,3 +13,7 @@
 Use plain feature names and numbered actions. Do not assume a previously prepared example or shared chat context. Keep Postman imports and API request execution out of UI reproduction steps/preconditions. Link a separate technical setup note when data preparation is required.
 
 Record actual outcomes separately for each run/build using the result template; do not edit expected behavior to match a faulty response.
+
+## Design and coverage links
+
+Reference the applicable [QA process records](../../../QA%20Process%20Context/README.md) and their revisions. In the canonical matrix, link case IDs to condition/source/risk IDs, relevant positive/negative/edge perspectives, techniques and selection rationale. Link any charter separately. Shared metadata belongs in that reference rather than duplicate step/result columns. Record what was actually exercised in each run; a label is not another test.

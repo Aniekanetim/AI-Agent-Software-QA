@@ -36,3 +36,9 @@ Use the project's approved tools. For Playwright, keep page objects, fixtures, a
 Preserve the smallest evidence that supports the claim: actual results, relevant records/requests/responses or measurements, source/cause checks and links. Screenshots, recordings, raw logs or JSON reports are included when required by the objective or useful to the finding; this package imposes no universal media deliverable. Redact secrets and unrelated personal data.
 
 Templates are unexecuted reference material. No product suites, automation, test data or historical outcomes are bundled in this reusable package.
+
+## Design and coverage references
+
+Use [QA Process Context](../../QA%20Process%20Context/README.md) for applicable strategy, design, coverage definitions, configuration/data and retained regression. Record source/process/suite revisions separately from the served build. Consider positive, negative and edge perspectives with appropriate techniques; use [exploratory charters](../../QA%20Process%20Context/Test%20Design%20and%20Exploration/exploratory-charter.md) for focused investigation.
+
+Keep case steps and result tables concise. Put shared classifications and condition links in the canonical matrix or a short suite reference section. Count a multiply-labelled case once; retain actual exercised conditions, failed/partial/blocked work and unknowns. Results stay canonical here or in the project's existing equivalent; tickets provide navigation. A structural helper assessment or completed charter alone is not a product pass.

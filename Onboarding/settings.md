@@ -25,3 +25,7 @@ The [global mailbox policy](../automation/email/mailbox-policy.md) supplies the 
 Use [shared discovery](../automation/tools/README.md) to inspect/reuse the selected tool before proposing setup. API tools and Postman controls local/cloud mode, selected resources, credential source and reporting; it does not select a testing category. Changing the Postman account, region or credential source requires a matching identity/resource check. Adding a resource reopens its access check. Recheck before asking for sign-in; changed settings alone do not prove authentication is missing. A harness change reopens affected verification while retaining prior answers.
 
 Preferences describe desired behavior. Capability records describe what actually works. A new browser needs a matching rehearsal and application sign-in; a new mailbox needs identity/content checks; a new schedule needs an actual scheduler result. Preserve unrelated settings and reopen only affected preparation. [Command contract](../automation/onboarding/README.md)
+
+## Process-record changes
+
+Use the existing review-responsibilities/execution-policies setting for proposed changes to the testing approach. Link canonical [QA process records](../QA%20Process%20Context/README.md) and their applicable revisions; do not store competing strategies in settings. Preserve unrelated preferences. A settings save is not approval of changed tests or evidence that affected coverage was rerun.

@@ -33,3 +33,7 @@ The source project's research reviewed the relevant ISTQB material and public IS
 The [workflow](qa-workflow.md), [board](../../QA%20task%20management%20Board/README.md) and [context index](../../Project%20Context/README.md) apply these rules together. Additional test types use the same decision process with their own measurable criteria and methods.
 
 The [release-sign-off research and procedure](release-signoff.md) adds explicit release notes, completion assessment, scoped decision and operational transfer to G5. One packet carries those distinct purposes; actual delivery and required acceptance are checked before closure. Its primary sources and local-versus-production tailoring are recorded in that procedure.
+
+## Project-specific process context
+
+[QA Process Context](../../QA%20Process%20Context/README.md) makes planning, test design/charters, traceability, configuration, data and regression maintenance explicit. Its directory names and G1–G5 integration are local product choices. ISTQB CTFL sections 1.4.3–1.4.4, 4, 5.1, 5.3 and 5.4 support these underlying practices. Positive/negative/edge perspectives cross interfaces/objectives; creative design can use exploratory and systematic techniques. [OpenSSF](https://glossary.openssf.org/negative-testing/) describes negative checks; [W3C evaluation guidance](https://www.w3.org/WAI/test-evaluate/conformance/wcag-em/) illustrates scoped accessibility coverage. These sources do not promise exhaustive testing or establish this package's formal standards conformance.

@@ -49,3 +49,7 @@ After a repository/PR policy is selected, a native check-in can run `github chec
 Store the desired mode/source in `.local/operation-preferences.json`. For scheduled operation, record the actual scheduler id/state/root/source/evidence in `.local/schedule-record.json` after inspecting the real scheduler result. For events, retain triggerReference and triggerEvidence. These are evidence-backed records, not a scheduler implementation. A saved cadence or a dispatched workflow is not proof of completed execution. Verify unattended browser/email capabilities in the actual scheduled context and record first-run observations.
 
 Stay quiet when monitored state is unchanged or nonactionable unless periodic updates were explicitly requested. Report meaningful progress, failures or human decisions needed. No adopting-project schedule, discovery poller or PR-regression trigger is activated in this master; its own package CI only tests helpers and a synthetic fixture.
+
+## Coverage and process records
+
+[QA Process Context](../QA%20Process%20Context/README.md) supplies task-relevant testing preparation and maintenance. The optional [coverage assessor](coverage/README.md) reads a private snapshot of canonical records, checks IDs/references/counts and exposes stale claims. It creates no report or product verdict and performs no tests. Board prompts and configured GitHub work retain the same authorizations and gates.

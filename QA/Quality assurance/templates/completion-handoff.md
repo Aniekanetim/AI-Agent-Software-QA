@@ -27,7 +27,7 @@ Explain the user-visible changes/fixes, their effect and relevant issue links. I
 | Testing type / target | Planned | Executed | Pass | Fail | Blocked / not run | Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
 
-Record actual executor/date, methods/configuration, original-versus-retest results, deviations, setup/harness issues, untested areas and retained regression links. Derive counts from actual result rows. A recognized expected-failure signature remains a failed product test.
+Link the applicable [coverage matrix](../../../QA%20Process%20Context/Coverage%20and%20Traceability/README.md) and process/data/configuration revisions. Separate designed items, actually exercised conditions and case outcomes. Explain sampling, unresolved intent and exclusions; keep overlapping labels out of additive totals. Record actual executor/date, methods/configuration, original-versus-retest results, deviations, setup/harness issues, untested areas and retained regression links. Derive counts from actual result rows. A recognized expected-failure signature remains a failed product test.
 
 ## 4. Defects, risks and exceptions
 

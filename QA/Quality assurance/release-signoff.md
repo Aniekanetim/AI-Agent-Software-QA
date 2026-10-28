@@ -54,3 +54,7 @@ For a local demo or test-level handoff, identify local setup and recovery instea
 After an actual decision, the closing message must identify the target and scoped verdict, material changes, actual test evidence, open limits, direct release-handoff link, next owner/actions and delivery/acknowledgement limits. Do not finish with only “updated,” “published,” a commit link or test totals. If sign-off is still pending, give the full review request rather than a completion claim.
 
 This policy strengthens future closure. When documenting an already accepted run, label a later supplement with its true preparation date and original approval source. Do not claim the new packet was available or reviewed earlier, manufacture a signature or require the same approval again unless scope/risk actually changed.
+
+## Process-context handoff
+
+Include applicable [QA Process Context](../../QA%20Process%20Context/README.md) revisions and canonical coverage/result references in the existing packet. Identify achieved versus agreed coverage, unresolved intent, sampling/exclusions, retained regression and who maintains affected strategy, data and configuration next. Keep failed/partial/blocked/unexecuted work visible and historical retests separate. A structural/count check is not product sign-off or proof of exhaustive coverage. The existing human decision, delivery and required receipt controls remain applicable.

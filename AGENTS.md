@@ -40,7 +40,7 @@ Use the existing workflow below for all ticket work. Folder placement and develo
 
 ## AI-led QA with human review
 
-Read `unified_project_context.md`, `Project Context/README.md`, `Product Discovery/Project Context/README.md`, the relevant requirements/discoveries/evidence and `QA/Quality assurance/qa-workflow.md` before QA work. Discovery follows its own procedure above. If present, read the ignored `mental_model/continuity.md` for assistant continuity; essential team facts must remain in shared records. Its absence on a fresh copy is not a blocker.
+Read `unified_project_context.md`, `Project Context/README.md`, `Product Discovery/Project Context/README.md`, `QA Process Context/README.md`, the relevant requirements/discoveries/evidence and `QA/Quality assurance/qa-workflow.md` before QA work. Discovery follows its own procedure above. If present, read the ignored `mental_model/continuity.md` for assistant continuity; essential team facts must remain in shared records. Its absence on a fresh copy is not a blocker.
 
 The AI agent performs the QA workflow; the human QA engineer reviews and approves its scoped decisions end to end. This applies across functional and non-functional testing types. Adoption of this operating model does not authorize any project test execution.
 
@@ -79,3 +79,13 @@ When a necessary answer is missing, inaccessible or contradictory, follow the bo
 After a material clarification, approval, build/flow change, execution, defect update or blocker, update the detailed evidence/review record, agent-managed discoveries where affected, shared progress and traceability; update an ignored personal note only if used. Propose any necessary human-baseline change to its owner instead of editing root Project Context. Shared records must stand alone; the personal mental model is not team authority. Keep records concise and linked from requests, tickets and handoffs.
 
 Never copy another project's private accounts, credentials, approvals or execution outcomes into this project. Verify access to the named target and observe the agreed environment/data limits. Read `SETUP.md` on first adoption and `automation/README.md` before arranging check-ins. This package starts unconfigured, with no live tickets, test outcomes or active schedule. Recheck setup and source/build identity after moving machines.
+
+## Maintain QA process context
+
+Before preparing or resuming testing, read [QA Process Context](QA%20Process%20Context/README.md) and the applicable strategy, design/exploration, coverage, configuration, data and regression records. These are agent-maintained operational records under reviewed policy, not another product-requirement authority. Name actual accountable owners and preserve source/review/revision references. Reuse canonical records; do not duplicate results or rewrite human requirements.
+
+Distinguish target/interface, quality objective, scenario perspectives, techniques and execution method. Consider meaningful positive, negative and edge cases; labels overlap and never multiply case counts. Use focused charters for creative/exploratory investigation. Explain selections and material exclusions, not a fixed technique/case quota. Keep QA charters distinct from independent discovery requests.
+
+At G1/G2 link the applicable process basis, risk/condition IDs, cases/charters, data and configuration. Record designed versus exercised coverage and actual outcomes by scope/run/build. Unknown intent blocks dependent Pass/Fail judgments; retain authorized observations with their limits. Update affected traceability and retained regression after execution/clarifications. At G5 expose untested items, residual gaps and next-owner maintenance actions through the existing packet and ticket.
+
+On changes, assess affected records and mark Needs review; preserve historical results and prior approvals. Routine operational updates remain within existing authorization, while material scope/criteria/action changes return to the affected gate. Do not rerun every test or restart onboarding solely because a record changed. Use the optional read-only coverage helper only as a structural/count check; inspect canonical records and never treat its output as execution, proof of accepted intent or product sign-off.

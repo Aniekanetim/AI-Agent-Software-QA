@@ -4,7 +4,7 @@ Use this procedure in a project-specific QA root. Preserve the existing working 
 
 ## 1. Inspect before asking
 
-Read AGENTS.md, shared progress, both context indexes, existing onboarding state/settings and applicable records. Identify available source revisions, target URLs, owners, operating limits and actual tool inventory. Reuse information already provided, including answers volunteered before their roadmap stage. An empty template is not project knowledge.
+Read AGENTS.md, shared progress, both product-context indexes, [QA Process Context](../QA%20Process%20Context/README.md), existing onboarding state/settings and applicable records. Identify available source revisions, target URLs, owners, operating limits and actual tool inventory. Reuse information already provided, including answers volunteered before their roadmap stage. An empty template is not project knowledge.
 
 Show the [roadmap](README.md#roadmap) with completed, pending, blocked and deferred items. Explain the immediate missing decision. Use `onboarding roadmap-shown --source <actual-message-reference>` only after showing it.
 
@@ -51,6 +51,12 @@ Brief the human on the resulting understanding, its basis, observed/inferred fac
 Establish on-demand, scheduled, events or combined operation. Reuse already supplied preferences; do not ask for them again. Discuss cadence/timezone, eligible repositories/PRs, evidence retention, reporting channels and accountable reviewers. Settings remain available after onboarding.
 
 A schedule must be configured through the actual host scheduling feature after authorization. PR polling/event intake creates or updates linked assignments without executing tests. A reviewed reusable regression policy can authorize matching automatic runs; brief every covered action, expected outcome and limit before that policy decision. A new policy is not approved because it was generated or saved. Preserve G3 findings decisions and G5 sign-off/handoff.
+
+## Establish the project's testing foundation
+
+Within the existing operation/handoff stages, inspect [QA Process Context](../QA%20Process%20Context/README.md) and existing equivalent records. Link canonical sources, identify actual QA/technical/data owners and record gaps as original questions. Retain earlier context-route, tool and mailbox answers. Prepare only missing process records as Draft; the human reviews material approach/coverage decisions through the normal gates.
+
+The handoff links the strategy, design guide/charters, RTM/coverage definitions, configuration/data plans and regression inventory that actually exist. State which missing items affect which work. This does not restrict future testing types or authorize execution. Existing schemaVersion 1 onboarding state is preserved; no automatic reset or new mandatory product-domain field is introduced. `onboarding status` verifies existing structural/evidence checks, not the semantic completeness of these process records. The agent must inspect and explain them.
 
 ## 6. Check readiness and hand over
 

@@ -19,3 +19,7 @@ Exploration goes through [Product Discovery](../Product%20Discovery/discovery-wo
 For every domain, retain one of: supported knowledge with source evidence; justified non-applicability and owner; or a concrete original question with its owner and affected work. Record conflicts and ask the responsible owner; do not settle intended policy by copying what the application does. Link actual updates back to the original question/request/ticket and refresh only affected discoveries.
 
 Onboarding establishes a bounded foundation. Later tasks can reveal new areas. Read accepted context for expectations and AI context for practical learning before each task; refresh stale discoveries without automatically rewriting the baseline.
+
+## Separate operational testing preparation
+
+After accounting for the five product domains, inspect [QA Process Context](../QA%20Process%20Context/README.md) through the existing operating-rules checkpoint. Locate the team's process records and accountable owners; ask one focused missing decision only when needed. Do not copy product requirements into a strategy, classify the user's future testing categories or claim folders establish coverage. Reuse valid answers and reference original questions for unresolved ownership.

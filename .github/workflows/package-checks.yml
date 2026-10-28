@@ -2,9 +2,9 @@ name: Package checks
 on:
   push:
     branches: [main, 'codex/**']
-    paths: ['automation/**/*.ts', '.github/workflows/**', 'package.json', 'package-lock.json', 'tsconfig.json']
+    paths: ['**/*.md', 'QA Process Context/**/*.json', 'automation/**/*.ts', '.github/workflows/**', 'package.json', 'package-lock.json', 'tsconfig.json']
   pull_request:
-    paths: ['automation/**/*.ts', '.github/workflows/**', 'package.json', 'package-lock.json', 'tsconfig.json']
+    paths: ['**/*.md', 'QA Process Context/**/*.json', 'automation/**/*.ts', '.github/workflows/**', 'package.json', 'package-lock.json', 'tsconfig.json']
 permissions:
   contents: read
 jobs:

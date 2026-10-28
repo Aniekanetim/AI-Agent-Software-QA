@@ -4,6 +4,8 @@ This board gives the AI QA agent and developers tickets to work on. Each ticket 
 
 [Human-maintained Project Context](../Project%20Context/README.md) locates product sources, owners, states and revisions. Applicable accepted sources establish expectations. [AI-managed discovery context](../Product%20Discovery/Project%20Context/README.md) supplies observations, journeys and setup/investigation knowledge. Read relevant sources in both before acting; discoveries are not automatically requirements.
 
+[QA Process Context](../QA%20Process%20Context/README.md) supplies maintained testing strategy, design/exploration, coverage, configuration, data and regression references. Read relevant records before preparing/resuming work. This board remains the central reporting entry point: tickets link canonical results and handoff evidence instead of duplicating them.
+
 ## Requesting product discovery
 
 This five-folder board continues to manage QA assignments and defects. Learning requests belong in the independent [Product Discovery pipeline](../Product%20Discovery/README.md). When a QA ticket needs exploration, identify the question/affected check and link a targeted discovery request in both directions. Record its required output and separate authorization; keep the QA ticket's current folder and checkpoint. Continue independent authorized checks.
@@ -36,7 +38,7 @@ Ticket references include stable IDs. When a file moves, keep its ID, contents a
 
 ## Initial testing and defect reporting
 
-1. Read the complete assignment, both context indexes and relevant sources/discoveries. Identify the build, objective, human-source revisions/criteria and discovery versions; resolve necessary gaps through the procedure below. Prepare the QA scope/design/readiness briefing.
+1. Read the complete assignment, both product-context indexes, applicable QA Process Context records and relevant sources/discoveries. Identify the build, objective, human-source revisions/criteria and discovery versions; resolve necessary gaps through the procedure below. Prepare the QA scope/design/readiness briefing.
 2. Execute only the work covered by the recorded human authorization. Keep actual outcomes, inferences and human decisions distinct.
 3. Open a new Dev Todo ticket for each distinct defect. Record reproduction, expected/actual behavior, evidence, severity, supported cause or hypothesis, proposed correction and release impact. Link its parent and relevant test case.
 4. Keep the parent assignment in Ready for QA while blocking findings or required decisions remain. Record its linked blockers and next action; do not repeatedly run the same tests against an unchanged build.
@@ -60,7 +62,7 @@ An original bug can reach Tested-Ok while a separate regression remains open. Li
 
 ## AI check-in procedure
 
-1. Read [AGENTS.md](../AGENTS.md), [shared progress](../unified_project_context.md), the [human context index](../Project%20Context/README.md), the [discovery context index](../Product%20Discovery/Project%20Context/README.md), this README and the [QA workflow](../QA/Quality%20assurance/qa-workflow.md).
+1. Read [AGENTS.md](../AGENTS.md), [shared progress](../unified_project_context.md), the [human context index](../Project%20Context/README.md), the [discovery context index](../Product%20Discovery/Project%20Context/README.md), the [process-context index](../QA%20Process%20Context/README.md), this README and the [QA workflow](../QA/Quality%20assurance/qa-workflow.md).
 2. Inspect ticket Markdown files directly inside Ready for QA and Retest. Read their ownership, waiting reason, linked blockers, clarification responses and existing decisions before selecting work. Consult the ticket's applicable source revisions/BR/AC IDs, rather than assuming the latest implementation defines expected behavior.
 3. Resume eligible unfinished work owned by this QA chat first. Otherwise choose an unclaimed actionable ticket across both queues by priority P0, P1, P2, P3, then oldest creation time, then ticket ID. If priority or essential input is missing, request that information once and record what is needed.
 4. Respect another worker's claim. Before claiming, re-read the ticket and record the owner, claim time, workflow checkpoint and next action. Handle one ticket at a time and verify that its ID is not duplicated elsewhere on the board.
@@ -137,6 +139,8 @@ Copy this into a new file in Ready for QA and replace the placeholders. Do not r
 
 ## Testing scope and completion criteria
 - Testing objective/types: <requested coverage>
+- QA process basis: <strategy, coverage/condition IDs, configuration/data and regression record revisions, or identified gaps>
+- Design considerations: <relevant positive/negative/edge perspectives, techniques and exploratory charter references; explain material omissions>
 - In scope / out of scope: <boundaries>
 - Completion criteria: <required outcomes, evidence and human decision>
 
