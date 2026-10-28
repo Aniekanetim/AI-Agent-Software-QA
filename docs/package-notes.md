@@ -1,6 +1,14 @@
 # Package notes
 
-**Version:** 1.4.1. **Created:** 22 October 2026. **Updated:** 27 October 2026. **State:** reusable workflow package; no configured product, live discovery or QA execution history.
+**Version:** 1.5.0. **Created:** 22 October 2026. **Updated:** 28 October 2026. **State:** reusable workflow package; no configured product, live discovery or QA execution history.
+
+## Version 1.5.0: global mailbox policy and tagged test identities
+
+The [global mailbox policy](../automation/email/mailbox-policy.md) now supplies the standard procedure across adopting projects. The agent establishes the selected inbox, permissions and provider/application alias support, then uses distinct identity/purpose/run aliases for fresh accounts and exact saved aliases for continuation/retests. Users no longer need to devise that policy. `email policy` displays the defaults; `email account` fresh/reuse commands prepare and record identities in the private test-account register. Preparation retains creator/profile, objective and declared starting state while explicitly leaving actual application state unverified.
+
+Corrected the helper's physical-inbox-only recipient restriction. A selected binding can explicitly enable supported plus aliases with an actual authorization/support source. Verification continues to authenticate the physical inbox while matching the full tagged recipient, sender/purpose and request window. Old bindings retain base-address-only behavior. Policy changes invalidate affected attempts. Full-message identity is also checked against the listed message, and redacted receipts identify both physical inbox and recipient.
+
+TypeScript and all 54 helper tests passed locally, including eight new alias/account-preparation regressions. They cover authorized/base recipients, other mailbox/domain rejection, concurrent aliases, sender/purpose/time filtering, ambiguous messages, changed full-message identity, policy revocation, fresh preparation, exact reuse and secret-field rejection. These use synthetic messages and registers; they do not establish live provider alias delivery, application signup, email-body access or release readiness for an adopting product. Browser and real-provider access still require their own project-specific checks. No live mailbox/account or active schedule is included in this repository.
 
 ## Version 1.4.1: Postman selection verification
 

@@ -4,6 +4,8 @@ Start with [shared discovery/reuse](tools/README.md): verify existing tools thro
 
 The runtime helpers support [guided onboarding](../Onboarding/README.md), [browser capabilities](browser/README.md), [email/mailbox verification](email/README.md) and [GitHub intake/regression](github/README.md). Install with `npm ci --ignore-scripts --cache .local/npm-cache`; `npm run qa -- help` lists commands. The agent's actual conversation and human decisions remain essential. Installed tooling, saved preferences and verified access are distinct states.
 
+The [global mailbox policy](email/mailbox-policy.md) and `email account` fresh/reuse helper provide shared-inbox account isolation across tasks. The physical mailbox remains the connection identity; verification preserves the full application alias. Identity preparation is recorded separately from actual account creation and application outcomes.
+
 Choose on-demand, scheduled, event-driven or combined operation during onboarding or settings. Each task determines testing coverage. The five-folder board and G1–G5 remain the work/execution model; discovery remains independent. Matching reviewed regression policy can authorize automatic runs, but neither intake nor a scheduler invents test authority.
 
 ## Native board check-ins

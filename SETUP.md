@@ -43,6 +43,8 @@ Missing tools are readiness blockers, not product defects. Install Node.js 22+, 
 
 Choose browser interaction/visibility using the [browser guide](automation/browser/README.md). Discover email providers and explicitly select the actual account/mailbox using the [email guide](automation/email/README.md). Prepare selected GitHub repositories through the [GitHub guide](automation/github/README.md). Verify actual required capabilities; configuration, authentication and a successful task-specific run are distinct states. Store operational metadata under ignored `.local/`; never commit credentials, full OTPs or reusable links.
 
+The agent applies the [global mailbox policy](automation/email/mailbox-policy.md) during setup: use purpose/run aliases where supported, prepare/register their context with `email account`, and reuse the exact original identity for retests. Inbox permissions, alias support and application registration scope are established once and reused; no bespoke policy-writing is required from the adopter.
+
 ## 4. Create the appropriate request
 
 For learning, copy the [discovery template](Product%20Discovery/templates/discovery-request.md) into `Product Discovery/requests/`. Identify questions/journeys, reasons, target, roles, permitted mutations/cleanup, completion criteria and reviewer. Follow the independent [discovery procedure](Product%20Discovery/discovery-workflow.md); do not route learning through QA status folders. The agent maintains discoveries within the recorded exploration authorization.

@@ -1,6 +1,6 @@
 {
   "name": "ai-agent-software-qa",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "private": true,
   "type": "module",
   "description": "Task-driven AI QA with guided onboarding, discovery, browser, email and GitHub integrations.",

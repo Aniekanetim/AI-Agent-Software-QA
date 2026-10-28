@@ -39,7 +39,7 @@ Start with [shared tool discovery](../automation/tools/README.md). The agent ins
 | Browser interaction | Harness in-app browser, Playwright CLI, Playwright MCP, or a recommendation based on actual checks. Record visibility/fallback. [Browser guide](../automation/browser/README.md) |
 | Scripted suites | Playwright library and Playwright Test are bundled independently of the interaction preference. Other task-specific tools can be added when needed. |
 | API tools | Postman CLI is bundled. Reuse a compatible accessible installation; local collections need no Postman login. Cloud work needs selected account/resources and reporting authorization. [Postman guide](../automation/postman/README.md) |
-| Email | Google — Gmail / Google Workspace first, other discovered providers, AgentMail, human-assisted verification or later. Then select the actual account/mailbox. [Email guide](../automation/email/README.md) |
+| Email | Google — Gmail / Google Workspace first, other discovered providers, AgentMail, human-assisted verification or later. Select the actual account/mailbox and apply the [global mailbox policy](../automation/email/mailbox-policy.md) for fresh identities, exact reuse and correlated verification. [Email guide](../automation/email/README.md) |
 | GitHub | Reuse compatible CLI/access or install the pinned CLI locally, authenticate and select repositories. [GitHub guide](../automation/github/README.md) |
 | Check-ins | On demand, scheduled, PR-based or combined. A saved choice does not activate an actual scheduler or workflow. [Automation guide](../automation/README.md) |
 

@@ -4,6 +4,8 @@ Repository: https://github.com/Aniekanetim/AI-Agent-Software-QA
 
 The user can point an agent to this repository or use a fork, template or clone. The agent prepares a project-specific structure; humans maintain accepted context and authorize bounded learning/testing. Reading a URL alone does not create files, establish access or authorize execution.
 
+Apply the bundled [global mailbox policy](../automation/email/mailbox-policy.md) during adoption. It gives the agent standard fresh-account alias preparation, exact identity reuse and verification correlation. Each project supplies its actual inbox, permissions and alias-support sources; no live account or access grant is inherited from this repository.
+
 ## 1. Read a consistent workflow version
 
 Read README.md, AGENTS.md and SETUP.md first, then the [QA workflow](../QA/Quality%20assurance/qa-workflow.md), [board](../QA%20task%20management%20Board/README.md), [context index](../Project%20Context/README.md) and [release sign-off procedure](../QA/Quality%20assurance/release-signoff.md). Read the linked templates needed for the selected objective.
