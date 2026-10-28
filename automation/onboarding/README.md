@@ -105,3 +105,7 @@ Version 1.2 had no runtime state schema. Inspect its existing documents/approval
 ## QA process records in version 1.6
 
 The agent inspects [QA Process Context](../../QA%20Process%20Context/README.md) during the existing operation/handoff stages. Record canonical sources, owners and original gaps in the handoff and linked project records. Runtime schemaVersion 1 and the five product domains are unchanged; preserve earlier answers and revalidate only affected preparation. Structural readiness checks do not assess substantive coverage or approve a strategy.
+
+## Application-map preparation in version 1.7
+
+The agent links [Application Flow Map](../../Application%20Flow%20Map/README.md) during existing context/understanding and handoff stages. State schemaVersion 1 is unchanged; retain answers, private progress and required decisions. Runtime readiness does not judge map semantics/completeness. Record actual owners, map/source references and bounded gaps in the handoff; extend mapping only through supplied sources or authorized discovery.

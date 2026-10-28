@@ -6,6 +6,7 @@ Template: replace `<QA_PROJECT_ROOT>` with the actual QA root before a manual ch
 Work in <QA_PROJECT_ROOT>.
 Read AGENTS.md, unified_project_context.md, Project Context/README.md,
 Product Discovery/Project Context/README.md, QA Process Context/README.md,
+Application Flow Map/README.md,
 QA task management Board/README.md and QA/Quality assurance/qa-workflow.md.
 Inspect Ready for QA and Retest under QA task management Board.
 Read relevant saved project settings/capability evidence. If GitHub PR polling is
@@ -18,6 +19,10 @@ regression records. Consider meaningful positive/negative/edge conditions with
 suitable techniques and bounded charters. Track designed versus actually exercised
 coverage; labels do not multiply counts. Changed sources/builds need impact review;
 retain historical evidence and reuse only applicable approvals.
+Read relevant map/source revisions and changed feature/relationship IDs. Trace
+candidate prerequisites/consumers and assess transferred behavior, conditions,
+freshness and risk. Explain each selected check, exclusions and gaps in the impact
+briefing. A missing path is unknown, and a helper result never authorizes testing.
 Follow the board's AI check-in procedure and existing human-reviewed workflow.
 Consult the relevant context sources and record applicable source/design revisions
 and rule/acceptance-criteria IDs, discovery OBS IDs/entry versions and the served

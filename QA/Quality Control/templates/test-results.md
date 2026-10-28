@@ -28,3 +28,7 @@ Retain original failure evidence and append or link a distinct corrected-build r
 ## Coverage for this run
 
 Link the canonical [coverage matrix](../../../QA%20Process%20Context/Coverage%20and%20Traceability/traceability-matrix.md), its scope/revision, selected run and actual evidence. Identify condition IDs actually exercised, designed-but-unexecuted work, exclusions and unresolved intent. Record data/configuration and process references separately from build identity. Count unique cases once despite multiple labels; Partial requires the actual subset and reason. A failed case may exercise coverage without meeting its expected outcome. Do not merge different runs/builds into current coverage or convert an undisclosed build into exact-revision verification.
+
+## Application-map traceability
+
+Reference applicable [Application Flow Map](../../../Application%20Flow%20Map/README.md) feature/relationship IDs, map revision and impact briefing, or an explicit gap. Keep relationship details in the map and steps/observations here. Record actual conditions/path segments exercised in results; inclusion in a plan or diagram is not execution evidence.

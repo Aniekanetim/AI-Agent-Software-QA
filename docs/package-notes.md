@@ -1,6 +1,18 @@
 # Package notes
 
-**Version:** 1.6.0. **Created:** 22 October 2026. **Updated:** 28 October 2026. **State:** reusable workflow package; no configured product, live discovery or QA execution history.
+**Version:** 1.7.0. **Created:** 22 October 2026. **Updated:** 28 October 2026. **State:** reusable workflow package; no configured product, live discovery or QA execution history.
+
+## Version 1.7.0: application connections and candidate impact
+
+Added a root [Application Flow Map](../Application%20Flow%20Map/README.md) with canonical feature/relationship records, overview/area guidance and separate intended/observed authority. Original observations remain in discovery context; accepted expectations remain in human context. Map entries preserve source revisions, conditions, uncertainty, retirement and correction history. Users can ask their agent for source-linked dependencies and selection explanations without editing each record.
+
+The optional [read-only helper](../automation/flow-map/README.md) validates temporary projections and traces candidate upstream/downstream paths with cycle protection, deduplication and depth limits. It preserves conditional/unknown connections, relevant stale evidence and test links, without automatically choosing tests or issuing a product verdict. Separate directional walks avoid mistaking unrelated co-producers for affected consumers. No path does not establish independence.
+
+Connected onboarding, discovery publication, tickets/generated PR intake, the impact briefing, coverage, G1–G5, check-ins and portability. Existing state schemaVersion 1, five product domains, five board folders, original results and human gates remain intact. No application map, crawl or live application is configured by this master.
+
+Local validation passed TypeScript and all 88 package tests: 67 retained checks and 21 new map checks. All 410 local Markdown targets/anchors resolved in the working root and a relocated copy with spaces in its path. Synthetic CLI checks covered indirect paths, cycles, deduplicated test links, conditional/unknown intent, depth truncation, missing seeds and changed evidence. A stale selected source produced exit 1 with currentCandidates null while preserving historical candidates. Repeated tracing preserved input bytes and prior onboarding answers; live QA/discovery queues remained empty. A depth-boundary cycle review exposed an omitted connection, corrected and retained as a regression check.
+
+The relocation check used the existing build/dependencies, not a fresh dependency install. An initial Node child-process attempt to enumerate Git files was denied by the managed harness; the completed rehearsal used shell/Python orchestration and the actual Node CLI without changing permissions. No application browser crawl, provider connection or product test was performed. Cross-platform CI restores pinned dependencies and separately exercises the package browser/Postman fixtures; its result is reported with the pull request.
 
 ## Version 1.6.0: maintained QA process context
 

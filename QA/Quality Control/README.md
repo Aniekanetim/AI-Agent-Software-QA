@@ -42,3 +42,7 @@ Templates are unexecuted reference material. No product suites, automation, test
 Use [QA Process Context](../../QA%20Process%20Context/README.md) for applicable strategy, design, coverage definitions, configuration/data and retained regression. Record source/process/suite revisions separately from the served build. Consider positive, negative and edge perspectives with appropriate techniques; use [exploratory charters](../../QA%20Process%20Context/Test%20Design%20and%20Exploration/exploratory-charter.md) for focused investigation.
 
 Keep case steps and result tables concise. Put shared classifications and condition links in the canonical matrix or a short suite reference section. Count a multiply-labelled case once; retain actual exercised conditions, failed/partial/blocked work and unknowns. Results stay canonical here or in the project's existing equivalent; tickets provide navigation. A structural helper assessment or completed charter alone is not a product pass.
+
+## Integration paths and test evidence
+
+Link [Application Flow Map](../../Application%20Flow%20Map/README.md) IDs/revision and the actual impact briefing where relevant. Keep considered paths separate from conditions/path segments actually exercised. Source-linked relationships inform selection; results still require actual observations and an applicable expectation. Preserve uncovered or stale map areas as limits.

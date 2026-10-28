@@ -53,3 +53,7 @@ Stay quiet when monitored state is unchanged or nonactionable unless periodic up
 ## Coverage and process records
 
 [QA Process Context](../QA%20Process%20Context/README.md) supplies task-relevant testing preparation and maintenance. The optional [coverage assessor](coverage/README.md) reads a private snapshot of canonical records, checks IDs/references/counts and exposes stale claims. It creates no report or product verdict and performs no tests. Board prompts and configured GitHub work retain the same authorizations and gates.
+
+## Application-map helpers
+
+[Map validation/tracing](flow-map/README.md) reads a temporary projection of the canonical [Application Flow Map](../Application%20Flow%20Map/README.md). It checks IDs/references and traces bounded candidate paths, preserving uncertainty, cycles and historical evidence. The agent reviews semantics and briefs the human before testing. No crawl, map-writing service, test runner or scheduler is activated.

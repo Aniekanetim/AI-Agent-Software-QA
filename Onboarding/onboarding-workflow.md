@@ -46,6 +46,12 @@ Read both context stores. For a discovery route, execute the authorized request 
 
 Brief the human on the resulting understanding, its basis, observed/inferred facts, missing intent, disagreements and affected work. Capture review confirms only its stated scope; review of accurate observations does not turn them into requirements. Baseline transcription requires explicit maintenance authorization for named documents and actual human sources.
 
+### Establish initial connection knowledge
+
+Read the root [Application Flow Map](../Application%20Flow%20Map/README.md). Reuse supplied diagrams, requirements, technical references and existing discoveries. Record actual owners, map/source revisions, known features/connections and original gaps; a bounded starting inventory is enough. Extend it through authorized discovery when the chosen context route needs it. Do not manufacture hidden dependencies or require full application exploration before useful work.
+
+Brief the human on intended versus observed/inferred connections and remaining unknowns. Human corrections retain their actual source and responsible intent owner. Map capture review does not approve a requirement or testing scope. Keep existing onboarding schemaVersion 1, answers and five product domains; process/map completeness is assessed by the agent and handoff, not inferred from a structural Ready flag.
+
 ## 5. Configure operation and reporting
 
 Establish on-demand, scheduled, events or combined operation. Reuse already supplied preferences; do not ask for them again. Discuss cadence/timezone, eligible repositories/PRs, evidence retention, reporting channels and accountable reviewers. Settings remain available after onboarding.

@@ -7,6 +7,7 @@
 | Scope ID / revision / state / owner / maintainer | <values> |
 | Assignment / approved plan and review | <references; Pending if undecided> |
 | Product-source IDs/revisions / process and design references | <actual references, independently of served build> |
+| Application map / relevant feature and relationship IDs | <map revision, impact briefing and gaps; not proof of exercise> |
 | Coverage unit / denominator / grouping / sampling | <defined items and limits; do not mix incompatible units> |
 | Selected run / build / environment / case revisions | <actual identity or No execution; Unknown build when undisclosed> |
 

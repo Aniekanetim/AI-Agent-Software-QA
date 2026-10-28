@@ -20,3 +20,7 @@ Keep browser URLs and user actions separate from API base URLs, methods, headers
 ## Integrations and limits
 
 Record real, stubbed and unavailable integrations, failure controls and their scope/duration. Do not claim a live provider guarantee or actual message receipt from local acceptance alone. Put missing contracts or conflicting expectations through the ticket clarification procedure.
+
+## Link feature relationships
+
+Use the root [Application Flow Map](../../Application%20Flow%20Map/README.md) for cross-feature IDs and relationship views, linking the applicable sections/revisions of this baseline. Maintain requirements/contracts here; original observations stay in discovery context. A derived diagram does not become an independently approved specification.

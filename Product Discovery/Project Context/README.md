@@ -53,3 +53,7 @@ When a linked source or relevant application area changes, flag affected entries
 ## References used during testing
 
 The separate [QA Process Context](../../QA%20Process%20Context/README.md) supplies strategy, design/coverage, configuration, data and regression knowledge. Discoveries can identify candidate conditions or setup facts, but cannot become accepted expectations merely by appearing in an RTM. Maintain observations here and link them from relevant testing records; human owners resolve intended-behavior questions.
+
+## Link application-map entries
+
+Keep original observations, interpretations and evidence here. The root [Application Flow Map](../../Application%20Flow%20Map/README.md) links them to source-backed features and relationships. Record OBS IDs/versions in the map and feature/relationship IDs in relevant discoveries. Updating a map does not promote an observation into intent or prove a path tested. Maintain only affected entries within the actual request/ticket authorization.

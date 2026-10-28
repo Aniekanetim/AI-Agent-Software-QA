@@ -18,6 +18,10 @@ State: Draft. Prepared by: <agent>. Human reviewer: <name>. Date: <actual date>.
 
 Context route: <provide / discover / combined; actual choice reference>. Baseline: <human index>. Discoveries: <AI index / request IDs>. Explain any conflict and dependent correctness judgments that must wait.
 
+## Initial application connections
+
+Map/inventory/register and revision: <actual links or Not established>. Actual maintainer and accountable product/technical/QA owners: <names or original questions>. Describe known areas, intended/observed/inferred connections, unvisited roles/states, stale sources and affected work. Link [Application Flow Map](../../Application%20Flow%20Map/README.md) and original discoveries. Capture review, owner intent decisions and execution authorization remain distinct; a partial starting map is not whole-application knowledge.
+
 ## QA process preparation
 
 | Process area | Canonical record and revision, or original gap | Accountable owner / maintainer | Review state / affected work |

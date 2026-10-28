@@ -4,7 +4,7 @@ Product Discovery builds practical knowledge of an application through authorize
 
 **Package state:** unconfigured. No target, live requests, observations, authorizations or discovery schedule are included.
 
-[Onboarding](../Onboarding/README.md) can request this pipeline when the user chooses discover or combined context establishment. It links the specific missing questions and its own preparation checkpoint; the discovery request still has independent scope/authorization and writes only learned knowledge to its AI context. Completing learning is not onboarding completion, test authorization or a product pass.
+[Onboarding](../Onboarding/README.md) can request this pipeline when the user chooses discover or combined context establishment. It links the specific missing questions and its own preparation checkpoint; the discovery request still has independent scope/authorization. Original learned knowledge stays in its AI context, with source-linked connections in the application map. Completing learning is not onboarding completion, test authorization or a product pass.
 
 ## Two context stores
 
@@ -60,3 +60,7 @@ Discovery completion records learning and coverage. It is neither a test pass, a
 ## Learning and QA process context
 
 [QA Process Context](../QA%20Process%20Context/README.md) governs maintained testing preparation. A discovery request may supply observations/gaps for a later QA plan, but discovery coverage is not exercised QA coverage. Do not move discovery requests onto the QA board or apply QA charter outcomes as discovery approval. Preserve the originating question, authority and separate authorizations.
+
+## Publish source-linked application connections
+
+The agent may maintain the root [Application Flow Map](../Application%20Flow%20Map/README.md) during authorized learning, linking feature/relationship IDs to original discoveries and applicable human sources. Original evidence and interpretations stay in the AI context; the map provides connections and views, not another product baseline. Include map changes/gaps in the request's completion briefing. Intended, observed, inferred and disputed relationships retain their separate authority and freshness. No automatic crawl is added.

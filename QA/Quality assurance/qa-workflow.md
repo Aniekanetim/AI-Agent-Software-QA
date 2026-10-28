@@ -154,6 +154,12 @@ The [design guide](../../QA%20Process%20Context/Test%20Design%20and%20Exploratio
 
 Use the [coverage definitions](../../QA%20Process%20Context/Coverage%20and%20Traceability/README.md): designed is not exercised, a failure can exercise a condition, overlapping labels do not multiply counts, and sampling/unknown inventory limit claims. Scope/source/build changes trigger impact review of affected records. The optional snapshot helper checks structure/counts, not accepted intent, actual behavior or human decisions. Preserve historical evidence; reuse applicable approvals and return only material changes to the affected gate.
 
+## Application-map impact reasoning
+
+Read [Application Flow Map](../../Application%20Flow%20Map/README.md) during ticket preparation/resumption. Identify changed feature/relationship IDs, map/source revisions and served identity separately. Assess prerequisites, consumers, shared components and relevant indirect paths by transferred behavior, conditions and risk. Missing or stale paths are unknown; consider broader regression rather than infer independence.
+
+Use the [impact briefing](../../QA%20Process%20Context/Regression%20Management/impact-analysis.md) at G1/G2: explain each proposed check/pass criterion, connection rationale, exclusions, unknowns and exact authorization. The helper returns candidates; it does not choose final scope or bypass review. At G3/G4/G5 distinguish paths considered, actual conditions/paths exercised and residual gaps. A diagram or structurally valid map does not establish tested behavior. Preserve actual human corrections, source authority and original historical results.
+
 ## Reusable records
 
 Use the templates for a [test plan](templates/test-plan.md), [human review record](templates/review-record.md) and [release notes/sign-off/handoff packet](templates/completion-handoff.md). The [QC guide](../Quality%20Control/README.md) explains build/channel separation, repeatable checks and result records. Templates are unexecuted reference material. Select the necessary records for the approved objective; do not impose a fixed case count or an unrelated testing framework.

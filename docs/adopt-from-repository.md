@@ -66,3 +66,7 @@ Follow [shared tool discovery](../automation/tools/README.md) before setup quest
 ## Adopt QA process context
 
 Include [QA Process Context](../QA%20Process%20Context/README.md) in the project-specific copy and intake reading. Inventory existing process records and link their canonical locations; preserve plans, cases, evidence and unrelated work. Name actual owners, source/process revisions and original gaps during operation/handoff. Templates start unconfigured, not approved. Keep human product authority, AI discoveries and testing-process knowledge distinct. Existing schemaVersion 1 onboarding answers remain usable; assess only affected preparation. The optional coverage snapshot is a temporary projection, not transferred product evidence or a second maintained RTM.
+
+## Adopt the application map
+
+Copy [Application Flow Map](../Application%20Flow%20Map/README.md) alongside the existing context/board files, preserving destination instructions and existing maps. Link canonical features/relationships, source revisions, original discoveries and actual owners; introduce missing entries as unknown or draft, not invented intent. Read the map during onboarding and ticket preparation, and use the existing impact briefing/review gates. Source inspection is optional for hosted discovery; hidden architecture remains unknown. Existing onboarding state is unchanged.

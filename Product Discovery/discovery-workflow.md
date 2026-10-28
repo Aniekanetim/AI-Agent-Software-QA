@@ -4,7 +4,7 @@ Use this independent pipeline to learn how an application behaves and preserve t
 
 ## 1. Read the request and existing knowledge
 
-Read the [working contract](../AGENTS.md), [shared progress](../unified_project_context.md), [discovery README](README.md), complete request and both context indexes. Consult relevant entries, actual owner replies and supplied documents. Identify the objective, requester/reviewer, existing authorization, claim, checkpoint, unanswered questions and prior coverage. Do not restart completed exploration merely because a new session began.
+Read the [working contract](../AGENTS.md), [shared progress](../unified_project_context.md), [discovery README](README.md), complete request, both product-context indexes and relevant [application-map records](../Application%20Flow%20Map/README.md). Consult relevant entries, actual owner replies and supplied documents. Identify the objective, requester/reviewer, existing authorization, claim, checkpoint, unanswered questions and prior coverage. Do not restart completed exploration merely because a new session began.
 
 Record the workflow revision, human-context sources/revisions, discovery entry versions and application identity separately. For external documents use immutable versions when available. If the served build is not exposed, record Unknown, the observation time and the available URL/version evidence; do not substitute a QA repository commit for the application build.
 
@@ -50,7 +50,7 @@ If a suspicious behavior appears, preserve the evidence and identify whether an 
 
 Use the [knowledge-entry format](Project%20Context/README.md#knowledge-entry-format). Assign stable OBS IDs and record source conditions, observation/inference, evidence, actual review state, relevant human sources and refresh conditions. Read an existing entry before changing it; merge new evidence, retain earlier versions through Git or explicit versioned snapshots and avoid duplicate claims.
 
-Publish within `Product Discovery/Project Context/` only. Update request history, indexes and shared progress as needed. Do not edit any file under the root `Project Context/` during discovery. Keep proposed requirements and missing-source questions in the discovery records. The human team maintains the baseline.
+Publish original observations, inferences and learning evidence within `Product Discovery/Project Context/`. Within the same authorized work, maintain source-linked inventory/register entries and derived views in [Application Flow Map](../Application%20Flow%20Map/README.md). Map entries link original OBS/evidence references and accepted human sources without becoming another observation or requirements repository. Update request history, indexes and shared progress as needed. Do not edit any file under the root `Project Context/` during discovery. Keep proposed requirements and missing-source questions in the discovery records. The human team maintains the baseline.
 
 Use the corresponding domain for each subject, without duplicating complete PRDs or BRDs. Link across domains where necessary. An entry about the apparent business purpose remains an inference unless supported by an identified source. Owner-confirmed intent must link the actual decision and applicable revision; reviewing capture accuracy does not confirm intent.
 
@@ -77,3 +77,9 @@ Refresh affected entries when the relevant human source changes, the application
 When a linked human requirement changes, flag related discoveries without automatically copying its content or rewriting old observations. Preserve both the previously observed behavior and the current evidence. Use a new or reopened explicit request for work beyond the prior authorization.
 
 After interruption or transfer, read the claim, checkpoint, actual approvals, open questions and evidence before resuming. Recheck access and relevant versions. Respect other owners; do not duplicate work, unresolved questions or approval requests. This package activates no discovery schedule; future scheduling needs an explicit request and must remain separate from QA-board check-ins.
+
+## Maintain connection knowledge within the authorized scope
+
+Use supplied documents and actual journey evidence to identify features, producers/consumers, prerequisites, permissions, events and shared components. Keep intended and observed states separate. If a connection is inferred, record the interpretation, supporting sources and specific gap. An unvisited feature or role is unknown, not missing. Do not infer hidden server architecture from a screen/request alone.
+
+After learning, link affected feature/relationship IDs, map revision, original OBS entries and questions from the request. Preserve corrections and actual owner responses. Refresh affected views after source changes; keep prior revisions and map gaps. A request completion records learning coverage, not exercised QA integration coverage. An empty board or a mapping template does not authorize more discovery.

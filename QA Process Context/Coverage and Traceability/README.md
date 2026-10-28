@@ -40,3 +40,7 @@ List `sourceRecords` as actual local evidence references to the canonical matrix
 The snapshot is an input projection, not a second maintained RTM. The helper writes no report or shared state, runs no product tests and always leaves the product verdict Not assessed. `needsReview` prevents its historical counts from being presented as current coverage. Default package fixtures never create a live matrix or outcomes.
 
 For accessibility evaluation, consult [W3C's scope and sampling guidance](https://www.w3.org/WAI/test-evaluate/conformance/wcag-em/). General traceability, metrics and configuration principles are described in [ISTQB CTFL](https://istqb.org/wp-content/uploads/2024/11/ISTQB_CTFL_Syllabus_v4.0.1.pdf). Our measurements still require a project-specific, reviewed basis.
+
+## Map links and actual exercise
+
+Link [Application Flow Map](../../Application%20Flow%20Map/README.md) feature/relationship IDs and revision to relevant conditions/cases/charters. A path considered during impact analysis is not yet exercised coverage. Actual runs identify the conditions/path segments investigated and supporting evidence. Missing map areas stay explicit gaps. Keep canonical matrix/results and map facts in their own locations; never count one multiply-labelled or multiply-linked case several times.
