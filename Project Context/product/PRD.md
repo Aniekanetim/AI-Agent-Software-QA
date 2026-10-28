@@ -22,3 +22,7 @@ Record agreed performance metrics/workloads, accessibility criteria, usability o
 ## Open questions and revisions
 
 Identify unavailable sources and unresolved owner decisions. Necessary ticket questions follow the board clarification procedure. Record actual requirement changes and their effective scope; a developer fix claim is not a changed requirement.
+
+## Link feature relationships
+
+Use the root [Application Flow Map](../../Application%20Flow%20Map/README.md) for cross-feature IDs and relationship views, linking the applicable sections/revisions of this baseline. Maintain requirements/contracts here; original observations stay in discovery context. A derived diagram does not become an independently approved specification.

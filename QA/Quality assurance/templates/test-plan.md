@@ -33,3 +33,7 @@ Present the complete self-contained briefing in the conversation before requesti
 ## Project process and design basis
 
 Link applicable [QA Process Context](../../../QA%20Process%20Context/README.md) strategy/risk, coverage, data/configuration and regression records with revisions and actual owners. Identify coverage items and denominator before execution. Explain the chosen interface/objective, techniques and relevant positive/negative/edge challenges. Link bounded exploratory charters for additional questions; no perspective or technique quota applies. Missing intent remains an original owner question; proposed checks cannot establish their own expected behavior.
+
+## Change-impact basis
+
+Link [Application Flow Map](../../../Application%20Flow%20Map/README.md) revision/IDs and the [impact briefing](../../../QA%20Process%20Context/Regression%20Management/impact-analysis.md). Explain source-backed propagation, selected checks, exclusions, conditions and gaps. A helper candidate list is supporting preparation, not the full human approval briefing or a test verdict.

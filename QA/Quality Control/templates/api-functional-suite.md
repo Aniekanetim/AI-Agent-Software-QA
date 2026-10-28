@@ -25,3 +25,7 @@ Where Postman reproduction is supplied, link the actual collection/environment a
 ## Design and coverage links
 
 Reference the applicable [QA process records](../../../QA%20Process%20Context/README.md) and their revisions. In the canonical matrix, link case IDs to condition/source/risk IDs, relevant positive/negative/edge perspectives, techniques and selection rationale. Link any charter separately. Shared metadata belongs in that reference rather than duplicate step/result columns. Record what was actually exercised in each run; a label is not another test.
+
+## Application-map traceability
+
+Reference applicable [Application Flow Map](../../../Application%20Flow%20Map/README.md) feature/relationship IDs, map revision and impact briefing, or an explicit gap. Keep relationship details in the map and steps/observations here. Record actual conditions/path segments exercised in results; inclusion in a plan or diagram is not execution evidence.

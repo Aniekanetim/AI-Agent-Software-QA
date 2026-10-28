@@ -25,3 +25,7 @@ Read the complete active request/ticket, actual responses/decisions and linked e
 ## QA process preparation
 
 Version 1.6.0 introduces [QA Process Context](QA%20Process%20Context/README.md). The master still has no configured owners, strategy, live matrix or execution. In an adopting project, link actual canonical records, owners, applicable revisions, affected gaps and the active ticket checkpoint. Preserve the separate authority of human product sources and AI discoveries. Changes to scope/source/build require impact review of relevant records, not fabricated current coverage or restarted onboarding.
+
+## Application connection knowledge
+
+Version 1.7.0 adds [Application Flow Map](Application%20Flow%20Map/README.md) and source-linked impact analysis. This master has no configured inventory, relationships or mapping access. In a project copy, record actual map/source revisions, relevant feature/relationship IDs, original gaps and the active ticket/request checkpoint. Read intended authority and observed evidence separately. Considered connections and candidate tests are not actual exercised coverage or approved scope.

@@ -68,3 +68,7 @@ Use [shared tool discovery](../tools/README.md) before setup. Reuse verified com
 ## Process-based regression selection
 
 Consult [QA Process Context](../../QA%20Process%20Context/README.md) and its retained regression inventory when assessing a PR. Link affected source/condition IDs, suite/charter revisions, data/configuration and selection rationale. These records inform selection but do not expand an existing approved policy. Unknown preview identity cannot support revision-specific coverage. Preserve original runs and distinct retests; link actual achieved coverage and residual gaps in the existing findings/handoff.
+
+## Map-based change-impact preparation
+
+Generated PR assignments link [Application Flow Map](../../Application%20Flow%20Map/README.md) and the [impact briefing](../../QA%20Process%20Context/Regression%20Management/impact-analysis.md). Identify relevant changed feature/relationship IDs, source/map revisions and deployed identity; do not assume PR text establishes relationships or authorization. Use candidate paths to explain proposed regression, gaps and exclusions within the existing policy and gates.

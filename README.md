@@ -2,7 +2,7 @@
 
 A portable workflow for an AI QA agent to join a project, build product understanding and perform assigned QA work with human review. Guided onboarding prepares context, tools and access. Product Discovery learns how an application behaves. QA evaluates assigned work against an agreed test basis, investigates findings and proposes readiness. Humans maintain the product baseline and own scoped decisions; developers fix or refute reported defects.
 
-**Package version:** 1.6.0 — 28 October 2026. **Project state:** unconfigured. **Live tickets/discovery requests:** none. **Product schedules/PR regression:** not activated. Start with [SETUP.md](SETUP.md) and [guided onboarding](Onboarding/README.md).
+**Package version:** 1.7.0 — 28 October 2026. **Project state:** unconfigured. **Live tickets/discovery requests:** none. **Product schedules/PR regression:** not activated. Start with [SETUP.md](SETUP.md) and [guided onboarding](Onboarding/README.md).
 
 ## Use with your AI agent
 
@@ -17,6 +17,7 @@ Create a project-specific QA copy, record the workflow revision used, and popula
 context only from actual project sources. Keep the upstream template unconfigured.
 Humans maintain root Project Context; the agent maintains discoveries under
 Product Discovery/Project Context. Read both, preserving their different authority.
+Read Application Flow Map for source-linked connections and impact reasoning.
 Read QA Process Context for maintained strategy, design, coverage, data/configuration
 and regression records; reuse existing records and identify actual owners.
 For a discovery objective, follow Product Discovery/discovery-workflow.md and use
@@ -59,6 +60,7 @@ Open the clone as your QA project, follow SETUP.md and give your agent the [boot
 | [Human-maintained Project Context](Project%20Context/README.md) | Team-maintained requirements, rules, criteria, designs and decisions, each with its state/owner/revision |
 | [Product Discovery](Product%20Discovery/README.md) | Independent requests and procedure for learning from a hosted or locally available application |
 | [AI-managed discovery context](Product%20Discovery/Project%20Context/README.md) | Observations, journeys, technical findings, inferences and gaps, with evidence and freshness |
+| [Application Flow Map](Application%20Flow%20Map/README.md) | Source-linked features, shared dependencies and candidate change-impact paths with separate intended/observed knowledge |
 | [QA Process Context](QA%20Process%20Context/README.md) | Maintained strategy, design/exploration, coverage, configuration, data and regression references with accountable owners |
 | [QA task management board](QA%20task%20management%20Board/README.md) | Tickets tell the agent and developers what work is ready and retain its history |
 | [QA workflow](QA/Quality%20assurance/qa-workflow.md) | Testing activities, five human review gates and safeguards against blind approval |
@@ -93,6 +95,14 @@ QA assignment completion requires a release-notes/sign-off/handoff packet, an ac
 Consider positive, negative and edge cases across relevant interfaces/objectives. Select techniques deliberately and use bounded exploratory charters for additional questions. Labels overlap: one positive boundary case is one case. Track designed and actually exercised conditions separately from Pass/Fail/Partial/Blocked/Not run outcomes. Unknown intent and excluded areas remain visible; complete identified coverage does not promise exhaustive testing.
 
 Tickets remain the shared reporting entry point and link their canonical results and completion packet. The optional [coverage helper](automation/coverage/README.md) checks a read-only snapshot for consistent counts/references; it runs no product tests and grants no approval. New adoption starts unconfigured; existing projects preserve records and adopt only missing process preparation.
+
+## Understand feature connections and change impact
+
+The root [Application Flow Map](Application%20Flow%20Map/README.md) links features, shared components and integrations to intended sources, observed evidence and relevant tests. The agent maintains a bounded inventory and relationship register; diagrams present those records. Human product sources remain the requirement authority, and original observations stay in discovery context.
+
+Ask your agent: **What depends on authentication? Why did you include refunds? Which connections are inferred or stale?** The agent reads the project's records and explains paths, conditions, risks, proposed checks, exclusions and uncertainty through the [impact briefing](QA%20Process%20Context/Regression%20Management/impact-analysis.md). Users can review/correct this reasoning through conversation without maintaining each map entry themselves. Unconfigured projects receive an honest gap explanation, not invented connections.
+
+The optional [map helper](automation/flow-map/README.md) validates a temporary projection and traces upstream/downstream candidates with cycle and depth controls. It does not select final tests, authorize work or establish coverage. Mapping extends through supplied context and authorized discovery; there is no automatic whole-application crawl. Missing paths do not prove independence. Map/source revisions and the served build remain separate.
 
 ## Ticket movement
 

@@ -58,3 +58,7 @@ This policy strengthens future closure. When documenting an already accepted run
 ## Process-context handoff
 
 Include applicable [QA Process Context](../../QA%20Process%20Context/README.md) revisions and canonical coverage/result references in the existing packet. Identify achieved versus agreed coverage, unresolved intent, sampling/exclusions, retained regression and who maintains affected strategy, data and configuration next. Keep failed/partial/blocked/unexecuted work visible and historical retests separate. A structural/count check is not product sign-off or proof of exhaustive coverage. The existing human decision, delivery and required receipt controls remain applicable.
+
+## Application-map limits in the handoff
+
+Include applicable [Application Flow Map](../../Application%20Flow%20Map/README.md) revision/IDs and the impact selection rationale. Report actual paths/conditions exercised, uncovered connections and freshness/identity limits. Link map maintenance actions and owners without making map completion or a helper result a release approval. Existing human sign-off, delivery and required acceptance remain unchanged.

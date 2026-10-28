@@ -29,3 +29,7 @@ Preferences describe desired behavior. Capability records describe what actually
 ## Process-record changes
 
 Use the existing review-responsibilities/execution-policies setting for proposed changes to the testing approach. Link canonical [QA process records](../QA%20Process%20Context/README.md) and their applicable revisions; do not store competing strategies in settings. Preserve unrelated preferences. A settings save is not approval of changed tests or evidence that affected coverage was rerun.
+
+## Map-related changes
+
+Use existing project/context and review-policy settings for actual source or responsibility changes. Link canonical [map records](../Application%20Flow%20Map/README.md); do not maintain another graph in settings. Reopen affected preparation only. A saved preference or accepted observation capture is not test execution approval.

@@ -83,3 +83,7 @@ Return the result to the linked QA ticket and identify its next checkpoint. Comp
 ## Refresh and resumption
 
 `<Relevant change triggers, affected entries, current claim/checkpoint and next action. Preserve history and avoid unchanged repeated exploration or unanswered requests.>`
+
+## Application-map references
+
+Map ID/revision and affected feature/relationship IDs: <actual references or known gap>. Link the root [Application Flow Map](../../Application%20Flow%20Map/README.md), original discoveries and actual source revisions. State which connections were supplied, observed, inferred or not reached. Mapping publication stays within the existing authorized journeys; it does not require a whole-product crawl or authorize QA execution.

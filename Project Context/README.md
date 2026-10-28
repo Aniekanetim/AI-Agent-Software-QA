@@ -63,3 +63,7 @@ Initial templates are unsupplied sources, not discovered product defects. Human 
 ## Project testing process references
 
 [QA Process Context](../QA%20Process%20Context/README.md) links the project's strategy, design/coverage, configuration, data and regression records. It is an operational context maintained under QA policy, separate from this human product baseline. Link source IDs and revisions without copying or changing requirements to match results. Technical owners still maintain canonical system/environment facts; agents record actual test configuration and propose needed baseline changes.
+
+## Application relationship view
+
+The root [Application Flow Map](../Application%20Flow%20Map/README.md) assembles source-linked feature connections, with intended authority and observed evidence recorded separately. Human owners maintain accepted expectations here or in linked canonical sources. Agents may maintain derived map entries within authorization, but cannot use them to approve or overwrite product requirements. Resolve a disputed intended connection with its responsible owner.

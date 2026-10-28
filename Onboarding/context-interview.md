@@ -23,3 +23,7 @@ Onboarding establishes a bounded foundation. Later tasks can reveal new areas. R
 ## Separate operational testing preparation
 
 After accounting for the five product domains, inspect [QA Process Context](../QA%20Process%20Context/README.md) through the existing operating-rules checkpoint. Locate the team's process records and accountable owners; ask one focused missing decision only when needed. Do not copy product requirements into a strategy, classify the user's future testing categories or claim folders establish coverage. Reuse valid answers and reference original questions for unresolved ownership.
+
+## Connect the supplied knowledge
+
+Use relevant answers/sources across the existing five domains to establish [Application Flow Map](../Application%20Flow%20Map/README.md) identities and source-linked relationships. Preserve intended authority separately from actual observations. Ask focused questions only for material missing facts/owners; maintain original questions and extra answers. An inaccessible or unexplored connection stays unknown. This is not a sixth product-domain questionnaire.

@@ -8,3 +8,7 @@ Candidate expectations remain proposed or inferred. A repeated observation is no
 
 | OBS ID / subject | Knowledge file | Role / conditions | Version / freshness |
 | --- | --- | --- | --- |
+
+## Application connections
+
+Link observed subjects to [Application Flow Map](../../../Application%20Flow%20Map/README.md) feature/relationship IDs and map revision. Keep original evidence in this domain and mark interpretations/unknowns explicitly. Distinguish intended sources from actual observations; the map cannot establish a hidden dependency or accepted contract by inference.

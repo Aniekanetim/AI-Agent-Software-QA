@@ -70,3 +70,7 @@ For a deployment, record deployment owner/window, post-deployment smoke criteria
 | Evidence/testware retention and improvement action | <locations and concrete learning> |
 
 Keep the assignment in its current folder while required sign-off/delivery/receipt is pending. External sending, deployment and new testing each need applicable authorization. The final conversational handoff must state the verdict, target, evidence, limits, packet link and next-owner actions.
+
+## Map-based selection and maintenance
+
+Link [Application Flow Map](../../../Application%20Flow%20Map/README.md) revision/IDs and the actual impact assessment. Distinguish considered connections from conditions/path segments exercised; record unmapped, conditional or stale areas and any broader-regression decision. Identify next-owner refresh actions and retain historical map/source/build identities. A mapped edge or diagram is not test evidence.

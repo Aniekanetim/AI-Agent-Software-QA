@@ -10,6 +10,7 @@ This folder holds the project's maintained testing approach, coverage obligation
 | --- | --- |
 | [Human Project Context](../Project%20Context/README.md) | Applicable requirements, contracts, designs and decisions; check owner, approval state and revision |
 | [AI discovery context](../Product%20Discovery/Project%20Context/README.md) | Observations, inferences and gaps; supports learning without establishing intended behavior |
+| [Application Flow Map](../Application%20Flow%20Map/README.md) | Source-linked feature identities/connections and candidate impact; intended and observed knowledge retain separate authority |
 | QA Process Context | How this project selects, prepares, measures and maintains testing; operational updates within reviewed policy |
 | [QA workflow](../QA/Quality%20assurance/qa-workflow.md) | How the agent performs work through the existing G1–G5 human review gates |
 | [Quality Control](../QA/Quality%20Control/README.md) | Actual cases, scripts and execution evidence; keep one canonical result record |

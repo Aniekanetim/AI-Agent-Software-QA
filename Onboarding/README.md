@@ -56,3 +56,7 @@ At completion the agent provides the [onboarding handoff](templates/onboarding-h
 ## QA process preparation
 
 During the existing operating-rules and handoff checkpoints, inspect [QA Process Context](../QA%20Process%20Context/README.md). Reuse existing team strategy, traceability, configuration, data and regression sources. Identify actual owners and unresolved preparation without repeating prior questions. Product context still has five domains; this is operational preparation rather than a sixth product domain. A template is not an approved strategy. Readiness for dependent testing requires the relevant basis and resources.
+
+## Initial application map
+
+Onboarding also inspects [Application Flow Map](../Application%20Flow%20Map/README.md) through the existing context/understanding stages. Reuse existing sources and record a bounded map, owners and gaps; full-product knowledge is not required. Users review source-linked understanding in the conversation and can challenge connections. No extra testing-category interview, state reset or automatic crawl is introduced.

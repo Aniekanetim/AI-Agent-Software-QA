@@ -4,7 +4,8 @@ Open the project-specific QA root and paste this prompt into its agent chat. The
 
 ```text
 Read AGENTS.md, README.md, SETUP.md, unified_project_context.md,
-Project Context/README.md, QA Process Context/README.md, Product Discovery/README.md,
+Project Context/README.md, QA Process Context/README.md, Application Flow Map/README.md,
+Product Discovery/README.md,
 Product Discovery/Project Context/README.md, QA task management Board/README.md and
 QA/Quality assurance/qa-workflow.md from this QA root.
 Use this AI-led, human-reviewed workflow for the named project.
@@ -57,3 +58,7 @@ Follow [shared tool discovery](../automation/tools/README.md) before setup quest
 ## Maintain the testing foundation
 
 Before QA preparation/resumption, read relevant [QA Process Context](../QA%20Process%20Context/README.md) records. Establish actual owners and reuse existing strategies/matrices/data procedures. Keep positive/negative/edge perspectives, design techniques and exploration explicit; preserve scoped coverage, original results and the existing human gates. A discovery-only adoption does not require an approved test suite or start a QA run.
+
+## Read the connection basis
+
+Use [Application Flow Map](../Application%20Flow%20Map/README.md) to explain relevant dependencies and candidate impact, preserving intended/observed authority and unknowns. Reuse existing maps and owner answers. Users review connection reasoning in conversation; source-linked capture review does not approve tests. Read map/source revisions with the ticket; no whole-application crawl or schema reset is implied.

@@ -17,6 +17,7 @@ import * as registry from './tools/registry.js';
 import { bindHarness, currentHarness, readHarness, harnessKey, type ExecutionContext } from './tools/runtime.js';
 import * as postman from './postman/postman.js';
 import { assessCoverage, type CoverageSnapshot } from './coverage/coverage.js';
+import { validateFlowMap, traceFlowMap, type FlowMapSnapshot, type Direction } from './flow-map/flow-map.js';
 
 const args = process.argv.slice(2), options = new Map<string, string>();
 const positional: string[] = [];
@@ -41,6 +42,7 @@ async function currentPr(repository: string, number: number) {
   const raw = JSON.parse(await github.runGh(['api', `repos/${repository}/pulls/${number}`])); return github.normalizePr(repository, raw);
 }
 const help = {
+  'flow-map': 'validate --input | trace --input --features id,id [--direction upstream/downstream/both] [--max-depth 8] : read-only candidate impact; no test execution or approval',
   coverage: 'assess --input : read-only consistency/count check of a canonical-record snapshot; no execution, approval or product verdict',
   tools: 'bind --input | scan --source [--tool] | select --input | status --tool [--requires operation,operation] | import-host --input',
   postman: 'check --source | login-instructions | run --input : detects/reuses the CLI; local runs need no login; cloud operations need selected account/reporting scope',
@@ -56,6 +58,18 @@ async function main() {
   const [area, action] = positional;
   if (!area || area === 'help') { output(help); return; }
   if (area === 'evidence') { output(store.evidence(root, option('path'), options.get('pointer'))); return; }
+  if (area === 'flow-map') {
+    const snapshot = input<FlowMapSnapshot>();
+    if (action === 'validate') {
+      const report = validateFlowMap(root, snapshot); output(report);
+      if (report.status === 'needsReview') process.exitCode = 1;
+    } else if (action === 'trace') {
+      const report = traceFlowMap(root, snapshot, { features: option('features').split(','), direction: options.get('direction') as Direction | undefined,
+        maxDepth: options.has('max-depth') ? Number(option('max-depth')) : undefined }); output(report);
+      if (report.selectionStatus === 'needsReview') process.exitCode = 1;
+    } else throw new Error('Use flow-map validate or trace.');
+    return;
+  }
   if (area === 'coverage') {
     if (action !== 'assess') throw new Error('Use coverage assess --input.');
     const assessment = assessCoverage(root, input<CoverageSnapshot>()); output(assessment);

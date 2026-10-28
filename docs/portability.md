@@ -41,3 +41,7 @@ Follow [shared tool discovery](../automation/tools/README.md) before setup quest
 ## Transfer QA process knowledge
 
 Transfer the applicable [QA Process Context](../QA%20Process%20Context/README.md) records, their revision history and linked canonical matrices/plans/data/configuration/regression references. Preserve actual ownership, decisions, gaps and historical run identities. Reverify affected environment/access references after relocation. Do not copy another project's strategy, outcomes or approval as live defaults. Existing onboarding schema is unchanged; unsupported runtime state still requires explicit migration rather than reset. Temporary coverage snapshots may be regenerated from the transferred canonical records; copied hashes do not establish fresh execution.
+
+## Transfer application connections
+
+Include [Application Flow Map](../Application%20Flow%20Map/README.md), area views, source links, correction/retirement history and impact briefings when transferring the same project. Preserve map IDs/revisions separately from served build identity and actual approvals. Recheck affected sources and environment applicability after relocation; regenerate temporary helper projections from canonical records. A different project starts with empty map templates, not another product's connections. No scheduler or application access transfers with the diagram.

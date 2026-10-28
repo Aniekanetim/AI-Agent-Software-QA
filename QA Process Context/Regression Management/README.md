@@ -20,3 +20,7 @@ For a fix, select the original failure plus relevant adjacent/affected behavior.
 An exploratory finding may become a scripted regression when the expected behavior and reproducible conditions are established. Preserve the originating charter and actual evidence. Automation is a method, not a prerequisite for retaining a useful check.
 
 For PR-based execution, follow the [GitHub regression policy](../../automation/github/README.md). The inventory recommends selection; it does not expand a reviewed command/suite/target policy. Material changes return to the relevant gate. Changes to requirements or risks can invalidate assumptions without proving every historical result false; record the impact assessment and select affected retests.
+
+## Use mapped dependencies
+
+For a change, consult [Application Flow Map](../../Application%20Flow%20Map/README.md) and prepare the [impact briefing](impact-analysis.md). Link map revision, changed feature/relationship IDs, affected condition/case references and selection rationale. Trace relevant prerequisites/consumers without assuming every reachable feature needs all tests. Source freshness, roles/configuration, unknowns and shared risks can require broader regression. Retain the same approval boundaries and actual original-versus-retest evidence.

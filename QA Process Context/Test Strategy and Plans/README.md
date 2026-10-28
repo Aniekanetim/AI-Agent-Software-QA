@@ -29,3 +29,7 @@ Choose a project-appropriate risk scale and explain it. Record an unknown rather
 | --- | --- | --- | --- | --- |
 
 Update after material product/risk changes, release planning and accepted lessons. Keep completed plans at their original revision; create an impact assessment for new work. The strategy supplies direction, not blanket execution permission.
+
+## Application-wide dependency basis
+
+Link the applicable [Application Flow Map](../../Application%20Flow%20Map/README.md) and its bounded inventory/relationship knowledge. Use sources, map gaps and shared-component risks to inform scope and regression policy. Completeness of an inventory is not established by a diagram, and unknown paths cannot justify automatic exclusions.

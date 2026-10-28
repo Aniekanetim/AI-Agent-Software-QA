@@ -32,3 +32,7 @@ For G5, link the prepared [release-notes/sign-off/handoff packet](completion-han
 ## Applicable process records
 
 Link strategy/coverage/design/data/configuration or regression revisions actually reviewed, the affected condition/case/charter IDs and their limits. Preserve the original reply and decision scope. A record revision or helper-generated count does not establish approval. Link any material change to its affected gate through [QA Process Context](../../../QA%20Process%20Context/README.md).
+
+## Connection reasoning reviewed
+
+Record the applicable [map](../../../Application%20Flow%20Map/README.md) revision/IDs, candidate paths, actual source authority and uncertainties supplied to the reviewer. Preserve corrections and responsible-owner decisions. Review of map capture, approval of intended policy and bounded execution authorization must not be conflated.

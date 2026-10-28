@@ -30,6 +30,10 @@ Inventory existing strategy/plans, matrices, data procedures, configurations and
 
 This adds project testing preparation, not another product-domain interview or testing-category selection. Reuse existing onboarding answers and valid approvals. The agent maintains operational records within reviewed limits; humans retain product-baseline ownership and material decisions. Keep existing results and plans canonical. The new folder/templates transfer with the QA root but confer no execution permission.
 
+## Establish a bounded application map
+
+Include [Application Flow Map](Application%20Flow%20Map/README.md) in the QA root. Reuse existing maps/sources, identify actual owners and record known areas and unknown relationships. Keep intended sources and observed evidence distinct. Onboarding accounts for this during existing understanding/handoff stages; it does not require complete discovery, another product domain or a repeated interview. Project-specific access and actual authorization still govern exploration/testing.
+
 ## 3. Verify tools for the chosen objective
 
 Start with [shared discovery and reuse](automation/tools/README.md). Record the actual calling harness from available metadata and inspect existing setup before asking tool questions. Reuse verified compatible tools; resolve only missing access/capabilities. A tool working in a personal terminal or CI does not prove it works through the adopting harness. The [Postman guide](automation/postman/README.md) covers local collections, conditional cloud login, selected resources and reporting.
@@ -63,7 +67,7 @@ Use the [bootstrap prompt](docs/bootstrap-prompt.md) to route the objective. Bef
 
 For QA, use the [check-in prompt](automation/check-in-prompt.md) with the actual root. Verify the five status folders, question index and ownership/checkpoints. An empty board produces a no-op with no file changes and does not trigger discovery. A new ticket produces preparation and an informed briefing, not silent tests.
 
-For discovery, give the agent a real request ID and follow its start/resume procedure. Verify that it reads both contexts, preserves history/scope and writes knowledge only in its own context. Reviewing templates does not demonstrate a live staging walkthrough.
+For discovery, give the agent a real request ID and follow its start/resume procedure. Verify that it reads both contexts, preserves history/scope and keeps original observations in its own context. Source-linked map updates follow the same authorized learning scope and do not change human requirements. Reviewing templates does not demonstrate a live staging walkthrough.
 
 For an existing ticket, use its recorded approvals only when the target, criteria and scope still match. A new machine must recheck access, tools and build identity before execution. Do not duplicate results or infer a new approval from a copied ticket.
 
