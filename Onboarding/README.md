@@ -52,3 +52,7 @@ Canonical context stays in the two [context stores](context-interview.md). Priva
 The agent saves clear extra answers from a reply instead of asking for them again. A pending response is recovered before another edit. Newer conflicting edits are retained for comparison; they are never silently overwritten. [Persistence contract and command examples](../automation/onboarding/README.md) describe this mechanism.
 
 At completion the agent provides the [onboarding handoff](templates/onboarding-handoff.md): usable capabilities, context coverage, remaining dependencies and the first eligible work. Onboarding completion is not test authorization, a product pass, release approval or schedule activation.
+
+## QA process preparation
+
+During the existing operating-rules and handoff checkpoints, inspect [QA Process Context](../QA%20Process%20Context/README.md). Reuse existing team strategy, traceability, configuration, data and regression sources. Identify actual owners and unresolved preparation without repeating prior questions. Product context still has five domains; this is operational preparation rather than a sixth product domain. A template is not an approved strategy. Readiness for dependent testing requires the relevant basis and resources.

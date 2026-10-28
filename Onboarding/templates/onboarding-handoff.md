@@ -18,6 +18,18 @@ State: Draft. Prepared by: <agent>. Human reviewer: <name>. Date: <actual date>.
 
 Context route: <provide / discover / combined; actual choice reference>. Baseline: <human index>. Discoveries: <AI index / request IDs>. Explain any conflict and dependent correctness judgments that must wait.
 
+## QA process preparation
+
+| Process area | Canonical record and revision, or original gap | Accountable owner / maintainer | Review state / affected work |
+| --- | --- | --- | --- |
+| Strategy/plans and risks | Not established | Not assigned | Not assessed |
+| Design and exploration | Not established | Not assigned | Not assessed |
+| Coverage and traceability | Not established | Not assigned | Not assessed |
+| Configuration and data | Not established | Not assigned | Not assessed |
+| Regression | Not established | Not assigned | Not assessed |
+
+Link existing records through [QA Process Context](../../QA%20Process%20Context/README.md). Draft preparation and unexecuted coverage do not establish readiness or approval. Preserve the five product domains above and existing answers; explain only missing process dependencies.
+
 ## Usable capabilities
 
 | Capability | Actual method, account/mailbox or target | Evidence / check date / execution context | Status and limit |

@@ -64,3 +64,7 @@ The portable repo's own [package checks](../../.github/workflows/package-checks.
 ## Existing setup and calling harness
 
 Use [shared tool discovery](../tools/README.md) before setup. Reuse verified compatible installations, identities and mailbox selections. A version/configuration check does not establish the required operation through this harness. Retain old evidence after moving hosts; reverify only affected capabilities. Missing or expired access does not require reinstalling a working tool.
+
+## Process-based regression selection
+
+Consult [QA Process Context](../../QA%20Process%20Context/README.md) and its retained regression inventory when assessing a PR. Link affected source/condition IDs, suite/charter revisions, data/configuration and selection rationale. These records inform selection but do not expand an existing approved policy. Unknown preview identity cannot support revision-specific coverage. Preserve original runs and distinct retests; link actual achieved coverage and residual gaps in the existing findings/handoff.

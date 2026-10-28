@@ -59,3 +59,7 @@ Human owners may maintain this baseline gap register. Agents record missing setu
 | --- | --- | --- | --- | --- |
 
 Initial templates are unsupplied sources, not discovered product defects. Human owners populate this register with actual gaps. Conflicting observations are retained in the discovery records and assessed through QA; missing intent is not automatically a defect.
+
+## Project testing process references
+
+[QA Process Context](../QA%20Process%20Context/README.md) links the project's strategy, design/coverage, configuration, data and regression records. It is an operational context maintained under QA policy, separate from this human product baseline. Link source IDs and revisions without copying or changing requirements to match results. Technical owners still maintain canonical system/environment facts; agents record actual test configuration and propose needed baseline changes.

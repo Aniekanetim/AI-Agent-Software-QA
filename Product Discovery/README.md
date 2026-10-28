@@ -56,3 +56,7 @@ The [five-folder QA board](../QA%20task%20management%20Board/README.md) continue
 A suspected problem found while learning is an observation pending QA assessment. Link its evidence to a related assignment or propose a new QA assignment. Do not create a confirmed defect from an inferred expectation or bypass the existing findings/retest gates. Separately authorized testing can establish an actionable defect through the normal workflow.
 
 Discovery completion records learning and coverage. It is neither a test pass, a release sign-off nor an automatic move to Tested-Ok.
+
+## Learning and QA process context
+
+[QA Process Context](../QA%20Process%20Context/README.md) governs maintained testing preparation. A discovery request may supply observations/gaps for a later QA plan, but discovery coverage is not exercised QA coverage. Do not move discovery requests onto the QA board or apply QA charter outcomes as discovery approval. Preserve the originating question, authority and separate authorizations.

@@ -24,6 +24,12 @@ The agent maintains [discovery context](Product%20Discovery/Project%20Context/RE
 
 Update [shared progress](unified_project_context.md) with actual setup facts/gaps. Propose human-baseline changes on the originating request/ticket. Adoption does not authorize exploration or testing. Record human source revisions, discovery entry versions and served identity separately; use Unknown when the build is undisclosed.
 
+## Establish QA process context
+
+Inventory existing strategy/plans, matrices, data procedures, configurations and regression records. Link them from [QA Process Context](QA%20Process%20Context/README.md), identify actual accountable owners/maintainers and record source states/revisions. Introduce missing records as Draft. Initial setup may retain original owner questions; do not fill missing requirements or declare affected testing ready.
+
+This adds project testing preparation, not another product-domain interview or testing-category selection. Reuse existing onboarding answers and valid approvals. The agent maintains operational records within reviewed limits; humans retain product-baseline ownership and material decisions. Keep existing results and plans canonical. The new folder/templates transfer with the QA root but confer no execution permission.
+
 ## 3. Verify tools for the chosen objective
 
 Start with [shared discovery and reuse](automation/tools/README.md). Record the actual calling harness from available metadata and inspect existing setup before asking tool questions. Reuse verified compatible tools; resolve only missing access/capabilities. A tool working in a personal terminal or CI does not prove it works through the adopting harness. The [Postman guide](automation/postman/README.md) covers local collections, conditional cloud login, selected resources and reporting.

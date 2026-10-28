@@ -101,3 +101,7 @@ For `pause/resume`, supply `--source` for the actual request. `defer` takes `{ i
 ## Existing projects and another machine
 
 Version 1.2 had no runtime state schema. Inspect its existing documents/approvals and retain them; introduce v1 state only for this onboarding. Do not import another product's or the job-applications project's state. Unsupported/corrupt schemas are preserved and rejected for explicit migration, never reset automatically. Back up project-private data securely if transferring it, exclude credentials, update the root, and reverify machine/context-specific access. Copying a Ready flag, tool report or schedule record does not make it valid on a new machine.
+
+## QA process records in version 1.6
+
+The agent inspects [QA Process Context](../../QA%20Process%20Context/README.md) during the existing operation/handoff stages. Record canonical sources, owners and original gaps in the handoff and linked project records. Runtime schemaVersion 1 and the five product domains are unchanged; preserve earlier answers and revalidate only affected preparation. Structural readiness checks do not assess substantive coverage or approve a strategy.

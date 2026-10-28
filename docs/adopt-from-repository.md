@@ -62,3 +62,7 @@ Do not claim background monitoring merely because the repository was cloned. Rec
 ## Existing tools and API readiness
 
 Follow [shared tool discovery](../automation/tools/README.md) before setup questions. Reuse existing tools and connections when actual access through this harness is verified. Moving hosts requires targeted capability checks, preserving earlier answers and historical evidence. [Postman CLI](../automation/postman/README.md) supports local collections without account login; cloud resources require selected identity/access and explicit reporting scope.
+
+## Adopt QA process context
+
+Include [QA Process Context](../QA%20Process%20Context/README.md) in the project-specific copy and intake reading. Inventory existing process records and link their canonical locations; preserve plans, cases, evidence and unrelated work. Name actual owners, source/process revisions and original gaps during operation/handoff. Templates start unconfigured, not approved. Keep human product authority, AI discoveries and testing-process knowledge distinct. Existing schemaVersion 1 onboarding answers remain usable; assess only affected preparation. The optional coverage snapshot is a temporary projection, not transferred product evidence or a second maintained RTM.

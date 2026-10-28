@@ -49,3 +49,7 @@ If observation conflicts with an accepted rule, retain both references and retur
 QA reads the relevant human sources and these entries before using discoveries for setup or investigation. Record human-context revisions, discovery entry/file versions and the served application identity separately, even when both context stores share one Git commit. Unsaved observations need a dated snapshot/reference rather than a claim that they are already in a commit.
 
 When a linked source or relevant application area changes, flag affected entries for refresh, preserve historical observations and follow the [discovery workflow](../discovery-workflow.md#7-refresh-or-resume-without-losing-history). A consumer must not silently treat old evidence as current. Retain narrow coverage honestly: exploring one role or journey does not establish whole-product knowledge.
+
+## References used during testing
+
+The separate [QA Process Context](../../QA%20Process%20Context/README.md) supplies strategy, design/coverage, configuration, data and regression knowledge. Discoveries can identify candidate conditions or setup facts, but cannot become accepted expectations merely by appearing in an RTM. Maintain observations here and link them from relevant testing records; human owners resolve intended-behavior questions.

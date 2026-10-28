@@ -21,3 +21,7 @@ Complete [guided onboarding](Onboarding/README.md) through [SETUP.md](SETUP.md).
 ## Continuity after interruption or transfer
 
 Read the complete active request/ticket, actual responses/decisions and linked evidence before resuming. Confirm both contexts' relevant versions, served identity and current-machine access; undisclosed build identity remains Unknown. Respect claims, preserve observations and restart only affected work with a stated reason. Optional assistant notes never replace shared records.
+
+## QA process preparation
+
+Version 1.6.0 introduces [QA Process Context](QA%20Process%20Context/README.md). The master still has no configured owners, strategy, live matrix or execution. In an adopting project, link actual canonical records, owners, applicable revisions, affected gaps and the active ticket checkpoint. Preserve the separate authority of human product sources and AI discoveries. Changes to scope/source/build require impact review of relevant records, not fabricated current coverage or restarted onboarding.

@@ -1,6 +1,16 @@
 # Package notes
 
-**Version:** 1.5.0. **Created:** 22 October 2026. **Updated:** 28 October 2026. **State:** reusable workflow package; no configured product, live discovery or QA execution history.
+**Version:** 1.6.0. **Created:** 22 October 2026. **Updated:** 28 October 2026. **State:** reusable workflow package; no configured product, live discovery or QA execution history.
+
+## Version 1.6.0: maintained QA process context
+
+Added [QA Process Context](../QA%20Process%20Context/README.md) with six areas for strategy/plans, design/exploration, coverage/RTM, configuration, test data and regression. Accountable human owners review material decisions; the agent maintains operational records within scope. Canonical product requirements and discoveries retain their separate authority. Existing result/plan/handoff templates remain canonical and tickets remain the shared reporting entry point.
+
+Positive, negative and edge perspectives are explicit across applicable interfaces/objectives, with systematic techniques and bounded exploratory charters. Designed coverage, actual exercise and execution outcomes remain distinct. Overlapping labels never multiply counts; exclusions and unresolved intent remain visible. An optional read-only coverage snapshot assessor checks ID/reference integrity, partial/blocked work, scoped counts and stale source/build references, always leaving product verdict Not assessed.
+
+Updated onboarding, G1–G5 workflow, board templates, check-in prompt, GitHub regression guidance, sign-off and adoption/portability entry points. Existing onboarding schemaVersion 1 is unchanged: no reset, extra product domain or repeated testing-category interview. Existing projects adopt missing records deliberately, preserving historical outcomes and approvals. No live records, product tests or schedules are introduced.
+
+Local validation passed TypeScript and all 67 package tests (54 retained checks, 12 new coverage checks and one document-link check). All 336 local Markdown targets/anchors resolved in the working root and a relocated copy whose path contains spaces. A synthetic CLI rehearsal retained 10 planned checks, 8 executed, 7 Pass, 1 Fail and 2 Not run, with 80% of identified conditions exercised. Changing its source evidence produced needsReview, exit 1 and no current coverage claim; prior answers and empty live queues were preserved. The command did not modify its input or issue a product verdict. The existing build was used for relocation checks; dependencies were not freshly installed in that copy. The harness denied the extra child launch used by node --test, so the document check used the package’s existing direct Node entry successfully. Browser/provider/product execution was not repeated for this process change; no live application readiness is implied. CI checks documentation paths as well as helper changes.
 
 ## Version 1.5.0: global mailbox policy and tagged test identities
 

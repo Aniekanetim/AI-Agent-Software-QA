@@ -37,3 +37,7 @@ Keep the master unconfigured. When a process improvement is accepted, update its
 ## Existing tools and API readiness
 
 Follow [shared tool discovery](../automation/tools/README.md) before setup questions. Reuse existing tools and connections when actual access through this harness is verified. Moving hosts requires targeted capability checks, preserving earlier answers and historical evidence. [Postman CLI](../automation/postman/README.md) supports local collections without account login; cloud resources require selected identity/access and explicit reporting scope.
+
+## Transfer QA process knowledge
+
+Transfer the applicable [QA Process Context](../QA%20Process%20Context/README.md) records, their revision history and linked canonical matrices/plans/data/configuration/regression references. Preserve actual ownership, decisions, gaps and historical run identities. Reverify affected environment/access references after relocation. Do not copy another project's strategy, outcomes or approval as live defaults. Existing onboarding schema is unchanged; unsupported runtime state still requires explicit migration rather than reset. Temporary coverage snapshots may be regenerated from the transferred canonical records; copied hashes do not establish fresh execution.

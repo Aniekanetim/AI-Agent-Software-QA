@@ -46,7 +46,7 @@ For email-backed test accounts, apply the [global mailbox policy](../../automati
 
 ## Start with the testing request
 
-Read the task, applicable context, changes and risks. Determine the relevant testing activities and explain the proposed coverage. Ask only about material missing requirements, limits or decisions; do not require the human to select a testing category. [Onboarding](../../Onboarding/README.md) prepares the project, while this task determines the work.
+Read the task, relevant sources in both product-context stores, applicable [QA process records](../../QA%20Process%20Context/README.md), changes and risks. Determine the relevant testing activities and explain the proposed coverage. Ask only about material missing requirements, limits or decisions; do not require the human to select a testing category. [Onboarding](../../Onboarding/README.md) prepares the project, while this task determines the work.
 
 Then identify the product flow, source requirements, target build/environment, data, risks, measurable criteria and operating limits. Consult the context index and record the applicable source revisions. Resolve contradictions before judging behavior; if a necessary answer is missing, record a ticket clarification and waiting checkpoint. Continue independent work only within the existing authorization. Derive expected results from the agreed requirements, independently of the application's current response. After a clarification, preserve the answer/source update and return to the affected gate if scope or criteria changed.
 
@@ -137,6 +137,22 @@ Keep these statuses distinct:
 
 Connect requirements, discovery entries, cases, observations, defects and retests by ID/version and build. Update detailed records, [shared progress](../../unified_project_context.md) and affected agent-managed discoveries after material changes; update ignored continuity only if used. Propose any required baseline change to its human owner. Shared records must stand alone. A completed execution can contain failures, and an approved handoff can retain explicit open risks.
 
+
+## QA process context at the existing gates
+
+Read [QA Process Context](../../QA%20Process%20Context/README.md) before preparing/resuming a ticket. Preserve human product sources and separate AI discovery knowledge. Link existing process records as canonical; create missing operational records as Draft within authorized preparation.
+
+| Gate | Process and coverage evidence to bring into the existing briefing |
+| --- | --- |
+| G1 | Applicable strategy/risk register, source and condition IDs, measurable coverage items, scope/exclusions and unknowns |
+| G2 | Case/charter revisions, technique and positive/negative/edge considerations, selection rationale, pass criteria, data/configuration and exact execution bounds |
+| G3 | Actual exercised items and evidence, original failures, Partial/Blocked/Not run work and residual gaps |
+| G4 | Original failure, affected dependencies/conditions, selected regression and actual build; retain prior results separately |
+| G5 | Achieved coverage against agreed scope, unresolved intent, exclusions, residual risk, retained regression and named maintenance actions |
+
+The [design guide](../../QA%20Process%20Context/Test%20Design%20and%20Exploration/README.md) separates targets, quality objectives, scenario perspectives and techniques. Select relevant challenges without a case quota. Creative thinking supports both scripts and bounded exploratory charters; QA exploration uses this workflow, while Product Discovery retains its independent learning procedure.
+
+Use the [coverage definitions](../../QA%20Process%20Context/Coverage%20and%20Traceability/README.md): designed is not exercised, a failure can exercise a condition, overlapping labels do not multiply counts, and sampling/unknown inventory limit claims. Scope/source/build changes trigger impact review of affected records. The optional snapshot helper checks structure/counts, not accepted intent, actual behavior or human decisions. Preserve historical evidence; reuse applicable approvals and return only material changes to the affected gate.
 
 ## Reusable records
 

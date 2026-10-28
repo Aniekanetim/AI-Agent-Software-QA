@@ -21,3 +21,7 @@ Replace this block with actual valid, formatted request JSON from the agreed con
 ```
 
 Where Postman reproduction is supplied, link the actual collection/environment and instructions for saving returned IDs. Do not claim a Postman execution unless it occurred. Record actual method/results separately per run and keep browser actions in the UI suite.
+
+## Design and coverage links
+
+Reference the applicable [QA process records](../../../QA%20Process%20Context/README.md) and their revisions. In the canonical matrix, link case IDs to condition/source/risk IDs, relevant positive/negative/edge perspectives, techniques and selection rationale. Link any charter separately. Shared metadata belongs in that reference rather than duplicate step/result columns. Record what was actually exercised in each run; a label is not another test.

@@ -29,3 +29,7 @@ Record tool/script/assertion checks, target identity verification, access, isola
 ## Review request and record
 
 Present the complete self-contained briefing in the conversation before requesting a decision. State exact allowed next work and exclusions. Record the actual reply, scope/build/plan revision and reviewed evidence in a [review record](review-record.md). Do not pre-fill approval. A material change returns to the affected gate.
+
+## Project process and design basis
+
+Link applicable [QA Process Context](../../../QA%20Process%20Context/README.md) strategy/risk, coverage, data/configuration and regression records with revisions and actual owners. Identify coverage items and denominator before execution. Explain the chosen interface/objective, techniques and relevant positive/negative/edge challenges. Link bounded exploratory charters for additional questions; no perspective or technique quota applies. Missing intent remains an original owner question; proposed checks cannot establish their own expected behavior.
