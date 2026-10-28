@@ -87,3 +87,7 @@ Return the result to the linked QA ticket and identify its next checkpoint. Comp
 ## Application-map references
 
 Map ID/revision and affected feature/relationship IDs: <actual references or known gap>. Link the root [Application Flow Map](../../Application%20Flow%20Map/README.md), original discoveries and actual source revisions. State which connections were supplied, observed, inferred or not reached. Mapping publication stays within the existing authorized journeys; it does not require a whole-product crawl or authorize QA execution.
+
+## Tools and exploration data
+
+Use [task-based selection](../../automation/tools/task-selection.md) for the learning actions; discovery does not require a project-wide browser choice. Prepare suitable synthetic inputs and authorized accounts/state using [the data policy](../../QA%20Process%20Context/Test%20Data%20Management/preparation-policy.md). Preserve learning authorization, actual starting-state evidence and original identities; escalate only affected missing rules/access/state. Discovery remains independent of QA test verdicts and gates.

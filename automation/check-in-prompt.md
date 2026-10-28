@@ -56,3 +56,7 @@ Preserve unrelated local work. If version control/publication is configured and
 authorized, commit only coherent changes for the actionable ticket; do not invent
 a repository, remote, publication permission or completed execution.
 ```
+
+## Adaptive task preparation
+
+Follow [task-based tool selection](../automation/tools/task-selection.md) and the [data preparation policy](../QA%20Process%20Context/Test%20Data%20Management/preparation-policy.md). The agent chooses suitable accessible methods per task, generates routine local inputs and establishes authorized state. Preserve explicit constraints, exact retest identities, old answers and failed attempts. Optional capability gaps do not block unrelated work. State precise missing dependencies and continue independent authorized checks. Preserve existing human gates; copied readiness is not current task readiness.

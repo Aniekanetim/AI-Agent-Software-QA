@@ -137,7 +137,8 @@ Copy this into a new file in Ready for QA and replace the placeholders. Do not r
 - Environment: <local or other authorized target>
 - Browser URL: <normal web address, if applicable>
 - API base URL: <API address, if applicable>
-- Setup, access and synthetic test data: <exact instructions or direct supporting links>
+- Setup/access and test-data basis: <required states and source/limits; supplied data or authorized generation/preparation/reuse options; verify actual state>
+- Tool requirements/constraints: <only explicit requirements; otherwise agent selects suitable methods per task>
 
 ## Testing scope and completion criteria
 - Testing objective/types: <requested coverage>
@@ -252,3 +253,7 @@ Not completed. Record the actual scoped disposition and human decision.
 ## Scheduling
 
 Follow [native scheduling setup](../automation/README.md) and use the [check-in prompt](../automation/check-in-prompt.md). No schedule is active merely because this folder was copied. A manual empty-board check leaves files unchanged; it does not demonstrate a product test or future unattended behavior.
+
+## Method and data decisions on a ticket
+
+The agent follows [task-based selection](../automation/tools/task-selection.md) and [data preparation](../QA%20Process%20Context/Test%20Data%20Management/preparation-policy.md). Record significant tool choices and evidence fit, required operations, data conditions/origin, preparation bounds, planned versus verified starting state and exact identity reuse. A missing attachment or unavailable optional tool does not automatically block the assignment. For a genuine dependency, retain the exact affected checks, sources/permitted options assessed, assistance/owner, original question and independent work. Use the existing question index and statuses; preserve failed attempts, human decisions and history.

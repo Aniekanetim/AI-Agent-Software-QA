@@ -2,14 +2,15 @@ import { existsSync, readFileSync } from 'node:fs';
 import { realpathSync } from 'node:fs';
 import { contained, verifyEvidence } from '../shared/store.js';
 import { validatePreference, validateReport, type BrowserPreference, type BrowserReport } from '../browser/tools.js';
+import { readToolPolicy } from '../tools/policy.js';
 import { readConnections } from '../email/email.js';
 import { validateSettings } from '../github/github.js';
 import { readHarness, currentHarness, type ExecutionContext } from '../tools/runtime.js';
 import { readRecord, readinessIssues } from '../tools/registry.js';
 import { settings as postmanSettings, capabilityIssues as postmanCapabilityIssues } from '../postman/postman.js';
 
-/** Revalidates configured capabilities; absence is not silently converted into a configured service. */
-export function integrationIssues(root: string): string[] {
+/** Project preparation and optional capability gaps remain separate; neither authorizes task execution. */
+export function integrationStatus(root: string) {
   const issues: string[] = [];
   const read = (path: string) => JSON.parse(readFileSync(contained(root, path), 'utf8'));
   const present = (path: string) => existsSync(contained(root, path));
@@ -33,40 +34,54 @@ export function integrationIssues(root: string): string[] {
       for (const ref of operation.triggerEvidence ?? []) { try { verifyEvidence(root, ref); } catch { issues.push('Event trigger evidence changed.'); } }
     }
   }
-  if (present('.local/browser-preferences.json')) {
-    const preference = read('.local/browser-preferences.json') as BrowserPreference;
-    try { validatePreference(preference); } catch { issues.push('Browser preference is invalid.'); return issues; }
-    if (preference.method === 'recommend') issues.push('Resolve the recommended browser using an actual capability comparison.');
-    const provider = preference.method === 'cli' ? 'cli' : preference.method === 'mcp' ? 'harnessMcp' : 'inApp';
-    const path = `.local/browser-reports/${provider}-${executionContext}.json`;
-    if (!present(path)) issues.push(`${provider}: verify actual ${executionContext} operation; a server/configuration check alone is insufficient.`);
-    else {
-      const report = read(path) as BrowserReport;
-      issues.push(...validateReport(root, report, executionContext));
-      if (report.provider !== provider || (preference.method !== 'inApp' && report.visibility !== preference.visibility)) issues.push('The browser report does not match the saved method/visibility.');
+  try { readToolPolicy(root); } catch { issues.push('Tool policy or its source is invalid; resolve the actual constraints.'); }
+  const projectIssues = [...issues]; issues.length = 0;
+  const inspect = (name: string, action: () => void) => { try { action(); } catch { issues.push(`${name}: configuration/evidence is invalid; preserve it and recheck affected work.`); } };
+  inspect('Legacy browser preference', () => {
+    if (present('.local/browser-preferences.json')) {
+      const preference = read('.local/browser-preferences.json') as BrowserPreference;
+      try { validatePreference(preference); } catch { issues.push('Browser preference is invalid.'); return; }
+      if (preference.method === 'recommend') return; // A historical recommendation is not an unresolved compulsory choice.
+      const provider = preference.method === 'cli' ? 'cli' : preference.method === 'mcp' ? 'harnessMcp' : 'inApp';
+      const path = `.local/browser-reports/${provider}-${executionContext}.json`;
+      if (!present(path)) issues.push(`${provider}: verify actual ${executionContext} operation; a server/configuration check alone is insufficient.`);
+      else {
+        const report = read(path) as BrowserReport;
+        issues.push(...validateReport(root, report, executionContext));
+        if (report.provider !== provider || (preference.method !== 'inApp' && report.visibility !== preference.visibility)) issues.push('The browser report does not match the saved method/visibility.');
+      }
     }
-  }
-  if (present('.local/email-connections.json')) for (const binding of readConnections(root).value.bindings) {
-    if (binding.transport === 'human') continue;
-    if (binding.authentication !== 'connected' || !binding.verification?.bodyReadAt || binding.verification.context !== executionContext) issues.push(`${binding.id}: full-message ${executionContext} access is not verified.`);
-    for (const ref of binding.verification?.evidence ?? []) { try { verifyEvidence(root, ref); } catch { issues.push(`${binding.id}: email capability evidence changed.`); } }
-    if (readHarness(root)) issues.push(...readinessIssues(root, readRecord(root, `email:${binding.id}`), ['account', 'listMessages', 'readMessage']).map(i => `${binding.id}: ${i}`));
-  }
-  if (present('.local/github-settings.json')) {
-    const settings = read('.local/github-settings.json');
-    validateSettings(settings);
-    if (!settings.account || !settings.source || !Array.isArray(settings.repositories)) issues.push('GitHub settings are incomplete.');
-    else for (const rule of settings.repositories) {
-      const path = `.local/github-access/${rule.repository.replace('/', '--')}.json`;
-      if (!present(path)) issues.push(`${rule.repository}: repository access is not verified.`);
-      else { const access = read(path); if (access.account !== settings.account || access.repository.toLowerCase() !== rule.repository.toLowerCase() || access.root !== realpathSync(root)) issues.push(`${rule.repository}: account/root access evidence differs.`); }
-      if (readHarness(root)) issues.push(...readinessIssues(root, readRecord(root, 'github'), [`repository:${rule.repository.toLowerCase()}`]).map(i => `${rule.repository}: ${i}`));
+  });
+  inspect('Email', () => {
+    if (present('.local/email-connections.json')) for (const binding of readConnections(root).value.bindings) {
+      if (binding.transport === 'human') continue;
+      if (binding.authentication !== 'connected' || !binding.verification?.bodyReadAt || binding.verification.context !== executionContext) issues.push(`${binding.id}: full-message ${executionContext} access is not verified.`);
+      for (const ref of binding.verification?.evidence ?? []) { try { verifyEvidence(root, ref); } catch { issues.push(`${binding.id}: email capability evidence changed.`); } }
+      if (readHarness(root)) issues.push(...readinessIssues(root, readRecord(root, `email:${binding.id}`), ['account', 'listMessages', 'readMessage']).map(i => `${binding.id}: ${i}`));
     }
-  }
-  const postman = postmanSettings(root);
-  if (postman && readHarness(root)) {
-    const required = ['version', 'collectionRun', ...(postman.mode === 'local' ? ['localCollectionRun'] : ['identity', ...postman.collections.map(id => `collection:${id}`), ...postman.environments.map(id => `environment:${id}`)])];
-    issues.push(...postmanCapabilityIssues(root, readRecord(root, 'postman'), required, postman).map(i => `Postman: ${i}`));
-  }
-  return issues;
+  });
+  inspect('GitHub', () => {
+    if (present('.local/github-settings.json')) {
+      const settings = read('.local/github-settings.json');
+      validateSettings(settings);
+      if (!settings.account || !settings.source || !Array.isArray(settings.repositories)) issues.push('GitHub settings are incomplete.');
+      else for (const rule of settings.repositories) {
+        const path = `.local/github-access/${rule.repository.replace('/', '--')}.json`;
+        if (!present(path)) issues.push(`${rule.repository}: repository access is not verified.`);
+        else { const access = read(path); if (access.account !== settings.account || access.repository.toLowerCase() !== rule.repository.toLowerCase() || access.root !== realpathSync(root)) issues.push(`${rule.repository}: account/root access evidence differs.`); }
+        if (readHarness(root)) issues.push(...readinessIssues(root, readRecord(root, 'github'), [`repository:${rule.repository.toLowerCase()}`]).map(i => `${rule.repository}: ${i}`));
+      }
+    }
+  });
+  inspect('Postman', () => {
+    const postman = postmanSettings(root);
+    if (postman && readHarness(root)) {
+      const required = ['version', 'collectionRun', ...(postman.mode === 'local' ? ['localCollectionRun'] : ['identity', ...postman.collections.map(id => `collection:${id}`), ...postman.environments.map(id => `environment:${id}`)])];
+      issues.push(...postmanCapabilityIssues(root, readRecord(root, 'postman'), required, postman).map(i => `Postman: ${i}`));
+    }
+  });
+  return { issues: projectIssues, capabilityIssues: issues, taskReadiness: 'Assess the selected operations for each task; onboarding completion is not task execution authorization.' };
 }
+
+/** Backwards-compatible full diagnostic list, not the onboarding blocking decision. */
+export function integrationIssues(root: string): string[] { const result = integrationStatus(root); return [...result.issues, ...result.capabilityIssues]; }

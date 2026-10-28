@@ -10,7 +10,7 @@ export const areas = [
   { id: 'review', label: 'Review responsibilities and execution policies', files: ['.local/review-settings.json'], stage: 'operation' },
   { id: 'email', label: 'Email providers, accounts and mailboxes', files: ['.local/email-connections.json'], stage: 'email' },
   { id: 'verification', label: 'OTP and verification preferences', files: ['.local/verification-settings.json'], stage: 'email' },
-  { id: 'browser', label: 'Browser and visibility', files: ['.local/browser-preferences.json'], stage: 'tools' },
+  { id: 'browser', label: 'Tool constraints and browser visibility', files: ['.local/tool-policy.json', '.local/browser-preferences.json'], stage: 'tools' },
   { id: 'schedule', label: 'Check-in schedule', files: ['.local/operation-preferences.json'], stage: 'operation' },
   { id: 'reporting', label: 'Reporting and evidence preferences', files: ['.local/reporting-settings.json'], stage: 'operation' },
   { id: 'postman', label: 'API tools and Postman', files: ['.local/postman-settings.json'], stage: 'tools' },

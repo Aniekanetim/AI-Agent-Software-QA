@@ -18,6 +18,8 @@ import { bindHarness, currentHarness, readHarness, harnessKey, type ExecutionCon
 import * as postman from './postman/postman.js';
 import { assessCoverage, type CoverageSnapshot } from './coverage/coverage.js';
 import { validateFlowMap, traceFlowMap, type FlowMapSnapshot, type Direction } from './flow-map/flow-map.js';
+import { assessTaskTools, type TaskToolPlan } from './tools/task.js';
+import { assessData, type DataPreparation } from './data/preparation.js';
 
 const args = process.argv.slice(2), options = new Map<string, string>();
 const positional: string[] = [];
@@ -44,9 +46,10 @@ async function currentPr(repository: string, number: number) {
 const help = {
   'flow-map': 'validate --input | trace --input --features id,id [--direction upstream/downstream/both] [--max-depth 8] : read-only candidate impact; no test execution or approval',
   coverage: 'assess --input : read-only consistency/count check of a canonical-record snapshot; no execution, approval or product verdict',
-  tools: 'bind --input | scan --source [--tool] | select --input | status --tool [--requires operation,operation] | import-host --input',
+  tools: 'bind --input | scan --source [--tool] | select --input | status --tool [--requires operation,operation] | import-host --input | assess-task --input : read-only assessment of agent-selected capabilities',
+  data: 'assess --input : read-only preparation/state assessment; no generation, application mutations or approval',
   postman: 'check --source | login-instructions | run --input : detects/reuses the CLI; local runs need no login; cloud operations need selected account/reporting scope',
-  onboarding: 'start | roadmap-shown --source | status | next | queue --input | shown/not-shown --id --source | reply --input | recover | reconcile --input | pause/resume --source | clarify/defer --input | check/domains --input | finish --input',
+  onboarding: 'start | roadmap-shown --source | status | next | queue --input | shown/not-shown --id --source | reply --input | recover | reconcile --input | retire-tool-questions --input | pause/resume --source | clarify/defer --input | check/domains --input | finish --input',
   settings: 'open --source | show | choose --area | edit --input | present | save --input | cancel | back | close',
   browser: 'versions | install | mcp-config | check --provider library/cli/mcpServer [--headless] [--context interactive/scheduled/ci] | import-report --input | fixture',
   email: 'policy | account --input | accounts | options --input | discover --provider gmailApi/agentmail --source | create-inbox --input | select --input | verify --input | begin --input | outcome --input',
@@ -58,6 +61,11 @@ async function main() {
   const [area, action] = positional;
   if (!area || area === 'help') { output(help); return; }
   if (area === 'evidence') { output(store.evidence(root, option('path'), options.get('pointer'))); return; }
+  if (area === 'data') {
+    if (action !== 'assess') throw new Error('Use data assess --input.');
+    const report = assessData(root, input<DataPreparation>()); output(report);
+    if (report.status === 'needsPreparation') process.exitCode = 1; return;
+  }
   if (area === 'flow-map') {
     const snapshot = input<FlowMapSnapshot>();
     if (action === 'validate') {
@@ -87,6 +95,7 @@ async function main() {
       output(tool === 'postman' ? postman.status(root, required) : registry.status(root, tool, required));
     }
     else if (action === 'import-host') output(registry.recordHost(root, input()));
+    else if (action === 'assess-task') { const report = assessTaskTools(root, input<TaskToolPlan>()); output(report); if (report.status === 'needsPreparation') process.exitCode = 1; }
     else throw new Error('Unknown tools command.');
     return;
   }
@@ -105,6 +114,7 @@ async function main() {
     else if (action === 'shown' || action === 'not-shown') conversation.acknowledge(root, option('id'), option('source'), action === 'shown');
     else if (action === 'reply') conversation.commitReply(root, input());
     else if (action === 'recover') conversation.recover(root);
+    else if (action === 'retire-tool-questions') conversation.retireToolQuestions(root, input());
     else if (action === 'reconcile') { const v = input<{ writes: conversation.ProposedWrite[]; source: string }>(); conversation.reconcile(root, v.writes, v.source); }
     else if (action === 'pause' || action === 'resume') conversation.pause(root, action === 'pause', option('source'));
     else if (action === 'clarify') { const v = input<{ id: string; prompt: string; source: string }>(); conversation.clarify(root, v.id, v.prompt, v.source); }

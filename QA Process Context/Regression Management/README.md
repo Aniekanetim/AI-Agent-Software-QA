@@ -24,3 +24,7 @@ For PR-based execution, follow the [GitHub regression policy](../../automation/g
 ## Use mapped dependencies
 
 For a change, consult [Application Flow Map](../../Application%20Flow%20Map/README.md) and prepare the [impact briefing](impact-analysis.md). Link map revision, changed feature/relationship IDs, affected condition/case references and selection rationale. Trace relevant prerequisites/consumers without assuming every reachable feature needs all tests. Source freshness, roles/configuration, unknowns and shared risks can require broader regression. Retain the same approval boundaries and actual original-versus-retest evidence.
+
+## Retest methods and original state
+
+The agent chooses methods appropriate to the original failure and retained evidence, while exact approved suites/commands remain binding. Verify data/starting state and reuse original identities where persisted state matters. A fresh replacement cannot certify an existing-state defect. Preserve the original failed run and preparation attempts; material changes return to the affected gate.

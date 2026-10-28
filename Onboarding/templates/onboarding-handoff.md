@@ -38,7 +38,7 @@ Link existing records through [QA Process Context](../../QA%20Process%20Context/
 
 | Capability | Actual method, account/mailbox or target | Evidence / check date / execution context | Status and limit |
 | --- | --- | --- | --- |
-| Browser | Not selected | Not checked | Not established |
+| Browser/testing tools | Agent selects per task; capabilities not established | Not checked | Constraints/visibility not established |
 | Scripted suites | Not selected for a task | Not executed | Not established |
 | Email / verification | Not selected | No credentials or codes here | Not established |
 | Application roles | Not established | Not checked | Not established |
@@ -58,3 +58,7 @@ Onboarding readiness is scoped preparation. It does not establish product-test p
 ## Tool reuse and remaining preparation
 
 Record the actual harness/profile/context, reused executable/connection selections, operation evidence and check dates. List only missing capabilities and the work they affect. Separate Postman local execution from cloud identity/resource/reporting access. Link the private operational records without copying credentials. Do not infer current harness readiness from another terminal or CI runner.
+
+## Task readiness and data initiative
+
+<Actual tool/visibility constraints, available methods and optional capability gaps; no compulsory project browser. Describe relevant standing data-preparation authority, rules/state gaps, verified accounts/datasets, exact reuse and retention/cleanup bounds. Identify what the agent can prepare and the precise remaining assistance needed. Onboarding completion is not authorization or readiness for every future task.>

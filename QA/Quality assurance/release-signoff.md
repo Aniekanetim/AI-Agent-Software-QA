@@ -62,3 +62,7 @@ Include applicable [QA Process Context](../../QA%20Process%20Context/README.md) 
 ## Application-map limits in the handoff
 
 Include applicable [Application Flow Map](../../Application%20Flow%20Map/README.md) revision/IDs and the impact selection rationale. Report actual paths/conditions exercised, uncovered connections and freshness/identity limits. Link map maintenance actions and owners without making map completion or a helper result a release approval. Existing human sign-off, delivery and required acceptance remain unchanged.
+
+## Tool/data handoff
+
+Link the actual task method choices and [data preparation record](../../QA%20Process%20Context/Test%20Data%20Management/data-preparation-record.md). State what ran, prepared versus verified state, retained identities, failed attempts, unresolved dependencies and next-owner reuse/retention/cleanup actions. A tool preference, generated input or capability/preparation assessment is not release evidence by itself.

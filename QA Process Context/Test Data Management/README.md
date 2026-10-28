@@ -2,6 +2,10 @@
 
 Plan data for the conditions being tested, including valid inputs, invalid inputs, boundaries, roles, lifecycle states and relevant combinations. Use synthetic or explicitly permitted data. A prepared account or fixture is not proof of its actual application state.
 
+## Agent initiative and preparation records
+
+Follow the [preparation policy](preparation-policy.md) to decide what can be generated, created or reused within existing authorization and what needs owner assistance. Use the [preparation record](data-preparation-record.md) to distinguish planned work, local inputs prepared and application state verified. Missing attached data is not an automatic blocker. Keep rules, original identities, failed attempts and exact assistance requests visible. The optional [read-only assessor](../../automation/data/README.md) checks record structure/references; it generates nothing and grants no approval.
+
 **Template — no dataset, account or cleanup action is authorized.** Apply [the common ownership rules](../README.md) and link this plan from the assignment.
 
 | Field | Actual value |

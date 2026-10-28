@@ -1,9 +1,9 @@
 {
   "name": "ai-agent-software-qa",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "private": true,
   "type": "module",
-  "description": "Task-driven AI QA with application flow maps, impact analysis, process context and guided integrations.",
+  "description": "Task-driven AI QA with agent-selected tools, test-data initiative, application maps and human review.",
   "license": "MIT",
   "engines": {
     "node": ">=22"

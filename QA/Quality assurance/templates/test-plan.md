@@ -37,3 +37,7 @@ Link applicable [QA Process Context](../../../QA%20Process%20Context/README.md) 
 ## Change-impact basis
 
 Link [Application Flow Map](../../../Application%20Flow%20Map/README.md) revision/IDs and the [impact briefing](../../../QA%20Process%20Context/Regression%20Management/impact-analysis.md). Explain source-backed propagation, selected checks, exclusions, conditions and gaps. A helper candidate list is supporting preparation, not the full human approval briefing or a test verdict.
+
+## Tool and data decisions
+
+Link [tool selection](../../../automation/tools/task-selection.md) and the actual [data preparation record](../../../QA%20Process%20Context/Test%20Data%20Management/data-preparation-record.md). Explain selected tools/operations and fit, alternatives/limits, actual constraints, generation/preparation/reuse mechanism, required state and permission sources. Routine synthetic inputs need no per-value approval within task preparation. Distinguish prepared inputs from verified application state; list precise blockers and independent work. Keep existing review gates and commands applicable.

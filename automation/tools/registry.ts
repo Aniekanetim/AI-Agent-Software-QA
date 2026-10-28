@@ -9,7 +9,11 @@ import { currentHarness, harnessKey, type HarnessIdentity, type OperationEvidenc
 
 export const tools = ['playwrightCli', 'playwrightMcp', 'playwrightLibrary', 'playwrightTest', 'github', 'postman'] as const;
 export type NativeTool = typeof tools[number];
-export type ToolId = NativeTool | 'inAppBrowser' | 'harnessMcp' | `email:${string}`;
+export type ToolId = NativeTool | 'inAppBrowser' | 'harnessMcp' | `email:${string}` | `custom:${string}`;
+export function assertToolId(value: unknown): asserts value is ToolId {
+  if (typeof value === 'string' && value.startsWith('email:')) { requireText(value.slice(6), 'Existing mailbox binding ID'); return; }
+  if (typeof value !== 'string' || ![...tools, 'inAppBrowser', 'harnessMcp'].includes(value) && !/^custom:[A-Za-z0-9._@+-]+$/.test(value)) throw new Error('Use a supported tool ID or a named email:/custom: capability.');
+}
 const definitions: Record<NativeTool, { name: string; packageName?: string; major?: number }> = {
   playwrightCli: { name: 'playwright-cli', packageName: '@playwright/cli', major: 0 },
   playwrightMcp: { name: 'playwright-mcp', packageName: '@playwright/mcp', major: 0 },
@@ -118,6 +122,7 @@ export function selectCommand(root: string, tool: NativeTool, command: Command, 
 export const recordPath = (tool: ToolId, identity: HarnessIdentity) => `.local/tools/reports/${digest(tool).slice(0, 12)}-${harnessKey(identity)}.json`;
 export function readRecord(root: string, tool: ToolId): ToolRecord | null { return load<ToolRecord | null>(root, recordPath(tool, currentHarness(root)), () => null).value; }
 export function saveRecord(root: string, record: ToolRecord): void {
+  assertToolId(record.tool);
   if (!record.source?.trim() || record.schemaVersion !== 1 || harnessKey(currentHarness(root)) !== harnessKey(record.harness)) throw new Error('Capability evidence must identify the actual calling harness and source.');
   assertNonsecret(record);
   for (const capability of Object.values(record.capabilities)) {
@@ -180,7 +185,8 @@ export async function scan(root: string, source: string, requested: NativeTool[]
   return { records, next: 'Reuse compatible selections. Version checks do not establish browser interaction, API execution or account access. Run only the missing relevant capability check; inspect native host integrations separately.' };
 }
 export function recordHost(root: string, input: Omit<ToolRecord, 'schemaVersion' | 'harness' | 'checkedAt'>): ToolRecord {
-  if (!['inAppBrowser', 'harnessMcp'].includes(input.tool) && !input.tool.startsWith('email:')) throw new Error('Native executables require the real CLI probe.');
+  assertToolId(input.tool);
+  if (!['inAppBrowser', 'harnessMcp'].includes(input.tool) && !input.tool.startsWith('email:') && !input.tool.startsWith('custom:')) throw new Error('Bundled native executables require the real CLI probe.');
   requireText(input.connectionReference, 'Actual host connection reference');
   if (input.command) throw new Error('Host reports cannot replace executable selections.');
   const record: ToolRecord = { ...input, schemaVersion: 1, harness: currentHarness(root), checkedAt: new Date().toISOString() };

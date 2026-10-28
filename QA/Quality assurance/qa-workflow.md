@@ -65,6 +65,12 @@ A cycle can combine or change testing types. Preserve its current progress and e
 
 Configured GitHub intake can supply a linked PR assignment. A reusable regression policy may carry an already reviewed G1/G2 execution scope: read its exact approved content, suite revisions, target, command and limits; verify current eligibility/build and reuse that authorization only while it still matches. Its initial briefing must explain every covered action/pass criterion and rationale. Do not request the same unchanged approval on every run, weaken expectations or infer approval from a configuration file. Material changes return to the affected gate. Actual findings, G3 confirmation and G5 sign-off/handoff remain separate required decisions. [GitHub controls](../../automation/github/README.md)
 
+## Task-based tools and data preparation
+
+At G1/G2 follow [tool selection](../../automation/tools/task-selection.md) and the [data preparation policy](../../QA%20Process%20Context/Test%20Data%20Management/preparation-policy.md). The agent chooses suitable methods from available capabilities and explains significant rationale, required evidence, limits and proposed data preparation. No fixed UI/API tool or compulsory onboarding browser applies. Retain actual explicit requirements and reviewed regression commands.
+
+Generate routine synthetic local inputs within task preparation; create/reuse application state only through authorized mechanisms. Validate the actual starting state and exact identity needed for retests. Missing rules, access or externally established state block dependent checks only, with precise owner questions. Routine equivalent choices do not add approval gates; material scope/criteria/action/evidence changes return to the affected gate. At G3/G4/G5 preserve actual methods, data revisions/observations, failed attempts, uncovered work and retention/cleanup handoff. Read-only capability/data assessment is preparation evidence, not test execution or approval.
+
 ## Project review gates
 
 | Gate | Concrete packet prepared by the agent | Human decision and next authorized work |

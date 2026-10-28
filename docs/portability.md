@@ -45,3 +45,7 @@ Transfer the applicable [QA Process Context](../QA%20Process%20Context/README.md
 ## Transfer application connections
 
 Include [Application Flow Map](../Application%20Flow%20Map/README.md), area views, source links, correction/retirement history and impact briefings when transferring the same project. Preserve map IDs/revisions separately from served build identity and actual approvals. Recheck affected sources and environment applicability after relocation; regenerate temporary helper projections from canonical records. A different project starts with empty map templates, not another product's connections. No scheduler or application access transfers with the diagram.
+
+## Adaptive task preparation
+
+Follow [task-based tool selection](../automation/tools/task-selection.md) and the [data preparation policy](../QA%20Process%20Context/Test%20Data%20Management/preparation-policy.md). The agent chooses suitable accessible methods per task, generates routine local inputs and establishes authorized state. Preserve explicit constraints, exact retest identities, old answers and failed attempts. Optional capability gaps do not block unrelated work. State precise missing dependencies and continue independent authorized checks. Preserve existing human gates; copied readiness is not current task readiness.

@@ -20,7 +20,8 @@ npm run qa -- help
 | `.local/postman-settings.json` | Local/cloud mode, selected account/resources, region, credential source and reporting; no secret values |
 | `.local/project.json` | Name, `environments` array, `owners` array and actual `source`; references to the applicable project sources |
 | `.local/context-settings.json` | `route`: provide/discover/combined, actual `source`, source/request references |
-| `.local/browser-preferences.json` | method: cli/mcp/inApp/recommend; visibility: headed/headless; fallback: cli/mcp/null; actual source |
+| `.local/tool-policy.json` | Optional sourced agent-selection constraints: schemaVersion 1, selection agent, visibility, allowedTools/null, prohibitedTools, source and evidence; [contract](../tools/task-selection.md) |
+| `.local/browser-preferences.json` | Legacy method/fallback history; retain actual visibility and source. No mandatory method selection; explicit constraints remain applicable |
 | `.local/github-settings.json` | Selected github.com account, repository rules and actual source |
 | `.local/email-connections.json` | Guarded provider/account/mailbox bindings and access observations |
 | `.local/operation-preferences.json` | mode: onDemand/scheduled/events/combined; source; actual trigger reference/evidence if events are used |
@@ -109,3 +110,9 @@ The agent inspects [QA Process Context](../../QA%20Process%20Context/README.md) 
 ## Application-map preparation in version 1.7
 
 The agent links [Application Flow Map](../../Application%20Flow%20Map/README.md) during existing context/understanding and handoff stages. State schemaVersion 1 is unchanged; retain answers, private progress and required decisions. Runtime readiness does not judge map semantics/completeness. Record actual owners, map/source references and bounded gaps in the handoff; extend mapping only through supplied sources or authorized discovery.
+
+## Adaptive methods and preparation
+
+Project readiness returns `issues` for general preparation and `capabilityIssues` for configured optional integrations. An unavailable saved browser/Postman connection does not globally block independent work. Existing pending/blocked checks are not automatically marked Verified; refresh their scoped evidence truthfully. Use [task-tool assessment](../tools/task-selection.md) and [data assessment](../data/README.md) before dependent work; neither grants execution approval. Actual provider/session checks and reviewed commands remain binding.
+
+Onboarding schemaVersion 1, replies, settings and recovery are preserved. `onboarding retire-tool-questions --input` can retire exact obsolete unanswered method/fallback questions with a sourced migration decision, preserving history. It cannot erase answers, cancel visibility/whole-document questions or skip an interrupted reply. Inspect existing instructions before classifying an old choice as advisory.

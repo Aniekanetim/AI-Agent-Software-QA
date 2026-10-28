@@ -11,6 +11,7 @@ import { contained, requireText, evidence, verifyEvidence, save, revision, asser
 import { startFixture } from './fixture.js';
 import { selectedCommand, selectCommand, readRecord, saveRecord, type NativeTool } from '../tools/registry.js';
 import { currentHarness, harnessKey, type HarnessIdentity, type ExecutionContext } from '../tools/runtime.js';
+import { readToolPolicy } from '../tools/policy.js';
 
 export type BrowserMethod = 'cli' | 'mcp' | 'inApp' | 'recommend';
 export interface BrowserPreference { method: BrowserMethod; visibility: 'headed' | 'headless'; fallback: 'cli' | 'mcp' | null; source: string }
@@ -55,8 +56,10 @@ export function mcpConfiguration(root: string) {
   const path = contained(root, '.local/browser-preferences.json');
   const preference = existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) as BrowserPreference : null;
   if (preference) validatePreference(preference);
+  const policy = readToolPolicy(root);
+  const visibility = policy?.visibility ?? preference?.visibility;
   const command = selectedCommand(root, 'playwrightMcp');
-  return { mcpServers: { playwright: { command: command.executable, args: [...command.prefix, '--isolated', ...(preference?.visibility === 'headless' ? ['--headless'] : [])], env: { PLAYWRIGHT_BROWSERS_PATH: resolve(root, '.local/browsers') } } } };
+  return { mcpServers: { playwright: { command: command.executable, args: [...command.prefix, '--isolated', ...(visibility === 'headless' ? ['--headless'] : [])], env: { PLAYWRIGHT_BROWSERS_PATH: resolve(root, '.local/browsers') } } } };
 }
 export function validatePreference(value: BrowserPreference): void {
   if (!['cli', 'mcp', 'inApp', 'recommend'].includes(value.method) || !['headed', 'headless'].includes(value.visibility) || ![null, 'cli', 'mcp'].includes(value.fallback)) throw new Error('Invalid browser preference.');

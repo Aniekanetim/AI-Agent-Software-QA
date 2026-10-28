@@ -2,7 +2,7 @@
 
 A portable workflow for an AI QA agent to join a project, build product understanding and perform assigned QA work with human review. Guided onboarding prepares context, tools and access. Product Discovery learns how an application behaves. QA evaluates assigned work against an agreed test basis, investigates findings and proposes readiness. Humans maintain the product baseline and own scoped decisions; developers fix or refute reported defects.
 
-**Package version:** 1.7.0 — 28 October 2026. **Project state:** unconfigured. **Live tickets/discovery requests:** none. **Product schedules/PR regression:** not activated. Start with [SETUP.md](SETUP.md) and [guided onboarding](Onboarding/README.md).
+**Package version:** 1.8.0 — 29 October 2026. **Project state:** unconfigured. **Live tickets/discovery requests:** none. **Product schedules/PR regression:** not activated. Start with [SETUP.md](SETUP.md) and [guided onboarding](Onboarding/README.md).
 
 ## Use with your AI agent
 
@@ -103,6 +103,14 @@ The root [Application Flow Map](Application%20Flow%20Map/README.md) links featur
 Ask your agent: **What depends on authentication? Why did you include refunds? Which connections are inferred or stale?** The agent reads the project's records and explains paths, conditions, risks, proposed checks, exclusions and uncertainty through the [impact briefing](QA%20Process%20Context/Regression%20Management/impact-analysis.md). Users can review/correct this reasoning through conversation without maintaining each map entry themselves. Unconfigured projects receive an honest gap explanation, not invented connections.
 
 The optional [map helper](automation/flow-map/README.md) validates a temporary projection and traces upstream/downstream candidates with cycle and depth controls. It does not select final tests, authorize work or establish coverage. Mapping extends through supplied context and authorized discovery; there is no automatic whole-application crawl. Missing paths do not prove independence. Map/source revisions and the served build remain separate.
+
+## Agent-selected tools and test data
+
+The agent chooses suitable accessible tools for each task or step, explaining significant choices and limits. Onboarding discovers capabilities and establishes constraints/visibility; it does not impose a preferred browser or a fixed tool per testing category. Bundled and other permitted tools can be combined. Explicit task requirements and approved regression commands remain applicable. Read [the selection procedure](automation/tools/task-selection.md).
+
+The agent can generate synthetic inputs and prepare/reuse authorized application state. Missing attached datasets are not automatic blockers. Generated values, prepared records and verified starting states remain distinct; continuation/retests retain the exact identity where required. Genuine missing rules/access/state produce a precise owner question while independent authorized work continues. Read [the data policy](QA%20Process%20Context/Test%20Data%20Management/preparation-policy.md).
+
+Project readiness exposes optional capability gaps separately from blockers. Read-only task-tool/data assessment supports preparation, without choosing tools, mutating the application or authorizing execution. Material changes retain existing human gates; ordinary choices within authorization need no per-call approval. Existing onboarding answers, visibility/explicit constraints, context ownership and five board statuses are preserved.
 
 ## Ticket movement
 

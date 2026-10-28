@@ -29,3 +29,7 @@ Version 1.6.0 introduces [QA Process Context](QA%20Process%20Context/README.md).
 ## Application connection knowledge
 
 Version 1.7.0 adds [Application Flow Map](Application%20Flow%20Map/README.md) and source-linked impact analysis. This master has no configured inventory, relationships or mapping access. In a project copy, record actual map/source revisions, relevant feature/relationship IDs, original gaps and the active ticket/request checkpoint. Read intended authority and observed evidence separately. Considered connections and candidate tests are not actual exercised coverage or approved scope.
+
+## Adaptive methods and data preparation
+
+Version 1.8.0 introduces agent tool selection per task and explicit test-data initiative. Onboarding preserves schemaVersion 1/answers and reports optional capability gaps separately; task checks still require actual selected operations, access, data/state and authorization. This master has no sourced tool restrictions, data-preparation authority, live inputs or verified application states. Adopting projects retain actual constraints, identity history, failed attempts and original owner questions.

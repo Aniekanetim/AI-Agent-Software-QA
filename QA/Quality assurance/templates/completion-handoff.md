@@ -74,3 +74,7 @@ Keep the assignment in its current folder while required sign-off/delivery/recei
 ## Map-based selection and maintenance
 
 Link [Application Flow Map](../../../Application%20Flow%20Map/README.md) revision/IDs and the actual impact assessment. Distinguish considered connections from conditions/path segments exercised; record unmapped, conditional or stale areas and any broader-regression decision. Identify next-owner refresh actions and retain historical map/source/build identities. A mapped edge or diagram is not test evidence.
+
+## Tool/data handoff
+
+Link the actual task method choices and [data preparation record](../../../QA%20Process%20Context/Test%20Data%20Management/data-preparation-record.md). State what ran, prepared versus verified state, retained identities, failed attempts, unresolved dependencies and next-owner reuse/retention/cleanup actions. A tool preference, generated input or capability/preparation assessment is not release evidence by itself.
