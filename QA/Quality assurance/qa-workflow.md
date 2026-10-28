@@ -42,6 +42,8 @@ This process is tailored from [the process references](standards-and-rationale.m
 
 Activities can overlap and repeat. For example, a failed readiness check returns to preparation, and a new requirement can require analysis and design changes. **Test implementation means preparing tests and their environment; it does not mean implementing the product fix.**
 
+For email-backed test accounts, apply the [global mailbox policy](../../automation/email/mailbox-policy.md). Prepare and record a distinct purpose/run alias for fresh-state checks where supported; reuse the original exact alias when retesting the same account. The helper's declared starting state and identity preparation are separate from the application's observed state. Verification must match the full alias, expected sender/purpose and trigger time in the selected physical inbox.
+
 ## Start with the testing request
 
 Read the task, applicable context, changes and risks. Determine the relevant testing activities and explain the proposed coverage. Ask only about material missing requirements, limits or decisions; do not require the human to select a testing category. [Onboarding](../../Onboarding/README.md) prepares the project, while this task determines the work.

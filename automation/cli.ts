@@ -8,6 +8,8 @@ import * as settings from './settings/menu.js';
 import * as browser from './browser/tools.js';
 import { startFixture } from './browser/fixture.js';
 import * as email from './email/email.js';
+import { mailboxPolicy } from './email/policy.js';
+import { prepareTestAccount, readTestAccounts, type AccountRequest } from './email/accounts.js';
 import { AgentMailAdapter, GmailAdapter } from './email/adapters.js';
 import * as github from './github/github.js';
 import { installGh } from './github/install.js';
@@ -43,7 +45,7 @@ const help = {
   onboarding: 'start | roadmap-shown --source | status | next | queue --input | shown/not-shown --id --source | reply --input | recover | reconcile --input | pause/resume --source | clarify/defer --input | check/domains --input | finish --input',
   settings: 'open --source | show | choose --area | edit --input | present | save --input | cancel | back | close',
   browser: 'versions | install | mcp-config | check --provider library/cli/mcpServer [--headless] [--context interactive/scheduled/ci] | import-report --input | fixture',
-  email: 'options --input | discover --provider gmailApi/agentmail --source | create-inbox --input | select --input | verify --input | begin --input | outcome --input',
+  email: 'policy | account --input | accounts | options --input | discover --provider gmailApi/agentmail --source | create-inbox --input | select --input | verify --input | begin --input | outcome --input',
   github: 'install --source | check --repository | check-in --source | event --repository --number --source | policy-digest --policy | run/dispatch --policy --target --repository --number --source | comment --policy --target --repository --number --body --source',
   evidence: '--path [--pointer] : calculate an evidence reference; no product verdict is inferred',
   note: 'Use project-private JSON under .local/ for inputs. The agent presents questions and performs authorized host connections. CLI output is a model, not an actual human conversation or approval. See Onboarding/README.md.',
@@ -127,7 +129,10 @@ async function main() {
     return;
   }
   if (area === 'email') {
-    if (action === 'options') output(email.providerOptions(input()));
+    if (action === 'policy') output(mailboxPolicy);
+    else if (action === 'account') output(prepareTestAccount(root, input<AccountRequest>()));
+    else if (action === 'accounts') output(readTestAccounts(root).value);
+    else if (action === 'options') output(email.providerOptions(input()));
     else if (action === 'create-inbox') { const v = input<{ source: string; purpose: string }>(); const inbox = await AgentMailAdapter.createInbox(process.env.AGENTMAIL_API_KEY ?? '', v); output({ inbox, next: 'Refresh AgentMail inbox metadata and ask for mailbox selection; creating it does not select or authorize testing it.' }); }
     else if (action === 'discover') {
       const provider = option('provider'); const source = option('source'); let accounts: email.Account[];

@@ -2,10 +2,11 @@ import { randomUUID } from 'node:crypto';
 import { load, save, revision, digest, requireText, withLock, type Evidence, verifyEvidence } from '../shared/store.js';
 import { currentHarness, readHarness } from '../tools/runtime.js';
 import { recordHost } from '../tools/registry.js';
+import { isAddress, recipientAllowed, validateRecipientPolicy, type RecipientPolicy } from './policy.js';
 
 export interface Account { provider: string; accountId: string | null; mailboxId: string; address: string; connectionReference: string; authentication: 'connected' | 'needsAuthentication' | 'denied' | 'unverified' }
 export interface Inventory { schemaVersion: 1; harness: string; executionContext: 'interactive' | 'scheduled'; source: string; providers: { id: string; name: string; available: boolean; connectionReference?: string }[]; accounts: Account[] }
-export interface Binding extends Account { id: string; environment: string; transport: 'host' | 'gmailApi' | 'agentmail' | 'human'; choiceSource: string; scope: { query?: string; labels?: string[] }; verification?: { context: 'interactive' | 'scheduled'; listedAt: string; bodyReadAt: string | null; evidence: Evidence[] } }
+export interface Binding extends Account { id: string; environment: string; transport: 'host' | 'gmailApi' | 'agentmail' | 'human'; choiceSource: string; scope: { query?: string; labels?: string[] }; recipientPolicy?: RecipientPolicy; verification?: { context: 'interactive' | 'scheduled'; listedAt: string; bodyReadAt: string | null; evidence: Evidence[] } }
 export interface Message { id: string; mailboxId: string; sentAt: string; from: string; to: string[]; subject: string; text: string }
 export interface MailAdapter { account(): Promise<Account>; list(scope: Binding['scope']): Promise<Omit<Message, 'text'>[]>; read(id: string): Promise<Message> }
 interface Connections { schemaVersion: 1; bindings: Binding[]; history: { id: string; previousDigest: string | null; choiceSource: string; updatedAt: string }[] }
@@ -13,9 +14,9 @@ const connectionsPath = '.local/email-connections.json';
 export function readConnections(root: string) {
   const value = load<Connections>(root, connectionsPath, () => ({ schemaVersion: 1, bindings: [], history: [] }));
   if (value.value.schemaVersion !== 1 || !Array.isArray(value.value.bindings)) throw new Error('Invalid email connections; preserve and reconcile them.');
+  for (const binding of value.value.bindings) validateRecipientPolicy(binding.address, binding.recipientPolicy);
   return value;
 }
-const isAddress = (value: string) => /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(value);
 export function providerOptions(inventory: Inventory) {
   if (inventory.schemaVersion !== 1 || !inventory.source?.trim() || !Array.isArray(inventory.providers) || !Array.isArray(inventory.accounts)) throw new Error('Supply actual observed provider/account metadata.');
   const google = inventory.providers.find(p => p.id === 'gmail');
@@ -28,10 +29,11 @@ export function providerOptions(inventory: Inventory) {
 export function selectBinding(root: string, binding: Binding, inventory: Inventory): void {
   providerOptions(inventory); requireText(binding.id); requireText(binding.choiceSource); requireText(binding.environment);
   if (!isAddress(binding.address) || !['host', 'gmailApi', 'agentmail', 'human'].includes(binding.transport)) throw new Error('Use an actual mailbox address and supported transport.');
+  validateRecipientPolicy(binding.address, binding.recipientPolicy);
   if (binding.transport !== 'human' && !inventory.accounts.some(a => a.provider === binding.provider && a.accountId === binding.accountId && a.mailboxId === binding.mailboxId && a.address.toLowerCase() === binding.address.toLowerCase() && a.connectionReference === binding.connectionReference)) throw new Error('The selected mailbox must match actual account metadata; connection availability alone is insufficient.');
   withLock(root, 'email-connections', () => {
     const current = readConnections(root), old = current.value.bindings.find(b => b.id === binding.id);
-    const stable = (b: Binding) => JSON.stringify([b.provider, b.accountId, b.mailboxId, b.address.toLowerCase(), b.connectionReference, b.environment, b.transport, b.scope]);
+    const stable = (b: Binding) => JSON.stringify([b.provider, b.accountId, b.mailboxId, b.address.toLowerCase(), b.connectionReference, b.environment, b.transport, b.scope, b.recipientPolicy]);
     if (old && stable(old) === stable(binding) && old.verification && inventory.accounts.some(a => a.connectionReference === binding.connectionReference && a.mailboxId === binding.mailboxId && a.authentication === 'connected')) return;
     const actual = inventory.accounts.find(a => a.provider === binding.provider && a.mailboxId === binding.mailboxId && a.connectionReference === binding.connectionReference);
     const selected = { ...binding, authentication: actual?.authentication ?? 'unverified' as Account['authentication'], verification: undefined };
@@ -63,7 +65,7 @@ export async function verifyBinding(root: string, id: string, adapter: MailAdapt
 export interface VerificationAttempt { schemaVersion: 1; id: string; bindingId: string; bindingDigest: string; recipient: string; sender: string; subjectContains: string; triggerTime: string; expiresAt: string; source: string }
 export function beginVerification(root: string, bindingId: string, recipient: string, sender: string, subjectContains: string, source: string, durationMs = 300_000, now = Date.now()): VerificationAttempt {
   const binding = readConnections(root).value.bindings.find(b => b.id === bindingId);
-  if (!binding || !isAddress(recipient) || !isAddress(sender) || recipient.toLowerCase() !== binding.address.toLowerCase() || durationMs < 1000 || durationMs > 900_000) throw new Error('Use the selected destination mailbox, exact recipient/sender and bounded verification lifetime.');
+  if (!binding || !recipientAllowed(binding.address, recipient, binding.recipientPolicy) || !isAddress(sender) || !Number.isFinite(durationMs) || durationMs < 1000 || durationMs > 900_000 || !Number.isFinite(now)) throw new Error('Use the selected physical mailbox, an authorized exact recipient/sender and bounded verification lifetime.');
   requireText(source); requireText(subjectContains);
   const attempt: VerificationAttempt = { schemaVersion: 1, id: randomUUID(), bindingId, bindingDigest: digest(JSON.stringify(binding)), recipient, sender, subjectContains, triggerTime: new Date(now).toISOString(), expiresAt: new Date(now + durationMs).toISOString(), source };
   save(root, `.local/verification/${attempt.id}.json`, attempt, null); return attempt;
@@ -93,7 +95,7 @@ export async function pollVerification(root: string, attempt: VerificationAttemp
     if (matches.length > 1) throw new Error('Multiple messages match this attempt; disambiguate rather than using the latest OTP.');
     if (matches.length === 1) {
       const message = await adapter.read(matches[0]!.id);
-      if (message.mailboxId !== binding.mailboxId || !matchingMessages([message], attempt, now()).length) throw new Error('The full message differs from the correlated header.');
+      if (message.id !== matches[0]!.id || message.mailboxId !== binding.mailboxId || !matchingMessages([message], attempt, now()).length) throw new Error('The full message differs from the correlated header.');
       let secret: string | undefined;
       if ((options.mode ?? 'code') === 'code') {
         const codes = [...new Set(message.text.match(/\b\d{6}\b/g) ?? [])]; if (codes.length !== 1) throw new Error('No unique supported six-digit code was found; use a task-specific parser.'); secret = codes[0];
@@ -102,7 +104,7 @@ export async function pollVerification(root: string, attempt: VerificationAttemp
         const links = [...new Set(message.text.match(/https:\/\/[^\s<>"']+/g) ?? [])].filter(link => { const url = new URL(link); return url.hostname === options.linkHost && !url.username && !url.password; });
         if (links.length !== 1) throw new Error('No unique link matches the expected host.'); secret = links[0];
       }
-      const receipt = { attemptId: attempt.id, bindingId: binding.id, messageId: message.id, sender: attempt.sender, receivedAt: message.sentAt, retrievedAt: new Date(now()).toISOString(), received: true, applicationState: 'Not yet verified' };
+      const receipt = { attemptId: attempt.id, bindingId: binding.id, mailboxId: binding.mailboxId, recipient: attempt.recipient, purpose: attempt.subjectContains, messageId: message.id, sender: attempt.sender, receivedAt: message.sentAt, retrievedAt: new Date(now()).toISOString(), received: true, applicationState: 'Not yet verified' };
       save(root, `.local/verification/${attempt.id}-receipt.json`, receipt, null);
       return { secret: secret!, receipt };
     }

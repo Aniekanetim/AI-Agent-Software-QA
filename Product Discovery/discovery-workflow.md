@@ -30,6 +30,8 @@ Record the required role and a nonsecret account/access reference on the request
 
 Register a synthetic account only within the approved scope, including any verification delivery and cleanup. Human assistance may be needed for MFA, email verification, CAPTCHA, VPN or SSO. Do not bypass access controls or silently use a more privileged account. Record the actual authenticated role; never infer access coverage from the presence of a navigation link.
 
+Use the [global mailbox policy](../automation/email/mailbox-policy.md) for test identities. Prepare a fresh purpose/run alias only when fresh state is needed and the selected provider/application supports it; reuse the exact saved alias when continuing an existing journey. Keep the physical inbox identity separate, record account context through the helper, and correlate verification to the full alias and current attempt. Identity preparation alone does not register an account or authorize exploration.
+
 Keep reusable cookies, tokens and browser storage state in an ignored local location such as `playwright/.auth/`, or a suitable secure store. These files can permit account access. Verify exclusion before saving; `.gitignore` does not untrack an already committed secret. Do not commit raw authentication traffic, signed URLs, invitation links or credentials in screenshots/exports. If evidence cannot be sanitized, retain it only in the authorized restricted location and link a nonsecret reference.
 
 Treat session expiry as an access issue. Wait only on affected roles/journeys; continue other authorized learning. On another machine, establish access again instead of transferring a session as product context.

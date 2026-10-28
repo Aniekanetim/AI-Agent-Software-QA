@@ -2,7 +2,7 @@
 
 A portable workflow for an AI QA agent to join a project, build product understanding and perform assigned QA work with human review. Guided onboarding prepares context, tools and access. Product Discovery learns how an application behaves. QA evaluates assigned work against an agreed test basis, investigates findings and proposes readiness. Humans maintain the product baseline and own scoped decisions; developers fix or refute reported defects.
 
-**Package version:** 1.4.1 — 27 October 2026. **Project state:** unconfigured. **Live tickets/discovery requests:** none. **Product schedules/PR regression:** not activated. Start with [SETUP.md](SETUP.md) and [guided onboarding](Onboarding/README.md).
+**Package version:** 1.5.0 — 28 October 2026. **Project state:** unconfigured. **Live tickets/discovery requests:** none. **Product schedules/PR regression:** not activated. Start with [SETUP.md](SETUP.md) and [guided onboarding](Onboarding/README.md).
 
 ## Use with your AI agent
 
@@ -32,6 +32,8 @@ Do not invent requirements, run unapproved exploration/tests or activate schedul
 ```
 
 An agent needs repository-reading and QA-file access plus the capabilities required by its tasks. The procedures are Markdown; optional executable helpers use Node.js 22+. Pinned dependencies include Playwright MCP, CLI, library/Test and Postman CLI, with email adapters and GitHub CLI setup support. [Tool discovery](automation/tools/README.md) verifies and reuses existing installations/connections through the actual selected harness before offering missing setup. [Postman onboarding](automation/postman/README.md) separates local collection execution from authenticated cloud access/reporting. Native host connections and credentials remain project-specific. [Adoption instructions](docs/adopt-from-repository.md) explain URL-based use and limits.
+
+The [global mailbox policy](automation/email/mailbox-policy.md) gives every adopting agent a standard way to manage test identities: purpose/run plus aliases on a supported test inbox, recorded account context, exact identity reuse for retests, and verification matched to the alias and current request. The helpers prepare identities and preserve correlation; actual application registration and provider delivery require project-specific execution.
 
 ## Fork, use as a template or clone
 

@@ -36,6 +36,8 @@ For GitHub, inspect the CLI, verify the actual identity and selected repositorie
 
 For email, follow **provider discovery → connect/reconnect → account/mailbox selection → scope → access verification → binding**. Inspect the harness's integration/tool directory when Gmail is not initially exposed. Show accessible account addresses from metadata; do not read email bodies to discover identities. AgentMail creation needs the actual scoped instruction. A mailbox may be connected without being selected, or selected without full-message access. Ask for human-assisted verification when an actual destination cannot be accessed.
 
+Apply the [global mailbox policy](../automation/email/mailbox-policy.md) as the standard account strategy rather than asking the human to write one. Confirm provider/application plus support, configure the actual binding's recipient policy and use the account helper to prepare aliases and their register. Fresh-state work gets a distinct identity/purpose/run alias; continuation/retests reuse the original exact alias. Read access and application registration follow the supplied scope. An empty inbox can verify listing while content access remains pending until a message exists. Recheck current inbox metadata when requested or when a change/deletion is reported.
+
 Establish application access using dedicated accounts, authorized registration, existing sessions or human-assisted sign-in/verification. Explain permitted mutations and cleanup. Record inaccessible roles as coverage gaps and continue independent authorized work. Tool preparation and fixture rehearsals do not authorize product exploration or tests.
 
 ## 4. Build and review the foundation

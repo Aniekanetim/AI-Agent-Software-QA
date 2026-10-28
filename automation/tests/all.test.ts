@@ -1,5 +1,6 @@
 import test from 'node:test';
 import './toolchain.test.js';
+import './email-aliases.test.js';
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync, renameSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
