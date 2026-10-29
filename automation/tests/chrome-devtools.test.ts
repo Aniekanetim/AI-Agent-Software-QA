@@ -169,6 +169,17 @@ test('CLI uses a named owned daemon and its exact private configuration, without
   await stopCliSession(f.root, owned.id, runner);
   assert.throws(() => cliBridge(f.root, owned.id, runner), /not running/);
 });
+test('shared browser claims prevent another session and retain cleanup after source changes', async () => {
+  for (const connection of [{ mode: 'launch' as const, executablePath: process.execPath, profile: 'project' as const }, { mode: 'existing' as const, browserUrl: 'http://127.0.0.1:9222' }]) {
+    const f = fixture(); await installation(f); f.settings.connection = connection;
+    const runner: registry.Runner = async () => ({ code: 0, stdout: 'Synthetic owned start/stop', stderr: '' });
+    const first = await startCliSession(f.root, f.settings, f.scope, runner);
+    await assert.rejects(startCliSession(f.root, f.settings, f.scope, runner), /claim exists/);
+    put(f.root, '.local/scope.json', { source: 'Synthetic scope edited after execution' });
+    await stopCliSession(f.root, first.id, runner);
+    assert(!readdirSync(store.contained(f.root, '.local/chrome-devtools/claims')).some(n => n === 'project-profile' || n.startsWith('existing-')));
+  }
+});
 test('output redaction removes sensitive fields and reusable URL parameters', () => {
   const value = JSON.stringify(redacted({ accessToken: 'synthetic-secret', nested: { password: 'synthetic' }, link: 'https://example.test/verify?code=secret#fragment', message: 'Bearer synthetic-secret' }));
   assert(!value.includes('synthetic-secret')); assert(!value.includes('code=secret')); assert(!value.includes('"password":'));

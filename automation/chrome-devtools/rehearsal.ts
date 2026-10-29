@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { chromium } from 'playwright';
 import { save, evidence, type Evidence } from '../shared/store.js';
 import { bindHarness } from '../tools/runtime.js';
-import { probe, readRecord, saveRecord } from '../tools/registry.js';
+import { probe, readRecord, saveRecord, packageCommand, runProcess } from '../tools/registry.js';
 import { startWebMcpFixture } from './fixture.js';
 import { withMcpSession, startCliSession, cliBridge, stopCliSession, structured, responseMessage, type Bridge } from './transport.js';
 import { type ChromeSettings } from './config.js';
@@ -27,7 +27,8 @@ export async function rehearseChrome(root: string, provider: 'mcpServer' | 'cli'
   const settings: ChromeSettings = { schemaVersion: 1, source: scope.source, evidence: scope.authorization, visibility, connection: { mode: 'launch', executablePath: executable, profile: 'isolated' },
     allowedOrigins: [new URL(fixture.url).origin], debuggingTools: false, javascriptEvaluation: true, usageStatistics: false, performanceCrux: false };
   const tool = provider === 'cli' ? 'chromeDevtoolsCli' : 'chromeDevtoolsMcp';
-  const installation = await probe(actualRoot, tool, scope.source);
+  const pinned = packageCommand(root, tool); if (!pinned) { await fixture.close(); throw new Error('The pinned package entry is unavailable.'); }
+  const installation = await probe(actualRoot, tool, scope.source, runProcess, pinned);
   if (!installation.compatible) { await fixture.close(); throw new Error('The actual selected Chrome executable is not compatible.'); }
   let sessionId: string | undefined;
   try {
@@ -81,7 +82,7 @@ export async function rehearseChrome(root: string, provider: 'mcpServer' | 'cli'
       let reloadRejected = false;
       try { await execute(actualRoot, bridge, settings, { ...invocation, id: 'stale-document', inventory: beforeReload.reference }); } catch { reloadRejected = true; }
       require(reloadRejected, 'same-URL document replacement requires a fresh inventory');
-      const record = { synthetic: true, provider, executionContext: context, visibility, browser: catalogue.inventory.browser, checks,
+      const record = { synthetic: true, provider, toolVersion: installation.version, executionContext: context, visibility, browser: catalogue.inventory.browser, checks,
         nativeHarnessConnection: 'Not verified: this is terminal SDK/CLI execution', productVerdict: 'Not assessed', checkedAt: new Date().toISOString() };
       save(actualRoot, '.local/result.json', record, null);
       const capabilities = Object.fromEntries(['navigate', 'inspect', 'interact', 'webmcp:discover', 'webmcp:execute', `visibility:${visibility}`, provider === 'cli' ? 'cliRehearsal' : 'serverRehearsal'].map(name => [name, { status: 'verified' as const, evidence: [evidence(actualRoot, '.local/result.json')] }]));
@@ -90,6 +91,13 @@ export async function rehearseChrome(root: string, provider: 'mcpServer' | 'cli'
     };
     if (provider === 'mcpServer') return await withMcpSession(actualRoot, settings, scope, run);
     sessionId = (await startCliSession(actualRoot, settings, scope)).id;
-    return await run(cliBridge(actualRoot, sessionId));
+    return await run(cliBridge(actualRoot, sessionId, async (command, args, options) => {
+      const result = await runProcess(command, args, options);
+      if (args[0] === 'new_page') {
+        let object = false; try { const value = JSON.parse(result.stdout); object = !!value && typeof value === 'object' && !Array.isArray(value); } catch { /* Inspect synthetic fixture-only output. */ }
+        if (!object) console.log(JSON.stringify({ syntheticFixtureOnly: true, cliNewPageResponse: result.stdout.slice(0, 4000), exitCode: result.code }));
+      }
+      return result;
+    }));
   } finally { try { if (sessionId) await stopCliSession(actualRoot, sessionId); } finally { await fixture.close(); } }
 }

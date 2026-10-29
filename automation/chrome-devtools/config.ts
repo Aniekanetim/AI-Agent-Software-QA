@@ -1,4 +1,4 @@
-import { existsSync, realpathSync } from 'node:fs';
+import { existsSync, realpathSync, statSync } from 'node:fs';
 import { isAbsolute } from 'node:path';
 import { load, privatePath, requireText, verifyEvidence, assertNonsecret, digest, type Evidence } from '../shared/store.js';
 import { selectedCommand } from '../tools/registry.js';
@@ -31,7 +31,7 @@ export function validateSettings(root: string, settings: ChromeSettings): void {
   for (const key of ['debuggingTools', 'javascriptEvaluation', 'usageStatistics', 'performanceCrux'] as const) if (typeof settings[key] !== 'boolean') throw new Error(`Set ${key} explicitly.`);
   if (!Array.isArray(settings.allowedOrigins) || !settings.allowedOrigins.length || settings.allowedOrigins.some(o => webOrigin(o) !== o) || new Set(settings.allowedOrigins).size !== settings.allowedOrigins.length) throw new Error('Specify unique exact allowed origins.');
   if (settings.connection?.mode === 'launch') {
-    if (!['isolated', 'project'].includes(settings.connection.profile) || !isAbsolute(settings.connection.executablePath) || !existsSync(settings.connection.executablePath)) throw new Error('Select an existing absolute browser executable and project/isolated profile.');
+    if (!['isolated', 'project'].includes(settings.connection.profile) || !isAbsolute(settings.connection.executablePath) || !existsSync(settings.connection.executablePath) || !statSync(settings.connection.executablePath).isFile()) throw new Error('Select an existing absolute browser executable and project/isolated profile.');
   } else if (settings.connection?.mode === 'existing') {
     const url = new URL(settings.connection.browserUrl);
     if (webOrigin(url.href) !== url.origin || !['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname) || url.pathname !== '/' || url.search || url.hash) throw new Error('Select an explicitly authorized loopback debugging endpoint; do not store credentials.');

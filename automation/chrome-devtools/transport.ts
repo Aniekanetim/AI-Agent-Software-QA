@@ -3,7 +3,7 @@ import { dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { privatePath, load, save, revision, verifyEvidence, requireText, type Evidence } from '../shared/store.js';
+import { privatePath, load, save, revision, verifyEvidence, requireText, digest, type Evidence } from '../shared/store.js';
 import { currentHarness, harnessKey } from '../tools/runtime.js';
 import { selectedCommand, selectCommand, commandStamp, runProcess, readRecord, readinessIssues, type Runner, type Command } from '../tools/registry.js';
 import { checkPolicy, chromeEnvironment, configurationObject, launchArguments, settingsHash, validateSettings, type ChromeSettings } from './config.js';
@@ -33,6 +33,10 @@ function verifiedInstallation(root: string, tool: 'chromeDevtoolsMcp' | 'chromeD
 function idPath(id: string): string {
   if (!/^[a-f0-9-]{36}$/.test(id)) throw new Error('Use the exact integration-owned session ID.');
   return `.local/chrome-devtools/sessions/${id}.json`;
+}
+function profileClaim(settings: ChromeSettings): string | null {
+  if (settings.connection.mode === 'existing') return 'existing-' + digest(new URL(settings.connection.browserUrl).origin).slice(0, 24);
+  return settings.connection.mode === 'launch' && settings.connection.profile === 'project' ? 'project-profile' : null;
 }
 /** Hold the claim through async execution; the shared synchronous lock is intentionally not used. */
 export async function claimed<T>(root: string, key: string, action: () => Promise<T>): Promise<T> {
@@ -85,7 +89,7 @@ export async function withMcpSession<T>(root: string, settings: ChromeSettings, 
     try { await client.connect(transport); return await action(bridge); }
     finally { await client.close().catch(() => {}); await transport.close().catch(() => {}); }
   };
-  return settings.connection.mode === 'launch' && settings.connection.profile === 'project' ? claimed(root, 'project-profile', run) : run();
+  const claim = profileClaim(settings); return claim ? claimed(root, claim, run) : run();
 }
 function session(root: string, id: string, permitClosed = false): CliSession {
   const value = load<CliSession | null>(root, idPath(id), () => null).value;
@@ -112,10 +116,11 @@ export async function startCliSession(root: string, settings: ChromeSettings, sc
   save(root, configPath, configurationObject(root, settings), null);
   const value: CliSession = { ...scope, schemaVersion: 1, id, harness: harnessKey(currentHarness(root)), command, settings, settingsHash: settingsHash(settings), configPath, configHash: revision(root, configPath)!, state: 'starting', createdAt: new Date().toISOString() };
   save(root, idPath(id), value, null);
-  if (settings.connection.mode === 'launch' && settings.connection.profile === 'project') {
-    const claim = privatePath(root, '.local/chrome-devtools/claims/project-profile'); mkdirSync(dirname(claim), { recursive: true });
+  const claimKey = profileClaim(settings);
+  if (claimKey) {
+    const claim = privatePath(root, `.local/chrome-devtools/claims/${claimKey}`); mkdirSync(dirname(claim), { recursive: true });
     try { mkdirSync(claim); } catch { throw new Error('A project-profile claim exists. Inspect its recorded owner before recovery.'); }
-    save(root, '.local/chrome-devtools/claims/project-profile/owner.json', { id, source: scope.source, pid: process.pid }, null);
+    save(root, `.local/chrome-devtools/claims/${claimKey}/owner.json`, { id, source: scope.source, pid: process.pid }, null);
   }
   const result = await runner(command, ['start', '--sessionId', id, '--config', privatePath(root, configPath)], { cwd: root, env: cliEnvironment(root, value), timeout: 60_000 });
   value.state = result.code === 0 ? 'running' : 'uncertain'; save(root, idPath(id), value, revision(root, idPath(id)));
@@ -151,8 +156,11 @@ export async function stopCliSession(root: string, id: string, runner: Runner = 
     const result = await runner(value.command, ['stop', '--sessionId', id], { cwd: root, env: cliEnvironment(root, value), timeout: 30_000 });
     if (result.code !== 0) throw new Error('Owned daemon cleanup failed; retain its claim for recovery.');
     value.state = 'closed'; save(root, idPath(id), value, revision(root, idPath(id)));
-    const ownerPath = '.local/chrome-devtools/claims/project-profile/owner.json';
-    const owner = load<{ id: string } | null>(root, ownerPath, () => null).value;
-    if (owner?.id === id) { const { unlinkSync } = await import('node:fs'); unlinkSync(privatePath(root, ownerPath)); rmdirSync(dirname(privatePath(root, ownerPath))); }
+    const claimKey = profileClaim(value.settings);
+    if (claimKey) {
+      const ownerPath = `.local/chrome-devtools/claims/${claimKey}/owner.json`;
+      const owner = load<{ id: string } | null>(root, ownerPath, () => null).value;
+      if (owner?.id === id) { const { unlinkSync } = await import('node:fs'); unlinkSync(privatePath(root, ownerPath)); rmdirSync(dirname(privatePath(root, ownerPath))); }
+    }
   });
 }
