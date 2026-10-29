@@ -168,4 +168,3 @@ The following eight written-procedure scenarios were reviewed for consistency:
 | No actionable QA ticket or discovery request exists | Do not fabricate work, trigger a crawl, change files or activate a schedule |
 
 These checks assess package structure and the written procedures. No staging URL was supplied, so no browser walkthrough, sign-in, account creation, product tests or actual owner confirmation was performed. Ownership controls are agent instructions, not filesystem access enforcement. Existing MustPayroll repositories, evidence and the configured source-project check-in were not changed. No discovery schedule was activated.
-
