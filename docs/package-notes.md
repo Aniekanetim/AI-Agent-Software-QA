@@ -1,6 +1,10 @@
 # Package notes
 
-**Version:** 1.9.0. **Created:** 22 October 2026. **Updated:** 29 October 2026. **State:** reusable workflow package; no configured product, live discovery or QA execution history.
+**Version:** 1.9.1. **Created:** 22 October 2026. **Updated:** 29 October 2026. **State:** reusable workflow package; no configured product, live discovery or QA execution history.
+
+## Version 1.9.1 — remaining validation recheck
+
+Adds real filesystem read/write boundary and hostile-content sentinel checks to the native fixtures, plus Windows headed and Linux Xvfb-headed CI runs. CLI script evaluation supports the upstream local `sourcePath` alternative without a compulsory inline function, and denies remote source retrieval. A denied executable probe now reports the harness restriction instead of implying version incompatibility. The [validation record](webmcp-validation.md#remaining-validation-recheck) retains actual outcomes and distinguishes this package from the separately configured development-harness integration. This patch does not reconfigure the harness or establish a native WebMCP connection by installation.
 
 ## Version 1.9.0 — Chrome DevTools and WebMCP
 

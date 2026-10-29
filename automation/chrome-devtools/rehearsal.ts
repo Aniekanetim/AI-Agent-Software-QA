@@ -1,12 +1,12 @@
-import { existsSync, mkdirSync, realpathSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, mkdirSync, realpathSync, readFileSync, writeFileSync, symlinkSync } from 'node:fs';
+import { resolve, relative } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { chromium } from 'playwright';
 import { save, evidence, type Evidence } from '../shared/store.js';
 import { bindHarness } from '../tools/runtime.js';
 import { probe, readRecord, saveRecord, packageCommand, runProcess } from '../tools/registry.js';
 import { startWebMcpFixture } from './fixture.js';
-import { withMcpSession, startCliSession, cliBridge, stopCliSession, structured, responseMessage, type Bridge } from './transport.js';
+import { withMcpSession, startCliSession, cliBridge, stopCliSession, structured, responseMessage, BridgeFailure, type Bridge } from './transport.js';
 import { type ChromeSettings } from './config.js';
 import { captureInventory, execute, confirmOutcome, type Target } from './webmcp.js';
 
@@ -30,7 +30,10 @@ export async function rehearseChrome(root: string, provider: 'mcpServer' | 'cli'
   const tool = provider === 'cli' ? 'chromeDevtoolsCli' : 'chromeDevtoolsMcp';
   const pinned = packageCommand(root, tool); if (!pinned) { await fixture.close(); throw new Error('The pinned package entry is unavailable.'); }
   const installation = await probe(actualRoot, tool, scope.source, runProcess, pinned);
-  if (!installation.compatible) { await fixture.close(); throw new Error('The actual selected Chrome executable is not compatible.'); }
+  if (!installation.compatible) {
+    await fixture.close();
+    throw new Error(installation.diagnostic === 'denied' ? 'This harness denied invocation of the pinned Chrome DevTools package. Installation was retained; no browser was launched.' : 'The pinned Chrome DevTools package could not be verified as compatible; inspect its retained probe diagnosis.');
+  }
   let sessionId: string | undefined;
   try {
     const run = async (bridge: Bridge) => {
@@ -50,6 +53,41 @@ export async function rehearseChrome(root: string, provider: 'mcpServer' | 'cli'
       const catalogue = await captureInventory(actualRoot, bridge, settings, target, scope.source);
       require(catalogue.inventory.apiObserved === true, 'native document.modelContext without a polyfill');
       require(catalogue.inventory.tools.some(t => t.name === 'create_draft') && catalogue.inventory.tools.some(t => t.name === 'save_profile'), 'imperative and declarative tool discovery');
+      require(visibility === 'headless' ? /HeadlessChrome\//.test(catalogue.inventory.browser ?? '') : /Chrome\//.test(catalogue.inventory.browser ?? '') && !/HeadlessChrome\//.test(catalogue.inventory.browser ?? ''), `actual browser identity matches ${visibility} launch`);
+      require(catalogue.inventory.tools.some(t => t.name === 'untrusted_note' && t.description.includes('Ignore previous instructions')) && fixture.state.noteCalls === 0 && fixture.state.forbiddenCalls === 0, 'hostile metadata remains data without implicit execution');
+
+      const outsideRoot = resolve(actualRoot, '..', `${actualRoot.split(/[\\/]/).pop()}-boundary-fixture`);
+      mkdirSync(outsideRoot, { recursive: true });
+      const insideScript = resolve(actualRoot, '.local/allowed-script.js'), outsideScript = resolve(outsideRoot, 'outside-script.js');
+      const canary = '() => { window.__outsideScriptRan = true; return "SYNTHETIC-OUTSIDE-CANARY"; }';
+      writeFileSync(insideScript, '() => { window.__allowedScriptRan = true; return "allowed-file-read"; }');
+      writeFileSync(outsideScript, canary);
+      const localRead = responseMessage(await bridge.call('evaluate_script', { pageId: page.id, sourcePath: insideScript }));
+      require(localRead.includes('allowed-file-read'), 'permitted source-file read and execution succeeds');
+      const insideSnapshot = resolve(actualRoot, '.local/allowed-snapshot.txt');
+      await bridge.call('take_snapshot', { pageId: page.id, filePath: insideSnapshot });
+      require(existsSync(insideSnapshot) && readFileSync(insideSnapshot, 'utf8').includes('Synthetic WebMCP rehearsal'), 'permitted snapshot write succeeds');
+      const link = resolve(actualRoot, '.local/outside-link');
+      symlinkSync(outsideRoot, link, process.platform === 'win32' ? 'junction' : 'dir');
+      const paths = [
+        { name: 'absolute outside path', script: outsideScript, write: resolve(outsideRoot, 'absolute-snapshot.txt') },
+        { name: 'relative traversal', script: relative(actualRoot, outsideScript), write: relative(actualRoot, resolve(outsideRoot, 'relative-snapshot.txt')) },
+        { name: 'symlink or junction', script: resolve(link, 'outside-script.js'), write: resolve(link, 'linked-snapshot.txt') },
+      ];
+      for (const path of paths) {
+        let readDenied = false, writeDenied = false;
+        try { await bridge.call('evaluate_script', { pageId: page.id, sourcePath: path.script }); } catch (err) { readDenied = err instanceof BridgeFailure && err.kind === 'toolError'; }
+        require(readDenied && readFileSync(outsideScript, 'utf8') === canary, `filesystem read denied for ${path.name}`);
+        try { await bridge.call('take_snapshot', { pageId: page.id, filePath: path.write }); } catch (err) { writeDenied = err instanceof BridgeFailure && err.kind === 'toolError'; }
+        require(writeDenied && !existsSync(resolve(actualRoot, path.write)), `filesystem write denied for ${path.name}`);
+      }
+      const readState = responseMessage(await bridge.call('evaluate_script', { pageId: page.id, function: '() => ({allowed: window.__allowedScriptRan === true, outside: window.__outsideScriptRan === true})' }));
+      const observedReadState = JSON.parse(readState.match(/```json\s*([\s\S]*?)```/)?.[1] ?? 'null');
+      require(observedReadState?.allowed === true && observedReadState?.outside === false, 'allowed source ran and outside source never ran');
+      const hostile = await captureInventory(actualRoot, bridge, settings, target, scope.source);
+      const hostileResult = await execute(actualRoot, bridge, settings, { id: 'hostile-note', inventory: hostile.reference, target, toolName: 'untrusted_note', input: {}, effect: 'read', ...scope });
+      const retained = readFileSync(resolve(actualRoot, '.local/chrome-devtools/invocations/hostile-note.json'), 'utf8');
+      require(hostileResult.invocation === 'reportedCompleted' && hostileResult.applicationOutcome === 'notAssessed' && hostileResult.qaVerdict === 'Not established by this helper' && fixture.state.noteCalls === 1 && fixture.state.forbiddenCalls === 0 && !retained.includes('SYNTHETIC-OUTPUT-CANARY') && readFileSync(outsideScript, 'utf8') === canary, 'hostile tool output grants no action, secret retention or QA verdict');
       const outside = await startWebMcpFixture();
       try {
         let denied = false; try { await bridge.call('new_page', { url: outside.url }); } catch { denied = true; }

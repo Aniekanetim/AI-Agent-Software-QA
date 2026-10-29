@@ -180,6 +180,20 @@ test('shared browser claims prevent another session and retain cleanup after sou
     assert(!readdirSync(store.contained(f.root, '.local/chrome-devtools/claims')).some(n => n === 'project-profile' || n.startsWith('existing-')));
   }
 });
+test('CLI source-file checks omit the optional function positional and reject remote retrieval', async () => {
+  const f = fixture(); await installation(f); let config = '', actual: string[] = [];
+  const runner: registry.Runner = async (_command, args) => {
+    if (args[0] === 'start') { config = args[args.indexOf('--config') + 1]!; return { code: 0, stdout: 'started', stderr: '' }; }
+    if (args[0] === 'status') return { code: 0, stdout: 'pid=123 version=1.12.0\nargs=' + JSON.stringify([`--config=${config}`]), stderr: '' };
+    if (args[0] === 'stop') return { code: 0, stdout: 'stopped', stderr: '' };
+    actual = args; return { code: 0, stdout: '{"message":"synthetic source result"}', stderr: '' };
+  };
+  const owned = await startCliSession(f.root, f.settings, f.scope, runner), bridge = cliBridge(f.root, owned.id, runner);
+  await bridge.call('evaluate_script', { pageId: 1, sourcePath: 'synthetic path/allowed.js' });
+  assert.equal(actual[0], 'evaluate_script'); assert.equal(actual[1], '--pageId'); assert.equal(actual[actual.indexOf('--sourcePath') + 1], 'synthetic path/allowed.js');
+  await assert.rejects(bridge.call('evaluate_script', { pageId: 1, sourcePath: 'https://untrusted.invalid/script.js' }), /remote source retrieval/);
+  await stopCliSession(f.root, owned.id, runner);
+});
 test('output redaction removes sensitive fields and reusable URL parameters', () => {
   const value = JSON.stringify(redacted({ accessToken: 'synthetic-secret', nested: { password: 'synthetic' }, link: 'https://example.test/verify?code=secret#fragment', message: 'Bearer synthetic-secret' }));
   assert(!value.includes('synthetic-secret')); assert(!value.includes('code=secret')); assert(!value.includes('"password":'));

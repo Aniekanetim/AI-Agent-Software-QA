@@ -1,6 +1,6 @@
 {
   "name": "ai-agent-software-qa",
-  "version": "1.9.0",
+  "version": "1.9.1",
   "private": true,
   "type": "module",
   "description": "Task-driven AI QA with agent-selected tools, native WebMCP support, application maps and human review.",

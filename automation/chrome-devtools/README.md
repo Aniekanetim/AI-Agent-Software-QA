@@ -126,6 +126,8 @@ The reviewed scope must cover the actual operation and inputs. A nonempty source
 
 Programmatic terminal SDK use is available through `withMcpSession`, `openPage`, `captureInventory`, `execute` and `confirmOutcome`. The SDK callback receives a `Bridge`; it is scoped to that owned connection and is closed after the callback. Do not classify it as `chromeDevtoolsHost`.
 
+For authorized local script-file evaluation, the CLI bridge accepts `evaluate_script` with `pageId` and `sourcePath` instead of an inline `function`. The browser bridge enforces its configured filesystem roots. This adapter rejects HTTP/file URLs for source retrieval; it does not grant remote script-fetch authority. Script evaluation still requires the actual task's JavaScript/data/access scope.
+
 ## Native harness evidence
 
 Use the harness's actual `list_webmcp_tools` / `execute_webmcp_tool` calls when accessible and suitable. Record actual call references and sanitized evidence. `tools import-host` accepts `chromeDevtoolsHost` records with a real `connectionReference` and per-operation evidence. Verify `hostConnection`, relevant operations and actual visibility separately. An MCP installation or terminal rehearsal cannot supply those observations.
@@ -162,7 +164,9 @@ npm test
 npm run test:chrome
 ```
 
-`test:chrome` runs MCP-server and CLI rehearsals against a loopback fixture using the pinned Playwright browser as a compatible Chrome executable. It checks browser initialization before navigation and uses a private working path containing spaces on both CI systems. It never retries a failed action, adds a WebMCP polyfill or tests a real product. Install browser binaries explicitly through the existing browser procedure if absent. On Windows/Linux CI it uses headless operation; `QA_CHROME_HEADED=1` selects visible rehearsal where a display is available. The standalone `chrome rehearse` command also accepts `--executable` and explicit visibility.
+`test:chrome` runs MCP-server and CLI rehearsals against a loopback fixture using the pinned Playwright browser as a compatible Chrome executable. It checks browser initialization before navigation and uses a private working path containing spaces on both CI systems. It never retries a failed action, adds a WebMCP polyfill or tests a real product. Install browser binaries explicitly through the existing browser procedure if absent. CI runs headless and headed fixtures; Linux headed runs use an Xvfb virtual display. `QA_CHROME_HEADED=1` selects headed rehearsal where a display is available. This does not establish visibility on a user's desktop. The standalone `chrome rehearse` command also accepts `--executable` and explicit visibility.
+
+The fixture exercises permitted file operations and denied reads/writes outside its workspace through absolute paths, relative traversal and a symlink/junction. All targets are disposable synthetic files inside the overall package's output folder. Hostile descriptions and tool output are deliberately returned as data; sentinel checks require no implicit action, forbidden request, retained output canary or automatic QA verdict. These checks cover the adapter's controlled pipeline, not every prompt-injection attack against an adopting agent or application.
 
 | Finding | Action |
 | --- | --- |

@@ -8,7 +8,7 @@ The user approved the WebMCP recommendations and implementation plan, including 
 
 Version 1.9.0 adds the pinned Chrome DevTools MCP/CLI dependency, registry integration, explicit session configuration, contextual inventories, invocation history, separate application verification and onboarding/workflow guidance. Human requirements, discovery ownership and board statuses retain their existing roles.
 
-## Evidence status
+## Version 1.9.0 evidence
 
 | Check | Actual status |
 | --- | --- |
@@ -50,3 +50,19 @@ For a later documentation-only revision, inspect the PR's checks at its actual h
 Headless CI does not establish visible operation, a user's native harness connection, target-application support or production behavior. The fixture's role change tests catalogue invalidation, not real authentication or authorization. Optional debugging tools, feature-version differences and cross-origin WebMCP exposure require task-specific sources and actual verification. Missing connections, disabled inspection and empty catalogues also have helper coverage; those simulations are not additional native-browser runs. Catalogue metadata is not a requirements baseline. Role/account changes must be reobserved even when tool schemas look identical.
 
 The implementation is delivered for review through its pull request; package checks do not replace the human's scoped review or authorize product testing/deployment.
+
+## Remaining validation recheck
+
+This follow-up concerns version 1.9.1 and the user's explicit request to recheck headed operation, filesystem/adversarial boundaries and current-harness WebMCP access. Earlier 1.9.0 results above retain their original scope and revisions.
+
+| Area | Current evidence |
+| --- | --- |
+| Current-harness integration | Read-only inspection found a separately configured Chrome DevTools MCP installation whose manifest is 0.21.0, selected with `--autoConnect`; it is not the repository's pinned 1.12.0 server |
+| Native tool access | No `list_webmcp_tools` or `execute_webmcp_tool` was exposed; a basic page-list probe returned no result within the bounded 25-second check, so no native pass is claimed |
+| Local headed rehearsal | Pinned-package probe recorded available=true, accessible=false and diagnostic=denied; browser launch did not occur and the installation was preserved |
+| Automated helpers | All 138 tests passed locally; the new source-file CLI check is synthetic helper evidence, not browser execution |
+| Headed CI and boundary fixtures | Added focused Windows headed and Linux virtual-display runs; actual results will be recorded after execution |
+
+The native configuration was inspected without copying credentials or personal browsing data into the repository. No global MCP setting, personal profile, connection timeout or server permission was changed. [Official MCP configuration guidance](https://learn.chatgpt.com/docs/extend/mcp?surface=cli) explains the independent configured server and tool-access settings; a repository dependency cannot replace that connection automatically.
+
+The new filesystem fixtures use disposable sibling files within the overall package output folder, while the browser bridge's workspace is restricted to its individual fixture root. Positive read/write controls establish that the operations work. Negative controls cover absolute outside paths, relative traversal and symlink/junction targets. Hostile metadata/output checks require the forbidden-action sentinel to remain untouched and retain separate invocation/application/QA states. Their scope is controlled adapter validation, not a general claim of prompt-injection immunity.

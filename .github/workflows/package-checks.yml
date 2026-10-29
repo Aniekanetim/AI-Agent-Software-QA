@@ -32,3 +32,13 @@ jobs:
         run: npx --no-install playwright install-deps chromium
       - run: npm run test:browsers
       - run: npm run test:chrome
+      - name: Headed Chrome fixtures (Windows)
+        if: runner.os == 'Windows'
+        run: npm run test:chrome
+        env:
+          QA_CHROME_HEADED: '1'
+      - name: Headed Chrome fixtures (Linux virtual display)
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum npm run test:chrome
+        env:
+          QA_CHROME_HEADED: '1'
