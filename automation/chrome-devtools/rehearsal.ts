@@ -44,7 +44,12 @@ export async function rehearseChrome(root: string, provider: 'mcpServer' | 'cli'
       // a failed action automatically.
       const initial = structured(await bridge.call('list_pages', {}));
       require(Array.isArray(initial.pages), 'browser initialization and page listing');
-      await bridge.call('new_page', { url: fixture.url });
+      // This rehearsal launches its own isolated browser. Reuse only that owned
+      // blank startup tab; do not overwrite an existing application tab or retry
+      // an initial new-tab failure. See the retained Windows failure evidence.
+      const startup = initial.pages.find((p: any) => p.url === 'about:blank');
+      if (!startup || !Number.isInteger(startup.id)) throw new Error('The isolated fixture has no identified blank startup page; preserve it for investigation.');
+      await bridge.call('navigate_page', { pageId: startup.id, url: fixture.url });
       const pages = structured(await bridge.call('list_pages', {})).pages;
       const page = Array.isArray(pages) ? pages.find((p: any) => p.url === fixture.url) : null;
       require(!!page, 'navigation and exact page identity');

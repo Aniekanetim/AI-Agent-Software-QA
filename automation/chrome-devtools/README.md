@@ -168,6 +168,8 @@ npm run test:chrome
 
 The fixture exercises permitted file operations and denied reads/writes outside its workspace through absolute paths, relative traversal and a symlink/junction. All targets are disposable synthetic files inside the overall package's output folder. Hostile descriptions and tool output are deliberately returned as data; sentinel checks require no implicit action, forbidden request, retained output canary or automatic QA verdict. These checks cover the adapter's controlled pipeline, not every prompt-injection attack against an adopting agent or application.
 
+Fixture startup navigates only the blank tab in its own newly launched isolated browser. An intermittent Windows error when creating an additional initial tab is retained in the validation history; its upstream cause is unconfirmed. A real navigation/tool failure remains a failure that requires investigation before another attempt.
+
 | Finding | Action |
 | --- | --- |
 | Child process denied (`EPERM`/access denied) | Preserve installation and report the harness restriction; do not bypass it or mark browser execution verified |
