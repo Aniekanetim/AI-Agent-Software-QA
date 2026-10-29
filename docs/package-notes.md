@@ -1,6 +1,12 @@
 # Package notes
 
-**Version:** 1.8.0. **Created:** 22 October 2026. **Updated:** 29 October 2026. **State:** reusable workflow package; no configured product, live discovery or QA execution history.
+**Version:** 1.9.0. **Created:** 22 October 2026. **Updated:** 29 October 2026. **State:** reusable workflow package; no configured product, live discovery or QA execution history.
+
+## Version 1.9.0 — Chrome DevTools and WebMCP
+
+Adds pinned Chrome DevTools MCP/CLI, named entry-point discovery, source-bound session settings, native-host reuse/import, contextual tool inventories, reserved invocation identities and separate application verification. Integrates with task selection, optional onboarding, context/map/process records and existing review gates. [Validation evidence](webmcp-validation.md) distinguishes helper checks, browser rehearsals, native-harness access and product testing. No adopting-project connection, live ticket, profile, requirement or schedule is preconfigured.
+
+Validation passed TypeScript, all 137 helpers (114 retained and 23 new), and 496 local Markdown targets/anchors in the working root and a relocated copy. Windows and Ubuntu CI passed both native WebMCP routes, with 14 assertions per route, including real configuration paths containing spaces. Existing Postman/Playwright fixtures also passed. The local sandbox blocked native child-process/browser launch; CI evidence does not establish a native connection in the user's harness, visible operation or product results. See the linked validation record for exact revisions/runs, the earlier intermittent navigation failure and remaining limits.
 
 ## Version 1.8.0: agent-selected methods and data initiative
 

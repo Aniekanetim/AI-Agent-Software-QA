@@ -58,3 +58,7 @@ Author task-specific suites with [Playwright Test](https://playwright.dev/docs/i
 ## Existing setup and calling harness
 
 Use [shared tool discovery](../tools/README.md) before setup. Reuse verified compatible installations, identities and mailbox selections. A version/configuration check does not establish the required operation through this harness. Retain old evidence after moving hosts; reverify only affected capabilities. Missing or expired access does not require reinstalling a working tool.
+
+## Additional Chrome capabilities
+
+[Chrome DevTools MCP/CLI](../chrome-devtools/README.md) is a separate available integration, including WebMCP actions when the application exposes them. Its native-host record is distinct from Playwright MCP and local server rehearsals. Keep each actual method/session/visibility and its evidence identifiable; choose suitable tools per task and verify the resulting application state.

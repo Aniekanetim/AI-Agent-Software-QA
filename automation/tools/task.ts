@@ -5,10 +5,12 @@ import { readRecord, readinessIssues, assertToolId, type ToolId } from './regist
 import { readToolPolicy, toolVisibility, uniqueTexts, type ToolPolicy } from './policy.js';
 import { validateReport, type BrowserReport } from '../browser/tools.js';
 import { status as postmanStatus } from '../postman/postman.js';
+import { assessInventory, type Target } from '../chrome-devtools/webmcp.js';
+import { readSettings as chromeSettings } from '../chrome-devtools/config.js';
 
 export interface TaskToolPlan {
   schemaVersion: 1; id: string; revision: string; task: Evidence; objective: string; executionContext: ExecutionContext;
-  requirements: { id: string; browser: boolean; operations: string[]; requiredTool: ToolId | null; basis: Evidence[] }[];
+  requirements: { id: string; browser: boolean; operations: string[]; requiredTool: ToolId | null; basis: Evidence[]; webmcp?: { inventory: Evidence; target: Target; toolNames?: string[] } }[];
   selections: { requirementId: string; tool: ToolId; rationale: string; limitations: string[] }[];
 }
 const providers: Partial<Record<ToolId, BrowserReport['provider']>> = { inAppBrowser: 'inApp', harnessMcp: 'harnessMcp', playwrightCli: 'cli', playwrightLibrary: 'library' };
@@ -44,6 +46,20 @@ export function assessTaskTools(root: string, plan: TaskToolPlan) {
         const report = readRecord(root, selection.tool);
         if (report && report.tool !== selection.tool) issues.push('Capability record identifies a different tool.');
         issues.push(...(selection.tool === 'postman' ? postmanStatus(root, requirement.operations).issues : readinessIssues(root, report, requirement.operations)));
+        if (requirement.operations.some(op => op.startsWith('webmcp:'))) {
+          if (!requirement.webmcp) issues.push('WebMCP work needs a fresh inventory for this actual target/role/state, beyond fixture capability evidence.');
+          else {
+            const provider = selection.tool === 'chromeDevtoolsCli' ? 'cli' : selection.tool === 'chromeDevtoolsMcp' ? 'mcpServer' : 'host';
+            try {
+              const inventory = assessInventory(root, requirement.webmcp.inventory, requirement.webmcp.target, provider, chromeSettings(root) ?? undefined);
+              if (requirement.operations.includes('webmcp:execute')) {
+                const names = requirement.webmcp.toolNames;
+                if (!Array.isArray(names) || !names.length || names.some(name => !inventory.tools.some(t => t.name === name))) issues.push('Identify the actual required action names in this target catalogue.');
+              }
+            }
+            catch { issues.push('Refresh the affected WebMCP target inventory; preserve previous observations.'); }
+          }
+        }
         const provider = requirement.browser ? providers[selection.tool] : undefined;
         if (provider) {
           const path = contained(root, `.local/browser-reports/${provider}-${plan.executionContext}.json`);

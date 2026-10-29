@@ -61,3 +61,7 @@ npm run qa -- onboarding retire-tool-questions --input .local/obsolete-tool-ques
 ```
 
 Input: `{ "ids": ["actual-question-id"], "source": "actual-migration-decision-reference" }`. Inspect the question first. Retirement preserves its prompts/history and appends the decision; repeated retirement is a no-op. Answered choices, visibility questions and whole-document questions cannot be retired by this command. Recover an interrupted reply first. Close an existing settings edit normally if needed. No new tool answer or approval is invented.
+
+## Contextual WebMCP selection
+
+[Chrome DevTools](../chrome-devtools/README.md) adds `chromeDevtoolsMcp`, `chromeDevtoolsCli` and `chromeDevtoolsHost`. A task requiring `webmcp:discover` or `webmcp:execute` also supplies `requirements[].webmcp` containing its actual inventory evidence reference and target (pageId, exact URL, role, accountState, build/null and contextEvidence). Execution requirements also identify `toolNames`, a nonempty array of the actual required action names. The assessor checks those bindings in addition to generic method capabilities. Fixture evidence alone does not establish target readiness. Execution must recheck the live page/catalogue and actual principal; read-only assessment sends no browser calls or approval requests.

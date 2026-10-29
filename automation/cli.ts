@@ -20,6 +20,10 @@ import { assessCoverage, type CoverageSnapshot } from './coverage/coverage.js';
 import { validateFlowMap, traceFlowMap, type FlowMapSnapshot, type Direction } from './flow-map/flow-map.js';
 import { assessTaskTools, type TaskToolPlan } from './tools/task.js';
 import { assessData, type DataPreparation } from './data/preparation.js';
+import * as chromeConfig from './chrome-devtools/config.js';
+import * as chromeTransport from './chrome-devtools/transport.js';
+import * as webmcp from './chrome-devtools/webmcp.js';
+import { rehearseChrome } from './chrome-devtools/rehearsal.js';
 
 const args = process.argv.slice(2), options = new Map<string, string>();
 const positional: string[] = [];
@@ -48,6 +52,7 @@ const help = {
   coverage: 'assess --input : read-only consistency/count check of a canonical-record snapshot; no execution, approval or product verdict',
   tools: 'bind --input | scan --source [--tool] | select --input | status --tool [--requires operation,operation] | import-host --input | assess-task --input : read-only assessment of agent-selected capabilities',
   data: 'assess --input : read-only preparation/state assessment; no generation, application mutations or approval',
+  chrome: 'check --source | mcp-config | rehearse --provider cli/mcpServer [--headless] [--executable path] | session-start --input | page --input | inventory --input | import-host-inventory --input | execute --input | confirm --input | session-stop --id : explicit scoped WebMCP operations; no implicit product authorization',
   postman: 'check --source | login-instructions | run --input : detects/reuses the CLI; local runs need no login; cloud operations need selected account/reporting scope',
   onboarding: 'start | roadmap-shown --source | status | next | queue --input | shown/not-shown --id --source | reply --input | recover | reconcile --input | retire-tool-questions --input | pause/resume --source | clarify/defer --input | check/domains --input | finish --input',
   settings: 'open --source | show | choose --area | edit --input | present | save --input | cancel | back | close',
@@ -97,6 +102,30 @@ async function main() {
     else if (action === 'import-host') output(registry.recordHost(root, input()));
     else if (action === 'assess-task') { const report = assessTaskTools(root, input<TaskToolPlan>()); output(report); if (report.status === 'needsPreparation') process.exitCode = 1; }
     else throw new Error('Unknown tools command.');
+    return;
+  }
+  if (area === 'chrome') {
+    if (action === 'check') {
+      output({ installation: await registry.scan(root, option('source'), ['chromeDevtoolsMcp', 'chromeDevtoolsCli']), settings: chromeConfig.readSettings(root) ? 'Configured; verify actual browser/connection and task operations' : 'Not configured', hostConnection: registry.status(root, 'chromeDevtoolsHost', ['hostConnection']), browser: 'Not launched by this check' });
+    } else if (action === 'mcp-config') output(chromeConfig.mcpConfiguration(root));
+    else if (action === 'rehearse') {
+      const provider = option('provider'); if (!['cli', 'mcpServer'].includes(provider)) throw new Error('Use cli or mcpServer for local fixture rehearsal.');
+      output(await rehearseChrome(root, provider as 'cli' | 'mcpServer', options.has('headless') ? 'headless' : 'headed', options.get('executable')));
+    } else if (action === 'session-start') output(await chromeTransport.startCliSession(root, chromeConfig.requireSettings(root), input()));
+    else if (action === 'page') {
+      const value = input<{ sessionId: string; url: string; source: string; authorization: store.Evidence[] }>();
+      output(await webmcp.openPage(root, chromeTransport.cliBridge(root, value.sessionId), chromeConfig.requireSettings(root), value.url, value));
+    } else if (action === 'import-host-inventory') output(webmcp.importHostInventory(root, chromeConfig.requireSettings(root), input()));
+    else if (action === 'inventory') {
+      const value = input<{ sessionId: string; target: webmcp.Target; source: string; channel?: webmcp.Inventory['channel'] }>();
+      output(await webmcp.captureInventory(root, chromeTransport.cliBridge(root, value.sessionId), chromeConfig.requireSettings(root), value.target, value.source, value.channel));
+    } else if (action === 'execute') {
+      const value = input<{ sessionId: string; request: webmcp.Invocation }>();
+      const result = await webmcp.execute(root, chromeTransport.cliBridge(root, value.sessionId), chromeConfig.requireSettings(root), value.request);
+      output(result); if (result.invocation !== 'reportedCompleted') process.exitCode = 1;
+    } else if (action === 'confirm') { const value = input<{ id: string; confirmation: Parameters<typeof webmcp.confirmOutcome>[2] }>(); output(webmcp.confirmOutcome(root, value.id, value.confirmation)); }
+    else if (action === 'session-stop') { await chromeTransport.stopCliSession(root, option('id')); output({ stoppedOwnedSession: option('id') }); }
+    else throw new Error('Unknown Chrome command; see help.');
     return;
   }
   if (area === 'postman') {

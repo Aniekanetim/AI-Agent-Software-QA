@@ -5,6 +5,7 @@ import './coverage.test.js';
 import './flow-map.test.js';
 import './adaptive-tools.test.js';
 import './data-preparation.test.js';
+import './chrome-devtools.test.js';
 import './documents.test.js';
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync, renameSync, existsSync } from 'node:fs';

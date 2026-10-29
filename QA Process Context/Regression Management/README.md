@@ -28,3 +28,7 @@ For a change, consult [Application Flow Map](../../Application%20Flow%20Map/READ
 ## Retest methods and original state
 
 The agent chooses methods appropriate to the original failure and retained evidence, while exact approved suites/commands remain binding. Verify data/starting state and reuse original identities where persisted state matters. A fresh replacement cannot certify an existing-state defect. Preserve the original failed run and preparation attempts; material changes return to the affected gate.
+
+## WebMCP changes and retained coverage
+
+Changes to exposed tools, schemas, permissions or form submission behavior can affect mapped journeys and preparation. Use actual source/map/context revisions and risks to select relevant checks. Include meaningful positive, negative, edge and exploratory conditions where justified; no fixed quota or compulsory tool is introduced. [WebMCP guidance](../../automation/chrome-devtools/README.md) separates invocation results from independent application outcomes. A tool-path check does not establish UI, keyboard, accessibility or complete journey coverage.

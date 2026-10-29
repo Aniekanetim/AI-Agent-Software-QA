@@ -80,3 +80,7 @@ Prepare the [handoff](templates/onboarding-handoff.md), review it with the human
 - Settings uses the same conversation focus. Show current values, preserve unrelated fields, and support Back, Cancel this edit and Close settings. Closing does not undo completed saves or resume a paused interview.
 - Recover a pending response before new edits. Inspect and explicitly merge newer conflicts. Keep the response ID, original source and already-applied writes. A stale lock requires inspection of the owning process; never delete an active claim automatically.
 - On environment, tool, mailbox or source changes, reopen affected checks and revalidate. Recheck actual access at task execution; a past capability check cannot guarantee future authentication.
+
+## Optional Chrome DevTools preparation
+
+During tools/access preparation, follow [Chrome DevTools/WebMCP](../automation/chrome-devtools/README.md). Inspect existing native connections and executable selections before setup questions. Reuse available access and prior answers. Establish only missing visibility, connection/profile, exact allowed origins and privacy settings in `.local/chrome-devtools-settings.json`; this is optional preparation, not a mandatory browser choice. Settings, installation, terminal operation, native harness connection and current-application support have separate evidence. Refresh affected checkpoints after changes, keeping schemaVersion 1 and the existing question/recovery history. The next task determines whether WebMCP is useful.

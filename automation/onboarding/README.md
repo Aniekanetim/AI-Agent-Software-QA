@@ -21,6 +21,7 @@ npm run qa -- help
 | `.local/project.json` | Name, `environments` array, `owners` array and actual `source`; references to the applicable project sources |
 | `.local/context-settings.json` | `route`: provide/discover/combined, actual `source`, source/request references |
 | `.local/tool-policy.json` | Optional sourced agent-selection constraints: schemaVersion 1, selection agent, visibility, allowedTools/null, prohibitedTools, source and evidence; [contract](../tools/task-selection.md) |
+| `.local/chrome-devtools-settings.json` | Optional explicit Chrome connection/profile, visibility, origins and privacy settings; [contract](../chrome-devtools/README.md) |
 | `.local/browser-preferences.json` | Legacy method/fallback history; retain actual visibility and source. No mandatory method selection; explicit constraints remain applicable |
 | `.local/github-settings.json` | Selected github.com account, repository rules and actual source |
 | `.local/email-connections.json` | Guarded provider/account/mailbox bindings and access observations |
@@ -116,3 +117,7 @@ The agent links [Application Flow Map](../../Application%20Flow%20Map/README.md)
 Project readiness returns `issues` for general preparation and `capabilityIssues` for configured optional integrations. An unavailable saved browser/Postman connection does not globally block independent work. Existing pending/blocked checks are not automatically marked Verified; refresh their scoped evidence truthfully. Use [task-tool assessment](../tools/task-selection.md) and [data assessment](../data/README.md) before dependent work; neither grants execution approval. Actual provider/session checks and reviewed commands remain binding.
 
 Onboarding schemaVersion 1, replies, settings and recovery are preserved. `onboarding retire-tool-questions --input` can retire exact obsolete unanswered method/fallback questions with a sourced migration decision, preserving history. It cannot erase answers, cancel visibility/whole-document questions or skip an interrupted reply. Inspect existing instructions before classifying an old choice as advisory.
+
+## Optional Chrome preparation in version 1.9
+
+The existing browser/settings area supports Chrome DevTools settings and targeted checkpoint refresh. Integration status exposes Chrome method diagnostics separately from project blockers. Preserve schemaVersion 1, prior answers and recovery. Native host reuse does not require a local server launch, and absent optional WebMCP support does not block independent tasks. See [the integration guide](../chrome-devtools/README.md).

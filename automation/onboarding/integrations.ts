@@ -8,6 +8,7 @@ import { validateSettings } from '../github/github.js';
 import { readHarness, currentHarness, type ExecutionContext } from '../tools/runtime.js';
 import { readRecord, readinessIssues } from '../tools/registry.js';
 import { settings as postmanSettings, capabilityIssues as postmanCapabilityIssues } from '../postman/postman.js';
+import { readSettings as chromeSettings } from '../chrome-devtools/config.js';
 
 /** Project preparation and optional capability gaps remain separate; neither authorizes task execution. */
 export function integrationStatus(root: string) {
@@ -80,7 +81,17 @@ export function integrationStatus(root: string) {
       issues.push(...postmanCapabilityIssues(root, readRecord(root, 'postman'), required, postman).map(i => `Postman: ${i}`));
     }
   });
-  return { issues: projectIssues, capabilityIssues: issues, taskReadiness: 'Assess the selected operations for each task; onboarding completion is not task execution authorization.' };
+  const chrome: { configured: boolean; methods: { tool: string; issues: string[] }[]; limitation: string } = {
+    configured: false, methods: [], limitation: 'Package, terminal SDK/CLI access, native harness connection and current-page WebMCP readiness are separate. Assess only task-selected methods.' };
+  inspect('Chrome DevTools', () => {
+    chrome.configured = !!chromeSettings(root);
+    for (const tool of ['chromeDevtoolsMcp', 'chromeDevtoolsCli', 'chromeDevtoolsHost'] as const) {
+      const record = readRecord(root, tool);
+      if (record) chrome.methods.push({ tool, issues: readinessIssues(root, record, [tool === 'chromeDevtoolsHost' ? 'hostConnection' : tool === 'chromeDevtoolsCli' ? 'cliRehearsal' : 'serverRehearsal']) });
+    }
+    if (chrome.configured && !chrome.methods.some(m => !m.issues.length)) issues.push('Chrome DevTools: verify the relevant selected access route; installation/settings alone are insufficient. Independent work can continue.');
+  });
+  return { issues: projectIssues, capabilityIssues: issues, chrome, taskReadiness: 'Assess the selected operations for each task; onboarding completion is not task execution authorization.' };
 }
 
 /** Backwards-compatible full diagnostic list, not the onboarding blocking decision. */
