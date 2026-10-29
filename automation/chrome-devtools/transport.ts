@@ -59,7 +59,9 @@ export function structured(value: unknown): Record<string, any> {
 export function responseMessage(value: unknown): string {
   const result = structured(value);
   if (typeof result.message === 'string') return result.message;
-  if (Array.isArray(result.content)) return result.content.filter((c: any) => c.type === 'text').map((c: any) => c.text).join('\n');
+  if (result.snapshot && typeof result.snapshot === 'object') return JSON.stringify(result.snapshot);
+  const content = Array.isArray(result.content) ? result.content : (value as any)?.content;
+  if (Array.isArray(content)) return content.filter((c: any) => c.type === 'text').map((c: any) => c.text).join('\n');
   return '';
 }
 export async function withMcpSession<T>(root: string, settings: ChromeSettings, scope: Scope, action: (bridge: Bridge) => Promise<T>): Promise<T> {

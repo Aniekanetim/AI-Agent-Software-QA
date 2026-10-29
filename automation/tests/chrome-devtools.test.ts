@@ -7,7 +7,7 @@ import * as store from '../shared/store.js';
 import * as registry from '../tools/registry.js';
 import { bindHarness } from '../tools/runtime.js';
 import { nodeCompatible, validateSettings, configurationObject, settingsHash, settingsPath, type ChromeSettings } from '../chrome-devtools/config.js';
-import { type Bridge, type Scope, startCliSession, stopCliSession, cliBridge, structured } from '../chrome-devtools/transport.js';
+import { type Bridge, type Scope, startCliSession, stopCliSession, cliBridge, structured, responseMessage } from '../chrome-devtools/transport.js';
 import { captureInventory, importHostInventory, assessInventory, execute, confirmOutcome, redacted, type Target, type Invocation } from '../chrome-devtools/webmcp.js';
 import { assessTaskTools, type TaskToolPlan } from '../tools/task.js';
 import { integrationStatus } from '../onboarding/integrations.js';
@@ -168,6 +168,12 @@ test('CLI uses a named owned daemon and its exact private configuration, without
 test('output redaction removes sensitive fields and reusable URL parameters', () => {
   const value = JSON.stringify(redacted({ accessToken: 'synthetic-secret', nested: { password: 'synthetic' }, link: 'https://example.test/verify?code=secret#fragment', message: 'Bearer synthetic-secret' }));
   assert(!value.includes('synthetic-secret')); assert(!value.includes('code=secret')); assert(!value.includes('"password":'));
+});
+test('MCP and CLI structured snapshots preserve visible-outcome assertions', () => {
+  const snapshot = { root: { role: 'status', name: 'Saved Synthetic QA' } };
+  assert(responseMessage({ structuredContent: { snapshot } }).includes('Saved Synthetic QA'));
+  assert(responseMessage({ snapshot }).includes('Saved Synthetic QA'));
+  assert.equal(responseMessage({ structuredContent: {}, content: [{ type: 'text', text: 'actual snapshot' }] }), 'actual snapshot');
 });
 test('native host reuse imports only fresh evidence from the matching verified connection', () => {
   const f = fixture(); f.settings.connection = { mode: 'host', connectionReference: 'actual-host-fixture' };
