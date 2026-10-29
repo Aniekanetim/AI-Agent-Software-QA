@@ -61,8 +61,21 @@ This follow-up concerns version 1.9.1 and the user's explicit request to recheck
 | Native tool access | No `list_webmcp_tools` or `execute_webmcp_tool` was exposed; a basic page-list probe returned no result within the bounded 25-second check, so no native pass is claimed |
 | Local headed rehearsal | Pinned-package probe recorded available=true, accessible=false and diagnostic=denied; browser launch did not occur and the installation was preserved |
 | Automated helpers | All 138 tests passed locally; the new source-file CLI check is synthetic helper evidence, not browser execution |
-| Headed CI and boundary fixtures | Added focused Windows headed and Linux virtual-display runs; actual results will be recorded after execution |
+| Headed CI and boundary fixtures | Passed all 26 checks per provider/mode on Windows and Ubuntu, including the actual positive/negative filesystem controls and hostile-content sentinels below |
 
 The native configuration was inspected without copying credentials or personal browsing data into the repository. No global MCP setting, personal profile, connection timeout or server permission was changed. [Official MCP configuration guidance](https://learn.chatgpt.com/docs/extend/mcp?surface=cli) explains the independent configured server and tool-access settings; a repository dependency cannot replace that connection automatically.
 
 The new filesystem fixtures use disposable sibling files within the overall package output folder, while the browser bridge's workspace is restricted to its individual fixture root. Positive read/write controls establish that the operations work. Negative controls cover absolute outside paths, relative traversal and symlink/junction targets. Hostile metadata/output checks require the forbidden-action sentinel to remain untouched and retain separate invocation/application/QA states. Their scope is controlled adapter validation, not a general claim of prompt-injection immunity.
+
+Implementation [c74414527a761057afb9f334c5d8ea51b7f32755](https://github.com/Aniekanetim/AI-Agent-Software-QA/commit/c74414527a761057afb9f334c5d8ea51b7f32755) passed the [branch run](https://github.com/Aniekanetim/AI-Agent-Software-QA/actions/runs/40880020285) and [PR run](https://github.com/Aniekanetim/AI-Agent-Software-QA/actions/runs/40880046277) on 29 October 2026. Both runners passed dependency installation, TypeScript, all 138 helpers and retained Postman/Playwright fixtures as well as these additional native checks:
+
+| Runner and actual mode | MCP-server route | CLI route |
+| --- | --- | --- |
+| Windows, headless | 26/26 passed | 26/26 passed |
+| Windows, headed | 26/26 passed | 26/26 passed |
+| Ubuntu 22.04, headless | 26/26 passed | 26/26 passed |
+| Ubuntu 22.04, headed under Xvfb | 26/26 passed | 26/26 passed |
+
+Headless runs reported `HeadlessChrome/156.0.0.0`; headed runs reported `Chrome/156.0.0.0`, with explicit headed launch configuration. The virtual-display/CI evidence does not establish that a local user watched the browser. Local document validation resolved 498 links/anchors. The corrected local probe message was also reproduced: invocation denied, installation retained, no browser launched.
+
+The remaining dependency is a working WebMCP-enabled native connection in the current harness, verified against its actual compatible browser/session. A separate 1.12.0 connection can be configured through the harness while retaining the existing integration; it must expose and successfully execute the required WebMCP operations. Copying the dependency, changing a JSON record or this CI success cannot establish that connection. No real-application testing or native-host pass is claimed.
