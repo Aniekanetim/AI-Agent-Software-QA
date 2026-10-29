@@ -100,11 +100,15 @@ test('disabled JavaScript inspection preserves its observation limitations', asy
   assert(observed.inventory.limits.some(l => l.includes('not performed')));
 });
 test('a reported completion is not a verified application outcome or QA pass', async () => {
-  const f = fixture(), first = await request(f); first.input = { password: 'never-store-this-value', name: 'Synthetic' };
+  const f = fixture(); f.bridge.provider = 'mcpServer'; const first = await request(f); first.input = { password: 'never-store-this-value', name: 'Synthetic' };
   const result = await execute(f.root, f.bridge, f.settings, first);
   assert.equal(result.invocation, 'reportedCompleted'); assert.equal(result.applicationOutcome, 'notAssessed'); assert.equal(result.qaVerdict, 'Not established by this helper');
   const saved = readFileSync(store.contained(f.root, '.local/chrome-devtools/invocations/original.json'), 'utf8');
   assert(!saved.includes('never-store-this-value')); assert(!saved.includes('synthetic-sensitive-value'));
+});
+test('sensitive fields cannot enter CLI process arguments', async () => {
+  const f = fixture(), first = await request(f); first.input = { password: 'synthetic-sensitive-value' };
+  await assert.rejects(execute(f.root, f.bridge, f.settings, first), /CLI process arguments/); assert.equal(f.writes(), 0);
 });
 test('same invocation IDs never repeat actions, including lost-response and interrupted records', async () => {
   const f = fixture(), first = await request(f); f.loseResponse();

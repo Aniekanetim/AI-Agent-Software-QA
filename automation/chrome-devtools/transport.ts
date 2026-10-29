@@ -75,6 +75,8 @@ export async function withMcpSession<T>(root: string, settings: ChromeSettings, 
     const transport = new StdioClientTransport({ command: command.executable, args: [...command.prefix, ...launchArguments(root, settings)], cwd: root, env: chromeEnvironment(settings) as Record<string, string>, stderr: 'pipe' });
     const bridge: Bridge = { provider: 'mcpServer', connectionReference: `local-sdk:${harnessKey(harness)}:${id}`, configurationHash: settingsHash(settings),
       call: async (name, args) => {
+        checkPolicy(root, 'chromeDevtoolsMcp');
+        if (harnessKey(currentHarness(root)) !== harnessKey(harness)) throw new Error('The calling harness changed; preserve this session and reverify affected access.');
         validateScope(root, scope); validateSettings(root, settings);
         if (commandStamp(command) !== command.stamp) throw new Error('The selected MCP executable changed.');
         return checkResponse(await client.callTool({ name, arguments: args }, undefined, { timeout: 60_000 }));

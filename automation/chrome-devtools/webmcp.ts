@@ -183,6 +183,10 @@ export async function execute(root: string, bridge: Bridge, settings: ChromeSett
 async function executeClaimed(root: string, bridge: Bridge, settings: ChromeSettings, request: Invocation): Promise<InvocationRecord> {
   validateScope(root, request); requireText(request.toolName);
   if (!/^[A-Za-z0-9_-]{1,100}$/.test(request.id) || !['read', 'write', 'unknown'].includes(request.effect) || !request.input || typeof request.input !== 'object' || Array.isArray(request.input) || JSON.stringify(request.input).length > 65_536) throw new Error('Use a unique invocation ID, explicit effect and bounded JSON-object inputs.');
+  if (bridge.provider === 'cli') {
+    try { assertNonsecret(request.input); }
+    catch { throw new Error('Sensitive values must not enter CLI process arguments. Use an authorized in-memory MCP/native route and secure credential handling.'); }
+  }
   const requestHash = digest(canonical(request)), path = `.local/chrome-devtools/invocations/${request.id}.json`;
   const earlier = load<InvocationRecord | null>(root, path, () => null).value;
   if (earlier) { if (earlier.requestHash !== requestHash) throw new Error('This invocation ID belongs to different inputs. Preserve its history.'); return earlier; }
