@@ -49,9 +49,10 @@ export async function rehearseChrome(root: string, provider: 'mcpServer' | 'cli'
       // an initial new-tab failure. See the retained Windows failure evidence.
       const startup = initial.pages.find((p: any) => p.url === 'about:blank');
       if (!startup || !Number.isInteger(startup.id)) throw new Error('The isolated fixture has no identified blank startup page; preserve it for investigation.');
-      await bridge.call('navigate_page', { pageId: startup.id, url: fixture.url });
+      const navigation = await bridge.call('navigate_page', { pageId: startup.id, url: fixture.url });
       const pages = structured(await bridge.call('list_pages', {})).pages;
       const page = Array.isArray(pages) ? pages.find((p: any) => p.url === fixture.url) : null;
+      if (!page) console.error(JSON.stringify({ syntheticFixtureOnly: true, phase: 'owned-startup-navigation', provider, visibility, navigation: responseMessage(navigation).slice(0, 1500), requestCount: fixture.requestCount(), pages: Array.isArray(pages) ? pages.map((p: any) => ({ id: p.id, blank: p.url === 'about:blank', atFixture: p.url === fixture.url })) : null }));
       require(!!page, 'navigation and exact page identity');
       save(actualRoot, '.local/actor.json', { role: 'synthetic reader', state: 'empty fixture', source: 'Observed local fixture state; not real authentication' }, null);
       const target: Target = { pageId: page.id, url: fixture.url, role: 'synthetic reader', accountState: 'empty fixture', build: 'native-webmcp-fixture-v1', contextEvidence: [evidence(actualRoot, '.local/actor.json')] };
