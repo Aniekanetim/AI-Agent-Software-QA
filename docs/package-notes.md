@@ -1,6 +1,16 @@
 # Package notes
 
-**Version:** 1.9.0. **Created:** 22 October 2026. **Updated:** 29 October 2026. **State:** reusable workflow package; no configured product, live discovery or QA execution history.
+**Version:** 1.9.1. **Created:** 22 October 2026. **Updated:** 29 October 2026. **State:** reusable workflow package; no configured product, live discovery or QA execution history.
+
+## Version 1.9.1 — remaining validation recheck
+
+Adds real filesystem read/write boundary and hostile-content sentinel checks to the native fixtures, plus Windows headed and Linux Xvfb-headed CI runs. CLI script evaluation supports the upstream local `sourcePath` alternative without a compulsory inline function, and denies remote source retrieval. A denied executable probe now reports the harness restriction instead of implying version incompatibility. The [validation record](webmcp-validation.md#remaining-validation-recheck) retains actual outcomes and distinguishes this package from the separately configured development-harness integration. This patch does not reconfigure the harness or establish a native WebMCP connection by installation.
+
+Validation passed 138 helpers, 498 document links/anchors and all 26 native checks for each MCP/CLI route in headless/headed mode on Windows and Ubuntu. Linux headed runs used a virtual display. Native reads/writes outside the fixture workspace were denied for absolute paths, traversal and symlink/junction targets, while permitted operations succeeded. Controlled hostile content did not trigger an implicit action, forbidden request, retained output canary or automatic QA verdict. The development harness's separately configured 0.21.0 integration remains unverified for WebMCP; local child invocation is denied. Exact revisions, CI evidence and remaining limitations are linked above.
+
+Repeat Windows-headed runs exposed intermittent initial navigation failures, including after switching to the owned blank startup tab. Successful executions above remain historical evidence; current Windows-headed reliability is unresolved. The exact-page assertion stays enforced, and a synthetic-fixture diagnostic records future failures. This candidate must not be described as a clean completion of every planned operational check.
+
+Two later CI runs also compared the runner's installed Google Chrome 156.0.8078.48. Both original Chromium and installed-Chrome headed routes passed all 26 assertions in those runs. That demonstrates headed capability but does not establish a cause or correction for the earlier intermittent failure. Current native-harness access still lacks verification, and the repeated local version probe still returned `EPERM`.
 
 ## Version 1.9.0 — Chrome DevTools and WebMCP
 

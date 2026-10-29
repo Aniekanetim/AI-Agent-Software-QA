@@ -8,7 +8,7 @@ The user approved the WebMCP recommendations and implementation plan, including 
 
 Version 1.9.0 adds the pinned Chrome DevTools MCP/CLI dependency, registry integration, explicit session configuration, contextual inventories, invocation history, separate application verification and onboarding/workflow guidance. Human requirements, discovery ownership and board statuses retain their existing roles.
 
-## Evidence status
+## Version 1.9.0 evidence
 
 | Check | Actual status |
 | --- | --- |
@@ -50,3 +50,44 @@ For a later documentation-only revision, inspect the PR's checks at its actual h
 Headless CI does not establish visible operation, a user's native harness connection, target-application support or production behavior. The fixture's role change tests catalogue invalidation, not real authentication or authorization. Optional debugging tools, feature-version differences and cross-origin WebMCP exposure require task-specific sources and actual verification. Missing connections, disabled inspection and empty catalogues also have helper coverage; those simulations are not additional native-browser runs. Catalogue metadata is not a requirements baseline. Role/account changes must be reobserved even when tool schemas look identical.
 
 The implementation is delivered for review through its pull request; package checks do not replace the human's scoped review or authorize product testing/deployment.
+
+## Remaining validation recheck
+
+This follow-up concerns version 1.9.1 and the user's explicit request to recheck headed operation, filesystem/adversarial boundaries and current-harness WebMCP access. Earlier 1.9.0 results above retain their original scope and revisions.
+
+| Area | Current evidence |
+| --- | --- |
+| Current-harness integration | Read-only inspection found a separately configured Chrome DevTools MCP installation whose manifest is 0.21.0, selected with `--autoConnect`; it is not the repository's pinned 1.12.0 server |
+| Native tool access | No `list_webmcp_tools` or `execute_webmcp_tool` was exposed; a basic page-list probe returned no result within the bounded 25-second check, so no native pass is claimed |
+| Local headed rehearsal | Pinned-package probe recorded available=true, accessible=false and diagnostic=denied; browser launch did not occur and the installation was preserved |
+| Automated helpers | All 138 tests passed locally; the new source-file CLI check is synthetic helper evidence, not browser execution |
+| Linux headed/headless fixtures | Passed 26/26 per MCP-server/CLI route, including filesystem and hostile-content controls |
+| Windows headless fixtures | Passed 26/26 per MCP-server/CLI route |
+| Windows headed fixtures | Full 26/26 executions were demonstrated, but repeat runs intermittently fail during startup navigation before those checks; this remains an unresolved reliability limitation |
+
+The native configuration was inspected without copying credentials or personal browsing data into the repository. No global MCP setting, personal profile, connection timeout or server permission was changed. [Official MCP configuration guidance](https://learn.chatgpt.com/docs/extend/mcp?surface=cli) explains the independent configured server and tool-access settings; a repository dependency cannot replace that connection automatically.
+
+The new filesystem fixtures use disposable sibling files within the overall package output folder, while the browser bridge's workspace is restricted to its individual fixture root. Positive read/write controls establish that the operations work. Negative controls cover absolute outside paths, relative traversal and symlink/junction targets. Hostile metadata/output checks require the forbidden-action sentinel to remain untouched and retain separate invocation/application/QA states. Their scope is controlled adapter validation, not a general claim of prompt-injection immunity.
+
+Implementation [c74414527a761057afb9f334c5d8ea51b7f32755](https://github.com/Aniekanetim/AI-Agent-Software-QA/commit/c74414527a761057afb9f334c5d8ea51b7f32755) passed the [branch run](https://github.com/Aniekanetim/AI-Agent-Software-QA/actions/runs/40880020285) and [PR run](https://github.com/Aniekanetim/AI-Agent-Software-QA/actions/runs/40880046277) on 29 October 2026. Both runners passed dependency installation, TypeScript, all 138 helpers and retained Postman/Playwright fixtures as well as these additional native checks:
+
+| Runner and actual mode | MCP-server route | CLI route |
+| --- | --- | --- |
+| Windows, headless | 26/26 passed | 26/26 passed |
+| Windows, headed | 26/26 passed | 26/26 passed |
+| Ubuntu 22.04, headless | 26/26 passed | 26/26 passed |
+| Ubuntu 22.04, headed under Xvfb | 26/26 passed | 26/26 passed |
+
+Headless runs reported `HeadlessChrome/156.0.0.0`; headed runs reported `Chrome/156.0.0.0`, with explicit headed launch configuration. The virtual-display/CI evidence does not establish that a local user watched the browser. Local document validation resolved 498 links/anchors. The corrected local probe message was also reproduced: invocation denied, installation retained, no browser launched.
+
+Native-harness validation still requires a working WebMCP-enabled connection in the current harness, verified against its actual compatible browser/session. A separate 1.12.0 connection can be configured through the harness while retaining the existing integration; it must expose and successfully execute the required WebMCP operations. Copying the dependency, changing a JSON record or this CI success cannot establish that connection. No real-application testing or native-host pass is claimed.
+
+A [later Windows repeat](https://github.com/Aniekanetim/AI-Agent-Software-QA/actions/runs/40881753937) failed during initial `new_page` navigation before the headed WebMCP assertions; the [parallel PR run](https://github.com/Aniekanetim/AI-Agent-Software-QA/actions/runs/40881763555) passed at the same revision. The fixture setup now identifies and navigates only its own isolated browser's blank startup tab, retaining all 26 assertions and the original failure. This avoids an unnecessary initial tab-creation dependency without retrying the failed action. The underlying intermittent `new_page` cause remains unconfirmed; this fixture does not establish that every new-tab startup is reliable.
+
+The setup change did not resolve the Windows issue: [PR CI at cbb85e1](https://github.com/Aniekanetim/AI-Agent-Software-QA/actions/runs/40883102935) failed the exact-page-identity assertion after initial navigation, while its [parallel branch run](https://github.com/Aniekanetim/AI-Agent-Software-QA/actions/runs/40883093543) passed. The failure remains blocking evidence for a clean Windows-headed verification claim. A fixture-only diagnostic now retains the bounded navigation response, request count and page-identity booleans on that failure; it does not log personal sessions or suppress the assertion. No upstream cause or successful correction is claimed.
+
+The [instrumented Windows failure](https://github.com/Aniekanetim/AI-Agent-Software-QA/actions/runs/40884763853) reported `net::ERR_ABORTED` for the loopback fixture with requestCount=0 and the owned page still blank. This is an observed symptom, not a confirmed cause. CI now also compares the runner's installed Google Chrome in an isolated headed session, using the same assertions. It records that browser's actual version and still runs after a preceding failure, without changing the original failed result. `QA_CHROME_EXECUTABLE` is an explicit fixture override, not a project-wide browser preference.
+
+At [b83570eb7eb7f3ac90eb550e83f5c15c2330ca25](https://github.com/Aniekanetim/AI-Agent-Software-QA/commit/b83570eb7eb7f3ac90eb550e83f5c15c2330ca25), the [branch run](https://github.com/Aniekanetim/AI-Agent-Software-QA/actions/runs/40934625388) and [PR run](https://github.com/Aniekanetim/AI-Agent-Software-QA/actions/runs/40934634962) both passed on Windows and Ubuntu. Each Windows job completed the original four Chromium provider/mode combinations and both additional installed-Chrome headed combinations, with 26/26 checks per combination. The installed Google Chrome binary reported product version `156.0.8078.48`; its user agent reported the reduced version `Chrome/156.0.0.0`. This comparison demonstrates actual headed operation through both browser sources, but does not isolate the cause because the original Chromium runs also passed in these repeats. The earlier Windows failures remain unresolved evidence, not corrected failures.
+
+After resuming the check, the native tool inventory still exposed no WebMCP operations and the configured MCP manifest remained 0.21.0 without a WebMCP flag. A fresh harmless local child-process version probe again returned `EPERM` on Node 22.21.0. Therefore native-harness WebMCP access remains unverified. No global connection/profile setting was edited, and the local restriction was not bypassed.
