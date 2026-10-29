@@ -19,7 +19,8 @@ export function fixtureBrowser(root: string): string {
 }
 export async function rehearseChrome(root: string, provider: 'mcpServer' | 'cli', visibility: 'headed' | 'headless', executable = fixtureBrowser(root)) {
   const fixture = await startWebMcpFixture();
-  const qaRoot = resolve(root, 'output/chrome-devtools-rehearsals', randomUUID()); mkdirSync(qaRoot, { recursive: true });
+  // Exercise real argument/configuration handling with spaces on both CI systems.
+  const qaRoot = resolve(root, 'output/Chrome DevTools rehearsals', randomUUID()); mkdirSync(qaRoot, { recursive: true });
   const actualRoot = realpathSync(qaRoot), context = process.env.CI === 'true' ? 'ci' : 'interactive';
   bindHarness(actualRoot, { id: context === 'ci' ? 'github-actions-terminal' : 'terminal', version: process.version, profile: `synthetic-${provider}`, executionContext: context, source: 'Actual package-only native WebMCP rehearsal; not an adopting-product/native-harness connection' });
   save(actualRoot, '.local/scope.json', { source: 'Approved package implementation validation', synthetic: true, origin: new URL(fixture.url).origin }, null);
