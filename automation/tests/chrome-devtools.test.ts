@@ -159,7 +159,7 @@ test('CLI uses a named owned daemon and its exact private configuration, without
   const runner: registry.Runner = async (_command, args, options) => {
     assert.equal(options?.env?.PLUGIN_DATA, config ? dirname(config) : options?.env?.PLUGIN_DATA);
     if (args[0] === 'start') { config = args[args.indexOf('--config') + 1]!; return { code: 0, stdout: 'started', stderr: '' }; }
-    if (args[0] === 'status') return { code: 0, stdout: running ? 'pid=123 version=1.12.0\nargs=' + JSON.stringify(['--config', config]) : 'not running', stderr: '' };
+    if (args[0] === 'status') return { code: 0, stdout: running ? 'pid=123 version=1.12.0\nargs=' + JSON.stringify(['--viaCli', `--config=${config}`]) : 'not running', stderr: '' };
     if (args[0] === 'stop') return { code: 0, stdout: 'stopped', stderr: '' };
     toolCalls++; return { code: 0, stdout: JSON.stringify({ pages: [] }), stderr: '' };
   };

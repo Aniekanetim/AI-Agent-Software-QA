@@ -130,7 +130,9 @@ export function cliBridge(root: string, id: string, runner: Runner = runProcess)
       const status = await runner(value.command, ['status', '--sessionId', id], { cwd: root, env: cliEnvironment(root, value) });
       const identity = status.stdout.match(/pid=(\d+).*version=([^\s]+)/);
       let actualArgs: unknown; try { actualArgs = JSON.parse(status.stdout.match(/^args=(.+)$/m)?.[1] ?? 'null'); } catch { /* Unsupported status. */ }
-      if (status.code !== 0 || !identity || !Array.isArray(actualArgs) || !actualArgs.includes(privatePath(root, value.configPath))) throw new Error('The owned daemon is unavailable or its settings changed. No tool call was sent.');
+      const at = Array.isArray(actualArgs) ? actualArgs.indexOf('--config') : -1;
+      const actualConfig = Array.isArray(actualArgs) ? at >= 0 ? actualArgs[at + 1] : actualArgs.find(a => typeof a === 'string' && a.startsWith('--config='))?.slice('--config='.length) : undefined;
+      if (status.code !== 0 || !identity || actualConfig !== privatePath(root, value.configPath)) throw new Error('The owned daemon is unavailable or its settings changed. No tool call was sent.');
       const positional: Record<string, string[]> = { new_page: ['url'], navigate_page: ['pageId'], list_webmcp_tools: ['pageId'], list_3p_developer_tools: ['pageId'], execute_webmcp_tool: ['pageId', 'toolName'], execute_3p_developer_tool: ['pageId', 'toolName'], take_snapshot: ['pageId'], evaluate_script: ['function'] };
       if (!['list_pages', ...Object.keys(positional)].includes(name)) throw new Error('Use a supported structured Chrome adapter operation.');
       const required = positional[name] ?? [], commandArgs = [name, ...required.map(key => { if (args[key] === undefined) throw new Error(`Missing ${key}.`); return String(args[key]); })];
