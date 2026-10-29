@@ -32,7 +32,7 @@ npm run qa -- tools scan --tool postman --source actual-inspection-reference
 npm run qa -- tools status --tool postman --requires version,collectionRun,localCollectionRun
 ```
 
-Native tool IDs are `playwrightCli`, `playwrightMcp`, `playwrightLibrary`, `playwrightTest`, `github` and `postman`. Scan checks versions without installing anything, signing in or running product tests. Version compatibility is preliminary; operation-specific checks establish readiness.
+Native tool IDs are `playwrightCli`, `playwrightMcp`, `playwrightLibrary`, `playwrightTest`, `github`, `postman`, `chromeDevtoolsMcp` and `chromeDevtoolsCli`. Scan checks versions without installing anything, signing in or running product tests. Version compatibility is preliminary; operation-specific checks establish readiness.
 
 For Postman, `tools status --tool postman --requires identity` or a selected `collection:<id>` / `environment:<id>` also checks the current account, region and credential binding. A version-only status remains an installation check and does not establish cloud readiness.
 
@@ -65,7 +65,7 @@ Node entry points use the absolute Node executable and an absolute entry-point p
 
 ## Native harness connections
 
-Use the actual harness integration directory and account metadata for in-app browsing, connected MCP and email. Tool names appearing in a configuration file are not connection evidence. Browser and email procedures publish their successful operation evidence to this registry. Other actual native observations can use `tools import-host --input` with a ToolRecord-shaped input, excluding schemaVersion/harness/checkedAt. Allowed host IDs are `inAppBrowser`, `harnessMcp` and `email:<binding-id>`.
+Use the actual harness integration directory and account metadata for in-app browsing, connected MCP and email. Tool names appearing in a configuration file are not connection evidence. Browser and email procedures publish their successful operation evidence to this registry. Other actual native observations can use `tools import-host --input` with a ToolRecord-shaped input, excluding schemaVersion/harness/checkedAt. Allowed host IDs are `inAppBrowser`, `harnessMcp`, `chromeDevtoolsHost`, `email:<binding-id>` and named `custom:<name>` capabilities.
 
 Each verified operation needs a nonempty evidence array with existing project-relative evidence hashes. Supply the actual connection reference, source, version, access/authentication state and operation outcomes. An imported record remains the agent's accountable observation; the helper cannot prove that entered prose describes a real tool call. Preserve the native call reference and redact sensitive content.
 
@@ -80,3 +80,7 @@ See [Postman](../postman/README.md), [browsers](../browser/README.md), [email](.
 ## Task selection and additional tools
 
 Use [task-based selection](task-selection.md) to explain significant decisions and assess only selected operations. `tools assess-task --input` is read-only; it does not choose, run or approve work. Native executable selection is an installation binding for that tool, not a compulsory tool for the project. Named `custom:<name>` host/terminal capability reports allow other accessible tools with actual evidence; they add no automatic installer or generic executor. Project onboarding reports optional capability gaps separately from its blockers. A task still needs its own tool/data/access checks and authorization.
+
+## Chrome DevTools routes
+
+[Chrome DevTools/WebMCP](../chrome-devtools/README.md) supplies separate MCP and CLI executables from one pinned package. Resolution selects the named bin entry, preserving existing compatible choices. `chromeDevtoolsHost` requires actual native harness calls and connection evidence; a terminal SDK fixture never establishes that record. Current-page WebMCP readiness needs a fresh target/role/state inventory in addition to generic operation evidence.

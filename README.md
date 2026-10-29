@@ -2,7 +2,7 @@
 
 A portable workflow for an AI QA agent to join a project, build product understanding and perform assigned QA work with human review. Guided onboarding prepares context, tools and access. Product Discovery learns how an application behaves. QA evaluates assigned work against an agreed test basis, investigates findings and proposes readiness. Humans maintain the product baseline and own scoped decisions; developers fix or refute reported defects.
 
-**Package version:** 1.8.0 — 29 October 2026. **Project state:** unconfigured. **Live tickets/discovery requests:** none. **Product schedules/PR regression:** not activated. Start with [SETUP.md](SETUP.md) and [guided onboarding](Onboarding/README.md).
+**Package version:** 1.9.0 — 29 October 2026. **Project state:** unconfigured. **Live tickets/discovery requests:** none. **Product schedules/PR regression:** not activated. Start with [SETUP.md](SETUP.md) and [guided onboarding](Onboarding/README.md).
 
 ## Use with your AI agent
 
@@ -34,7 +34,7 @@ criteria, reasons, alternatives, gaps and exact next authorization for my review
 Do not invent requirements, run unapproved exploration/tests or activate scheduling.
 ```
 
-An agent needs repository-reading and QA-file access plus the capabilities required by its tasks. The procedures are Markdown; optional executable helpers use Node.js 22+. Pinned dependencies include Playwright MCP, CLI, library/Test and Postman CLI, with email adapters and GitHub CLI setup support. [Tool discovery](automation/tools/README.md) verifies and reuses existing installations/connections through the actual selected harness before offering missing setup. [Postman onboarding](automation/postman/README.md) separates local collection execution from authenticated cloud access/reporting. Native host connections and credentials remain project-specific. [Adoption instructions](docs/adopt-from-repository.md) explain URL-based use and limits.
+An agent needs repository-reading and QA-file access plus the capabilities required by its tasks. The procedures are Markdown; optional executable helpers use Node.js 22.12+. Pinned dependencies include Chrome DevTools MCP/CLI, Playwright MCP, CLI, library/Test and Postman CLI, with email adapters and GitHub CLI setup support. [Tool discovery](automation/tools/README.md) verifies and reuses existing installations/connections through the actual selected harness before offering missing setup. [Postman onboarding](automation/postman/README.md) separates local collection execution from authenticated cloud access/reporting. Native host connections and credentials remain project-specific. [Adoption instructions](docs/adopt-from-repository.md) explain URL-based use and limits.
 
 The [global mailbox policy](automation/email/mailbox-policy.md) gives every adopting agent a standard way to manage test identities: purpose/run plus aliases on a supported test inbox, recorded account context, exact identity reuse for retests, and verification matched to the alias and current request. The helpers prepare identities and preserve correlation; actual application registration and provider delivery require project-specific execution.
 
@@ -68,6 +68,7 @@ Open the clone as your QA project, follow SETUP.md and give your agent the [boot
 | [Quality Control](QA/Quality%20Control/README.md) | Separate suites, repeatable checks and actual results by target and testing type |
 | [Shared progress](unified_project_context.md) | Current checkpoint, decisions, blockers and next action |
 | [Tool discovery and reuse](automation/tools/README.md) | Actual harness access, existing executable/connection reuse and targeted capability verification |
+| [Chrome DevTools and WebMCP](automation/chrome-devtools/README.md) | Page-tool discovery/execution, explicit MCP/CLI sessions and independently verified outcomes |
 | [Postman CLI](automation/postman/README.md) | API collection execution, conditional authentication and assertion/result handling |
 | [Automation](automation/README.md) | Browser/API/email/GitHub helpers, native check-ins and reviewed PR-regression integration |
 | [Portability](docs/portability.md) | Adoption on another project or machine without inheriting credentials or stale approvals |
@@ -103,6 +104,10 @@ The root [Application Flow Map](Application%20Flow%20Map/README.md) links featur
 Ask your agent: **What depends on authentication? Why did you include refunds? Which connections are inferred or stale?** The agent reads the project's records and explains paths, conditions, risks, proposed checks, exclusions and uncertainty through the [impact briefing](QA%20Process%20Context/Regression%20Management/impact-analysis.md). Users can review/correct this reasoning through conversation without maintaining each map entry themselves. Unconfigured projects receive an honest gap explanation, not invented connections.
 
 The optional [map helper](automation/flow-map/README.md) validates a temporary projection and traces upstream/downstream candidates with cycle and depth controls. It does not select final tests, authorize work or establish coverage. Mapping extends through supplied context and authorized discovery; there is no automatic whole-application crawl. Missing paths do not prove independence. Map/source revisions and the served build remain separate.
+
+## WebMCP as an additional capability
+
+The [Chrome DevTools bundle](automation/chrome-devtools/README.md) gives the agent MCP and CLI routes to inspect Chrome and use WebMCP actions exposed by the current application. The agent selects a suitable method per task; onboarding reuses working installations and native connections. Application tool availability depends on the page, role, state and compatible browser. Invocations, independent application verification and QA verdicts remain separate. [Validation evidence and limits](docs/webmcp-validation.md) distinguish helper tests, native browser rehearsals and current-harness access.
 
 ## Agent-selected tools and test data
 

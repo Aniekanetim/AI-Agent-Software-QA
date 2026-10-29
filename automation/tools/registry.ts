@@ -7,12 +7,12 @@ import { privatePath, load, save, revision, digest, requireText, verifyEvidence,
 import { localGh } from '../github/install.js';
 import { currentHarness, harnessKey, type HarnessIdentity, type OperationEvidence } from './runtime.js';
 
-export const tools = ['playwrightCli', 'playwrightMcp', 'playwrightLibrary', 'playwrightTest', 'github', 'postman'] as const;
+export const tools = ['playwrightCli', 'playwrightMcp', 'playwrightLibrary', 'playwrightTest', 'github', 'postman', 'chromeDevtoolsMcp', 'chromeDevtoolsCli'] as const;
 export type NativeTool = typeof tools[number];
-export type ToolId = NativeTool | 'inAppBrowser' | 'harnessMcp' | `email:${string}` | `custom:${string}`;
+export type ToolId = NativeTool | 'inAppBrowser' | 'harnessMcp' | 'chromeDevtoolsHost' | `email:${string}` | `custom:${string}`;
 export function assertToolId(value: unknown): asserts value is ToolId {
   if (typeof value === 'string' && value.startsWith('email:')) { requireText(value.slice(6), 'Existing mailbox binding ID'); return; }
-  if (typeof value !== 'string' || ![...tools, 'inAppBrowser', 'harnessMcp'].includes(value) && !/^custom:[A-Za-z0-9._@+-]+$/.test(value)) throw new Error('Use a supported tool ID or a named email:/custom: capability.');
+  if (typeof value !== 'string' || ![...tools, 'inAppBrowser', 'harnessMcp', 'chromeDevtoolsHost'].includes(value) && !/^custom:[A-Za-z0-9._@+-]+$/.test(value)) throw new Error('Use a supported tool ID or a named email:/custom: capability.');
 }
 const definitions: Record<NativeTool, { name: string; packageName?: string; major?: number }> = {
   playwrightCli: { name: 'playwright-cli', packageName: '@playwright/cli', major: 0 },
@@ -20,6 +20,8 @@ const definitions: Record<NativeTool, { name: string; packageName?: string; majo
   playwrightLibrary: { name: 'playwright', packageName: 'playwright', major: 1 },
   playwrightTest: { name: 'playwright', packageName: '@playwright/test', major: 1 },
   github: { name: 'gh', major: 2 }, postman: { name: 'postman', packageName: 'postman-cli', major: 1 },
+  chromeDevtoolsMcp: { name: 'chrome-devtools-mcp', packageName: 'chrome-devtools-mcp', major: 1 },
+  chromeDevtoolsCli: { name: 'chrome-devtools', packageName: 'chrome-devtools-mcp', major: 1 },
 };
 export interface Command { executable: string; prefix: string[]; origin: 'explicit' | 'path' | 'bundled'; packageRoot?: string; stamp: string }
 export interface ToolRecord {
@@ -46,7 +48,7 @@ export function packageCommand(root: string, tool: NativeTool, origin: Command['
   try {
     const manifest = createRequire(resolve(root, 'package.json')).resolve(`${name}/package.json`);
     const pkg = JSON.parse(readFileSync(manifest, 'utf8'));
-    const entry = typeof pkg.bin === 'string' ? pkg.bin : Object.values(pkg.bin ?? {})[0];
+    const entry = typeof pkg.bin === 'string' ? pkg.bin : pkg.bin?.[definitions[tool].name] ?? Object.values(pkg.bin ?? {})[0];
     if (tool === 'postman') {
       const os = ({ win32: 'windows', darwin: 'macos', linux: 'linux' } as Record<string, string>)[process.platform];
       const binary = createRequire(manifest).resolve(`@postman/pm-bin-${os}-${process.arch}/bin/postman${process.platform === 'win32' ? '.exe' : ''}`);
@@ -160,7 +162,10 @@ export async function probe(root: string, tool: NativeTool, source: string, runn
   for (const command of options) {
     const result = await runner(command, ['--version'], { cwd: root, env: tool === 'postman' ? isolatedPostmanEnvironment(root) : { ...process.env, NO_UPDATE_NOTIFIER: '1' } });
     const version = result.stdout.match(/\b(\d+\.\d+\.\d+(?:-[\w.]+)?)/)?.[1] ?? null;
-    const compatible = result.code === 0 && version !== null && Number(version.split('.')[0]) === definitions[tool].major;
+    const chrome = tool === 'chromeDevtoolsMcp' || tool === 'chromeDevtoolsCli';
+    const [nodeMajor, nodeMinor] = process.versions.node.split('.').map(Number);
+    const compatible = result.code === 0 && version !== null && Number(version.split('.')[0]) === definitions[tool].major &&
+      (!chrome || Number(version.split('.')[1]) >= 12 && (nodeMajor! > 22 || nodeMajor === 22 && nodeMinor! >= 12));
     record = { ...record, accessible: result.code === 0, compatible, version, command, diagnostic: result.error ?? (compatible ? undefined : 'Required version could not be verified.') };
     if (compatible) {
       selectCommand(root, tool, command, source);
@@ -186,7 +191,7 @@ export async function scan(root: string, source: string, requested: NativeTool[]
 }
 export function recordHost(root: string, input: Omit<ToolRecord, 'schemaVersion' | 'harness' | 'checkedAt'>): ToolRecord {
   assertToolId(input.tool);
-  if (!['inAppBrowser', 'harnessMcp'].includes(input.tool) && !input.tool.startsWith('email:') && !input.tool.startsWith('custom:')) throw new Error('Bundled native executables require the real CLI probe.');
+  if (!['inAppBrowser', 'harnessMcp', 'chromeDevtoolsHost'].includes(input.tool) && !input.tool.startsWith('email:') && !input.tool.startsWith('custom:')) throw new Error('Bundled native executables require the real CLI probe.');
   requireText(input.connectionReference, 'Actual host connection reference');
   if (input.command) throw new Error('Host reports cannot replace executable selections.');
   const record: ToolRecord = { ...input, schemaVersion: 1, harness: currentHarness(root), checkedAt: new Date().toISOString() };

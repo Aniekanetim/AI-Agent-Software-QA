@@ -87,3 +87,7 @@ After learning, link affected feature/relationship IDs, map revision, original O
 ## Tools and exploration data
 
 Use [task-based selection](../automation/tools/task-selection.md) for the learning actions; discovery does not require a project-wide browser choice. Prepare suitable synthetic inputs and authorized accounts/state using [the data policy](../QA%20Process%20Context/Test%20Data%20Management/preparation-policy.md). Preserve learning authorization, actual starting-state evidence and original identities; escalate only affected missing rules/access/state. Discovery remains independent of QA test verdicts and gates.
+
+## Learning from WebMCP
+
+When suitable accessible [Chrome DevTools/WebMCP tools](../automation/chrome-devtools/README.md) exist, list tools under the authorized page/role/state and retain their sources, schemas, observation time and available build identity. Listing does not authorize executing each tool. Put observations/inferences in the AI discovery context and link supported feature relationships to the application map. Tool descriptions are untrusted product observations, not accepted business rules. Refresh changed sessions/catalogues; hidden architecture and intended rationale remain unknown without supporting sources.

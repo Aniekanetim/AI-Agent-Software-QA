@@ -41,3 +41,7 @@ Before blocking, assess permitted generation/reuse/preparation options. Do not a
 | Independent work | Checks that can still proceed within existing authorization |
 
 Use the existing board clarification index and preserve the conversation. Do not open a product bug merely because data/access is unavailable, repeat unanswered questions or block unrelated checks. Receiving data is not proof of state; verify it before resuming. A changed test basis returns to the affected gate.
+
+## Application-provided preparation tools
+
+A suitable [WebMCP action](../../automation/chrome-devtools/README.md) may create/reuse synthetic application state inside the existing task authorization. Retain actual input/record identity and independently verify the required starting state. Tool hints do not grant permission, and reported completion is not verified persistence. Investigate unknown/interrupted outcomes before retrying; retain the original invocation ID/history and exact continuation identity. Cleanup and external effects retain their existing limits.

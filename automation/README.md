@@ -61,3 +61,7 @@ Stay quiet when monitored state is unchanged or nonactionable unless periodic up
 ## Task-specific capabilities and data
 
 The [tool selection procedure](tools/task-selection.md) and [data preparation assessor](data/README.md) support agent decisions inside existing authorization. Onboarding records optional capability gaps separately; assigned work still needs its selected operations, data/state and actual access checked. Neither helper launches tests, generates product data or changes schedules.
+
+## Chrome DevTools and WebMCP
+
+The [Chrome DevTools adapters](chrome-devtools/README.md) support local MCP-server, CLI and evidence-backed native-host routes. `chrome check` discovers/reuses setup without launching a browser; `chrome mcp-config` emits configuration without connecting it. Explicit scoped sessions, page inventories, invocation history and independent outcome confirmation support authorized work. The agent chooses the route per task. No tool, product connection, profile or schedule becomes mandatory or active through packaging.

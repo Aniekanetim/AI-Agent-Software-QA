@@ -2,9 +2,9 @@ name: Package checks
 on:
   push:
     branches: [main, 'codex/**']
-    paths: ['**/*.md', 'QA Process Context/**/*.json', 'Application Flow Map/**/*.json', 'automation/**/*.ts', '.github/workflows/**', 'package.json', 'package-lock.json', 'tsconfig.json']
+    paths: ['**/*.md', 'QA Process Context/**/*.json', 'Application Flow Map/**/*.json', 'automation/**/*.ts', 'automation/**/*.json', '.github/workflows/**', '.gitignore', 'package.json', 'package-lock.json', 'tsconfig.json']
   pull_request:
-    paths: ['**/*.md', 'QA Process Context/**/*.json', 'Application Flow Map/**/*.json', 'automation/**/*.ts', '.github/workflows/**', 'package.json', 'package-lock.json', 'tsconfig.json']
+    paths: ['**/*.md', 'QA Process Context/**/*.json', 'Application Flow Map/**/*.json', 'automation/**/*.ts', 'automation/**/*.json', '.github/workflows/**', '.gitignore', 'package.json', 'package-lock.json', 'tsconfig.json']
 permissions:
   contents: read
 jobs:
@@ -31,3 +31,4 @@ jobs:
       - if: runner.os == 'Linux'
         run: npx --no-install playwright install-deps chromium
       - run: npm run test:browsers
+      - run: npm run test:chrome

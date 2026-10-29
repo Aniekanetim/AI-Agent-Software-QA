@@ -33,3 +33,7 @@ Version 1.7.0 adds [Application Flow Map](Application%20Flow%20Map/README.md) an
 ## Adaptive methods and data preparation
 
 Version 1.8.0 introduces agent tool selection per task and explicit test-data initiative. Onboarding preserves schemaVersion 1/answers and reports optional capability gaps separately; task checks still require actual selected operations, access, data/state and authorization. This master has no sourced tool restrictions, data-preparation authority, live inputs or verified application states. Adopting projects retain actual constraints, identity history, failed attempts and original owner questions.
+
+## WebMCP package capability
+
+Version 1.9.0 adds [Chrome DevTools MCP/CLI and WebMCP support](automation/chrome-devtools/README.md). The package remains unconfigured: no product connection, browser profile, live catalogue or WebMCP task authorization is supplied. Existing adopting-project onboarding remains schemaVersion 1 and is preserved. [Validation](docs/webmcp-validation.md) records actual helper/browser results separately from native-harness and real-product access. In an adopting project, retain exact source/build/context/connection references and uncertain invocation history before resuming work.

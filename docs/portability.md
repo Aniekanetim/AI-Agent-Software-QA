@@ -49,3 +49,7 @@ Include [Application Flow Map](../Application%20Flow%20Map/README.md), area view
 ## Adaptive task preparation
 
 Follow [task-based tool selection](../automation/tools/task-selection.md) and the [data preparation policy](../QA%20Process%20Context/Test%20Data%20Management/preparation-policy.md). The agent chooses suitable accessible methods per task, generates routine local inputs and establishes authorized state. Preserve explicit constraints, exact retest identities, old answers and failed attempts. Optional capability gaps do not block unrelated work. State precise missing dependencies and continue independent authorized checks. Preserve existing human gates; copied readiness is not current task readiness.
+
+## Chrome DevTools on another machine
+
+Install the pinned dependency with scripts disabled on Node 22.12+, then follow [Chrome DevTools discovery](../automation/chrome-devtools/README.md). Reuse compatible existing executables/connections, preserve earlier answers and reverify only machine/harness/session-dependent capabilities. Do not transfer browser profiles, cookies or daemon state as project knowledge. Preserve sanitized invocation/evidence history through an appropriate secure transfer; copied inventories/readiness remain historical until refreshed. Native-host access and target-application tool support require their own actual observations.

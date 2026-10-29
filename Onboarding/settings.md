@@ -39,3 +39,7 @@ Use existing project/context and review-policy settings for actual source or res
 Use [task selection](../automation/tools/task-selection.md) to set actual constraints in `.local/tool-policy.json`; never require a preferred tool as an onboarding condition. Historical browser settings/replies remain available. Changing an optional tool does not invalidate unrelated task capabilities. Project readiness lists capability gaps separately; it is not permission to run an unverified task.
 
 Maintain preparation limits and responsibilities in the canonical [data policy/plan](../QA%20Process%20Context/Test%20Data%20Management/README.md), referenced from existing review/project settings rather than another copy. The agent generates routine synthetic inputs and establishes authorized state; clarify only material missing limits, intent or dependencies. Preserve actual scope, identity reuse, retention and cleanup decisions.
+
+## Chrome DevTools settings
+
+The browser/tool-constraints area also accepts `.local/chrome-devtools-settings.json`. [The integration guide](../automation/chrome-devtools/README.md) defines explicit connection, visibility, origin and privacy settings. Show current values, preserve unrelated settings and prior replies, and reverify only affected tools/access/operation checkpoints. Saving this file neither connects the harness nor changes an existing browser server. Native-host mode reuses a separately verified connection.

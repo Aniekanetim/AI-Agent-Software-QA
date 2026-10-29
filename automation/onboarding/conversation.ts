@@ -19,7 +19,7 @@ export function permittedWrite(root: string, write: ProposedWrite, reply: Reply)
     // Discovery observations retain their own authority; they cannot write the root baseline.
   } else if (path.startsWith('.local/')) {
     privatePath(root, path);
-    if (!['project', 'context-settings', 'tool-policy', 'browser-preferences', 'github-settings', 'review-settings', 'verification-settings', 'operation-preferences', 'reporting-settings', 'postman-settings'].some(name => path === `.local/${name}.json`)) throw new Error('Use the dedicated state/evidence procedure for this destination.');
+    if (!['project', 'context-settings', 'tool-policy', 'browser-preferences', 'chrome-devtools-settings', 'github-settings', 'review-settings', 'verification-settings', 'operation-preferences', 'reporting-settings', 'postman-settings'].some(name => path === `.local/${name}.json`)) throw new Error('Use the dedicated state/evidence procedure for this destination.');
     try { assertNonsecret(JSON.parse(write.content)); } catch { throw new Error('Canonical settings must be valid, nonsecret JSON.'); }
   } else throw new Error('Response writes must target authorized baseline documents, discovery knowledge or private canonical settings.');
   if (!reply.answers.some(a => a.path === write.path)) throw new Error('Every proposed write must be bound to a saved answer.');
@@ -145,7 +145,7 @@ function recoverLocked(root: string, afterWrite?: (index: number) => void): void
     const q = current.value.questions.find(q => q.id === answer.id)!;
     q.answerReferences.push({ source: reply.source, evidence: evidence(root, answer.path, answer.pointer) }); q.status = 'answered';
     current.value.checks[q.stage].status = 'pending'; current.value.checks[q.stage].nextAction = 'Revalidate preparation affected by the saved answer.';
-    const affected: Stage[] = (answer.path.includes('browser-preferences') || answer.path.includes('tool-policy')) ? ['tools', 'access', 'operation'] : answer.path.includes('github-settings') ? ['tools', 'operation'] : answer.path.startsWith('Project Context/') || answer.path.startsWith('Product Discovery/') ? ['understanding'] : [];
+    const affected: Stage[] = (answer.path.includes('browser-preferences') || answer.path.includes('tool-policy') || answer.path.includes('chrome-devtools-settings')) ? ['tools', 'access', 'operation'] : answer.path.includes('github-settings') ? ['tools', 'operation'] : answer.path.startsWith('Project Context/') || answer.path.startsWith('Product Discovery/') ? ['understanding'] : [];
     for (const stage of affected) { current.value.checks[stage].status = 'pending'; current.value.checks[stage].nextAction = 'Revalidate only preparation affected by this change.'; }
   }
   current.value.completed = false;

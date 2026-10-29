@@ -47,3 +47,7 @@ Keep stable IDs through display-name changes. Retire obsolete entries with a rea
 Unmapped connections and unvisited roles/states are unknown. Missing, conditional or stale relationships may justify broader regression. The agent must reason about transferred data/state and risk; following every reachable arrow does not determine the final scope. Retain selection explanations, map/source revisions and actual coverage on the ticket and G5 packet.
 
 The package activates no mapping crawl, scheduler or application access. Existing projects adopt missing records deliberately; supplied sources, discovery authorization, test approval and release decisions stay separate.
+
+## WebMCP as relationship evidence
+
+[WebMCP discovery](../automation/chrome-devtools/README.md) can supply source-linked observations of exposed actions and their inputs/outputs. Original evidence stays in AI discovery context. Map only relationships supported by observations or other applicable sources, preserving intended authority and observed behavior separately. A tool name is not proof of a backend dependency, accepted rule or passing journey. Retain page/role/state/build, catalogue/source revisions and freshness; changed tools can prompt targeted impact review.

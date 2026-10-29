@@ -162,3 +162,7 @@ The following eight written-procedure scenarios were reviewed for consistency:
 | No actionable QA ticket or discovery request exists | Do not fabricate work, trigger a crawl, change files or activate a schedule |
 
 These checks assess package structure and the written procedures. No staging URL was supplied, so no browser walkthrough, sign-in, account creation, product tests or actual owner confirmation was performed. Ownership controls are agent instructions, not filesystem access enforcement. Existing MustPayroll repositories, evidence and the configured source-project check-in were not changed. No discovery schedule was activated.
+
+## Version 1.9.0 — Chrome DevTools and WebMCP
+
+Adds pinned Chrome DevTools MCP/CLI, named entry-point discovery, source-bound session settings, native-host reuse/import, contextual tool inventories, reserved invocation identities and separate application verification. Integrates with task selection, optional onboarding, context/map/process records and existing review gates. [Validation evidence](webmcp-validation.md) distinguishes helper checks, browser rehearsals, native-harness access and product testing. No adopting-project connection, live ticket, profile, requirement or schedule is preconfigured.
