@@ -42,3 +42,15 @@ jobs:
         run: xvfb-run --auto-servernum npm run test:chrome
         env:
           QA_CHROME_HEADED: '1'
+      - name: Compare installed Google Chrome (Windows headed)
+        if: runner.os == 'Windows' && !cancelled()
+        shell: pwsh
+        run: |
+          $qaChromeCandidates = @("$env:ProgramFiles\Google\Chrome\Application\chrome.exe", "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe")
+          $qaChromeExecutable = $qaChromeCandidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+          if (-not $qaChromeExecutable) { throw 'No installed Google Chrome is available for the explicit comparison.' }
+          Write-Output "Comparison Google Chrome version: $((Get-Item -LiteralPath $qaChromeExecutable).VersionInfo.ProductVersion)"
+          $env:QA_CHROME_EXECUTABLE = $qaChromeExecutable
+          npm run test:chrome
+        env:
+          QA_CHROME_HEADED: '1'
