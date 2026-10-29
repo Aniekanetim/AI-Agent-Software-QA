@@ -10,6 +10,8 @@ Validation passed 138 helpers, 498 document links/anchors and all 26 native chec
 
 Repeat Windows-headed runs exposed intermittent initial navigation failures, including after switching to the owned blank startup tab. Successful executions above remain historical evidence; current Windows-headed reliability is unresolved. The exact-page assertion stays enforced, and a synthetic-fixture diagnostic records future failures. This candidate must not be described as a clean completion of every planned operational check.
 
+Two later CI runs also compared the runner's installed Google Chrome 156.0.8078.48. Both original Chromium and installed-Chrome headed routes passed all 26 assertions in those runs. That demonstrates headed capability but does not establish a cause or correction for the earlier intermittent failure. Current native-harness access still lacks verification, and the repeated local version probe still returned `EPERM`.
+
 ## Version 1.9.0 — Chrome DevTools and WebMCP
 
 Adds pinned Chrome DevTools MCP/CLI, named entry-point discovery, source-bound session settings, native-host reuse/import, contextual tool inventories, reserved invocation identities and separate application verification. Integrates with task selection, optional onboarding, context/map/process records and existing review gates. [Validation evidence](webmcp-validation.md) distinguishes helper checks, browser rehearsals, native-harness access and product testing. No adopting-project connection, live ticket, profile, requirement or schedule is preconfigured.
