@@ -36,7 +36,7 @@ Start with [shared tool discovery](../automation/tools/README.md). The agent ins
 
 | Area | Choices and next step |
 | --- | --- |
-| Browser interaction | Harness in-app browser, Playwright CLI, Playwright MCP, or a recommendation based on actual checks. Record visibility/fallback. [Browser guide](../automation/browser/README.md) |
+| Browser/testing capabilities | Discover what works through the harness and establish visibility/operating constraints. The agent selects suitable methods per task. [Selection policy](../automation/tools/task-selection.md) |
 | Scripted suites | Playwright library and Playwright Test are bundled independently of the interaction preference. Other task-specific tools can be added when needed. |
 | API tools | Postman CLI is bundled. Reuse a compatible accessible installation; local collections need no Postman login. Cloud work needs selected account/resources and reporting authorization. [Postman guide](../automation/postman/README.md) |
 | Email | Google — Gmail / Google Workspace first, other discovered providers, AgentMail, human-assisted verification or later. Select the actual account/mailbox and apply the [global mailbox policy](../automation/email/mailbox-policy.md) for fresh identities, exact reuse and correlated verification. [Email guide](../automation/email/README.md) |

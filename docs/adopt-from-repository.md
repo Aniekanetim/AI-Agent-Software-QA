@@ -70,3 +70,7 @@ Include [QA Process Context](../QA%20Process%20Context/README.md) in the project
 ## Adopt the application map
 
 Copy [Application Flow Map](../Application%20Flow%20Map/README.md) alongside the existing context/board files, preserving destination instructions and existing maps. Link canonical features/relationships, source revisions, original discoveries and actual owners; introduce missing entries as unknown or draft, not invented intent. Read the map during onboarding and ticket preparation, and use the existing impact briefing/review gates. Source inspection is optional for hosted discovery; hidden architecture remains unknown. Existing onboarding state is unchanged.
+
+## Adaptive task preparation
+
+Follow [task-based tool selection](../automation/tools/task-selection.md) and the [data preparation policy](../QA%20Process%20Context/Test%20Data%20Management/preparation-policy.md). The agent chooses suitable accessible methods per task, generates routine local inputs and establishes authorized state. Preserve explicit constraints, exact retest identities, old answers and failed attempts. Optional capability gaps do not block unrelated work. State precise missing dependencies and continue independent authorized checks. Preserve existing human gates; copied readiness is not current task readiness.

@@ -1,6 +1,18 @@
 # Package notes
 
-**Version:** 1.7.0. **Created:** 22 October 2026. **Updated:** 28 October 2026. **State:** reusable workflow package; no configured product, live discovery or QA execution history.
+**Version:** 1.8.0. **Created:** 22 October 2026. **Updated:** 29 October 2026. **State:** reusable workflow package; no configured product, live discovery or QA execution history.
+
+## Version 1.8.0: agent-selected methods and data initiative
+
+The agent chooses suitable accessible tools per task/step, using actual capabilities, evidence needs and constraints. The bundle is a capability set rather than a testing-category default. Onboarding/readiness separate general project blockers from optional capability gaps; per-task assessment checks the selected operations. Custom host/terminal tools can retain accountable evidence without a new generic executor. Explicit requirements, current sessions, provider/resource checks and approved regression commands remain binding.
+
+Added the data-preparation policy/record and optional read-only assessment. The agent generates local synthetic inputs and creates/reuses authorized state, preserving source rules, exact continuation identities, isolation, failed attempts and retention/cleanup limits. Prepared values/records cannot establish verified application state. Missing attached data is not an automatic blocker; genuine dependencies retain affected checks, exact assistance/owner and independent work.
+
+Existing onboarding schemaVersion 1, answers, interrupted-save recovery, legacy method history/visibility, five board statuses, context ownership and human gates remain. Exact obsolete unanswered method/fallback questions can be explicitly retired without erasing their history or deciding another tool. No project/tool policy, application access, dataset, state mutation or schedule is configured by this master.
+
+Local validation passed TypeScript and all 114 package tests: 88 retained checks and 26 new tool/data checks. All 464 local Markdown targets/anchors resolved in the working root and a relocated copy with spaces in its path. The actual CLI rehearsal used explicitly synthetic capability and state records to check independent work with unavailable optional tools, required constraints, obsolete-question retirement/idempotence, preserved prior replies, local input preparation, separate state evidence and stale-source rejection. Read-only assessments preserved input bytes and earlier answers; QA/discovery queues stayed empty.
+
+Review corrected a malformed legacy browser setting affecting API-only work, retained historical mailbox-name compatibility, and added visibility evidence for additional browser tools. These checks establish framework behavior, not live browser/provider access or a real application state. The relocated rehearsal reused existing build/dependencies; no fresh local dependency install, application discovery, product tests, account creation or schedule activation occurred. Cross-platform CI restores dependencies and executes the package browser/Postman fixtures; its result is linked with the pull request.
 
 ## Version 1.7.0: application connections and candidate impact
 

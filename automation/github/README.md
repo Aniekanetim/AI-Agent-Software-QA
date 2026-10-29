@@ -72,3 +72,7 @@ Consult [QA Process Context](../../QA%20Process%20Context/README.md) and its ret
 ## Map-based change-impact preparation
 
 Generated PR assignments link [Application Flow Map](../../Application%20Flow%20Map/README.md) and the [impact briefing](../../QA%20Process%20Context/Regression%20Management/impact-analysis.md). Identify relevant changed feature/relationship IDs, source/map revisions and deployed identity; do not assume PR text establishes relationships or authorization. Use candidate paths to explain proposed regression, gaps and exclusions within the existing policy and gates.
+
+## Adaptive task preparation
+
+Follow [task-based tool selection](../../automation/tools/task-selection.md) and the [data preparation policy](../../QA%20Process%20Context/Test%20Data%20Management/preparation-policy.md). The agent chooses suitable accessible methods per task, generates routine local inputs and establishes authorized state. Preserve explicit constraints, exact retest identities, old answers and failed attempts. Optional capability gaps do not block unrelated work. State precise missing dependencies and continue independent authorized checks. Preserve existing human gates; copied readiness is not current task readiness.

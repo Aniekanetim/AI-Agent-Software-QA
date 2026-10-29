@@ -57,3 +57,7 @@ Stay quiet when monitored state is unchanged or nonactionable unless periodic up
 ## Application-map helpers
 
 [Map validation/tracing](flow-map/README.md) reads a temporary projection of the canonical [Application Flow Map](../Application%20Flow%20Map/README.md). It checks IDs/references and traces bounded candidate paths, preserving uncertainty, cycles and historical evidence. The agent reviews semantics and briefs the human before testing. No crawl, map-writing service, test runner or scheduler is activated.
+
+## Task-specific capabilities and data
+
+The [tool selection procedure](tools/task-selection.md) and [data preparation assessor](data/README.md) support agent decisions inside existing authorization. Onboarding records optional capability gaps separately; assigned work still needs its selected operations, data/state and actual access checked. Neither helper launches tests, generates product data or changes schedules.

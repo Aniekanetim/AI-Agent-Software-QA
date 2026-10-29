@@ -52,3 +52,7 @@ Keep historical results and approvals tied to their original basis. A new revisi
 Inventory existing plans, matrices, data procedures and configuration records. Link useful external or existing files as canonical rather than copying them. Move a record only when necessary, update incoming links and preserve history. Introduce missing records as Draft; do not retrospectively approve a strategy or attach new coverage IDs to historical execution as if they existed then. Existing onboarding answers and runtime schema remain unchanged by this documentation addition. Account for missing process ownership in the onboarding handoff and affected ticket rather than restarting onboarding.
 
 The master ships no live strategy, test data, coverage register, approvals or schedule. Product Discovery remains independent. The six areas are extensible; create additional process records only when actual work requires them.
+
+## Prepare without unnecessary dependencies
+
+Use [task-based tools](../automation/tools/task-selection.md) and [test-data initiative](Test%20Data%20Management/preparation-policy.md). The agent selects methods and prepares data within scope. Preserve explicit requirements and actual state evidence; blocked rules/access/state affect dependent checks only. Missing attached data and unavailable optional tools are not automatic assignment blockers.

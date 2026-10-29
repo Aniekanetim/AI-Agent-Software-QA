@@ -10,7 +10,7 @@ The pinned dependencies bundle four distinct tools. The host's in-app browser is
 | Playwright Test | Repeatable suites, assertions and regression | Actual selected suite/result, separate from fixture checks |
 | Harness in-app browser | Native host browser interaction | Actual host tools and demonstrated operations |
 
-Choose cli, mcp, inApp or recommend for interaction. A recommendation must compare actual available capabilities, then save the resolved choice. Save visibility and any explicitly accepted fallback. Playwright Test remains available regardless of that preference. Separate sessions do not automatically share site authentication.
+Follow [task-based selection](../tools/task-selection.md). The agent chooses suitable methods from actual capabilities for each task/step; onboarding establishes visibility and operating constraints without a compulsory browser choice. Existing method/fallback selections remain history, not a task default. Preserve actual explicit instructions and visibility. Playwright Test remains available for suitable scripted work. Separate sessions do not automatically share site authentication.
 
 ## Inspect existing setup, then rehearse
 

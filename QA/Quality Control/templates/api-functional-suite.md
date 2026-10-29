@@ -29,3 +29,7 @@ Reference the applicable [QA process records](../../../QA%20Process%20Context/RE
 ## Application-map traceability
 
 Reference applicable [Application Flow Map](../../../Application%20Flow%20Map/README.md) feature/relationship IDs, map revision and impact briefing, or an explicit gap. Keep relationship details in the map and steps/observations here. Record actual conditions/path segments exercised in results; inclusion in a plan or diagram is not execution evidence.
+
+## Method and data preparation
+
+Choose suitable tools for the required behavior/evidence using the [selection policy](../../../automation/tools/task-selection.md). Retain any explicit runner requirement. State required data/starting state and its source; the agent may generate synthetic inputs or establish authorized state using the [data policy](../../../QA%20Process%20Context/Test%20Data%20Management/preparation-policy.md). Verify actual preconditions and preserve exact continuation identities. Keep preparation steps separate from the action under test; list only genuine dependent blockers.

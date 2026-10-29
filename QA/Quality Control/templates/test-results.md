@@ -32,3 +32,7 @@ Link the canonical [coverage matrix](../../../QA%20Process%20Context/Coverage%20
 ## Application-map traceability
 
 Reference applicable [Application Flow Map](../../../Application%20Flow%20Map/README.md) feature/relationship IDs, map revision and impact briefing, or an explicit gap. Keep relationship details in the map and steps/observations here. Record actual conditions/path segments exercised in results; inclusion in a plan or diagram is not execution evidence.
+
+## Preparation and execution identity
+
+Record actual methods/tool versions and capability limits, data-plan revision, generated/supplied/reused origin, exact record identities and starting-state observations. Link generation rules/artifacts as appropriate. Preserve preparation errors and failed attempts separately; unavailable data/tool access is not automatically a product failure. A different method does not prove an unrun named suite passed. Link data retention/reuse/cleanup handoff and unresolved dependencies.

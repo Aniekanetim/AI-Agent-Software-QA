@@ -34,6 +34,12 @@ This adds project testing preparation, not another product-domain interview or t
 
 Include [Application Flow Map](Application%20Flow%20Map/README.md) in the QA root. Reuse existing maps/sources, identify actual owners and record known areas and unknown relationships. Keep intended sources and observed evidence distinct. Onboarding accounts for this during existing understanding/handoff stages; it does not require complete discovery, another product domain or a repeated interview. Project-specific access and actual authorization still govern exploration/testing.
 
+## Adopt adaptive tool and data preparation
+
+Read [task-based selection](automation/tools/task-selection.md) and the [data preparation policy](QA%20Process%20Context/Test%20Data%20Management/preparation-policy.md). Preserve installations, prior answers, constraints and history. Introduce a sourced tool policy only when needed; do not reset onboarding or create a compulsory preferred browser. Retire only exact obsolete unanswered tool-choice questions through the documented procedure. Keep product requirements, board statuses and human gates unchanged.
+
+Data preparation includes agent-generated local inputs and authorized state creation/reuse. Missing attached datasets are not automatic blockers. Establish limits once where possible, verify actual starting state and link precise unresolved dependencies. The master has no granted application/data access or live preparation records.
+
 ## 3. Verify tools for the chosen objective
 
 Start with [shared discovery and reuse](automation/tools/README.md). Record the actual calling harness from available metadata and inspect existing setup before asking tool questions. Reuse verified compatible tools; resolve only missing access/capabilities. A tool working in a personal terminal or CI does not prove it works through the adopting harness. The [Postman guide](automation/postman/README.md) covers local collections, conditional cloud login, selected resources and reporting.
@@ -51,7 +57,7 @@ For discovery, establish browser/network access, authorized journeys/roles/actio
 
 Missing tools are readiness blockers, not product defects. Install Node.js 22+, Git and the pinned helpers with `npm ci --ignore-scripts --cache .local/npm-cache`; run `npm run check` and `npm test`. The package includes browser/email/GitHub adapters and reproducible dependencies. Browser binaries and actual host connections require adopting-machine setup. Restore application dependencies only when local execution requires them.
 
-Choose browser interaction/visibility using the [browser guide](automation/browser/README.md). Discover email providers and explicitly select the actual account/mailbox using the [email guide](automation/email/README.md). Prepare selected GitHub repositories through the [GitHub guide](automation/github/README.md). Verify actual required capabilities; configuration, authentication and a successful task-specific run are distinct states. Store operational metadata under ignored `.local/`; never commit credentials, full OTPs or reusable links.
+Discover browser/testing capabilities and establish visibility/operating constraints using [task-based selection](automation/tools/task-selection.md). The agent chooses suitable tools per task. Discover email providers and explicitly select the actual account/mailbox using the [email guide](automation/email/README.md). Prepare selected GitHub repositories through the [GitHub guide](automation/github/README.md). Verify actual required capabilities; configuration, authentication and a successful task-specific run are distinct states. Store operational metadata under ignored `.local/`; never commit credentials, full OTPs or reusable links.
 
 The agent applies the [global mailbox policy](automation/email/mailbox-policy.md) during setup: use purpose/run aliases where supported, prepare/register their context with `email account`, and reuse the exact original identity for retests. Inbox permissions, alias support and application registration scope are established once and reused; no bespoke policy-writing is required from the adopter.
 

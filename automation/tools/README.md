@@ -1,6 +1,6 @@
 # Discover, verify and reuse tools
 
-Onboarding starts by inspecting the tools the agent can use through its actual harness. A working installation should be reused. Ask the user only for missing choices or access; do not repeat installation, sign-in or mailbox selection simply because onboarding started again.
+Onboarding starts by inspecting the tools the agent can use through its actual harness. A working installation should be reused. The agent chooses suitable tools per task using [the selection policy](task-selection.md). Ask the user only for missing constraints or access; do not repeat installation, sign-in or mailbox selection simply because onboarding started again.
 
 ## Establish the calling environment
 
@@ -76,3 +76,7 @@ Selections are private under `.local/tool-selections.json`; reports are retained
 Switching harnesses, moving machines or changing executables requires targeted verification. Old records and onboarding replies remain intact. Existing browser reports without harness identity are retained as historical evidence and need one targeted check before reuse. No full onboarding restart is required. A CI pass proves that runner's fixture execution, not the user's interactive harness or application access.
 
 See [Postman](../postman/README.md), [browsers](../browser/README.md), [email](../email/README.md) and [GitHub](../github/README.md) for operation-specific checks.
+
+## Task selection and additional tools
+
+Use [task-based selection](task-selection.md) to explain significant decisions and assess only selected operations. `tools assess-task --input` is read-only; it does not choose, run or approve work. Native executable selection is an installation binding for that tool, not a compulsory tool for the project. Named `custom:<name>` host/terminal capability reports allow other accessible tools with actual evidence; they add no automatic installer or generic executor. Project onboarding reports optional capability gaps separately from its blockers. A task still needs its own tool/data/access checks and authorization.

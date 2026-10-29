@@ -1,5 +1,5 @@
 import { load, save, requireText, verifyEvidence, type Evidence } from '../shared/store.js';
-import { integrationIssues } from './integrations.js';
+import { integrationStatus } from './integrations.js';
 
 export const stages = ['project', 'contextRoute', 'tools', 'email', 'access', 'understanding', 'operation', 'handoff'] as const;
 export type Stage = typeof stages[number];
@@ -45,7 +45,7 @@ export function readState(root: string) { const result = load(root, statePath, e
 export function writeState(root: string, state: SetupState, expected: string | null) {
   validateState(state); state.updatedAt = new Date().toISOString(); return save(root, statePath, state, expected);
 }
-export function readiness(root: string, state: SetupState, includeHandoff = true): { ready: boolean; issues: string[] } {
+export function readiness(root: string, state: SetupState, includeHandoff = true): { ready: boolean; issues: string[]; capabilityIssues: string[] } {
   validateState(state); const issues: string[] = [];
   for (const stage of stages.filter(s => includeHandoff || s !== 'handoff')) {
     const check = state.checks[stage];
@@ -67,7 +67,8 @@ export function readiness(root: string, state: SetupState, includeHandoff = true
     }
   }
   for (const q of state.questions) if (q.required && q.status !== 'answered') issues.push(`question ${q.id}: ${q.status}`);
-  try { issues.push(...integrationIssues(root)); } catch { issues.push('Configured integration state is invalid; preserve and reconcile it.'); }
+  let capabilityIssues: string[] = [];
+  try { const integrations = integrationStatus(root); issues.push(...integrations.issues); capabilityIssues = integrations.capabilityIssues; } catch { issues.push('Project integration state is invalid; preserve and reconcile it.'); }
   if (state.paused) issues.push('Onboarding is paused.');
-  return { ready: !issues.length, issues };
+  return { ready: !issues.length, issues, capabilityIssues };
 }

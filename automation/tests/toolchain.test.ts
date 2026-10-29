@@ -204,7 +204,7 @@ function cloudSettings(accountId = 'selected-account'): postman.PostmanSettings 
 }
 const postmanIssues = (root: string) => integrationIssues(root).filter(issue => issue.startsWith('Postman:'));
 
-test('switching Postman accounts invalidates onboarding and login reuse until the new identity is verified', async () => {
+test('switching Postman accounts invalidates capability diagnostics and login reuse until the new identity is verified', async () => {
   const f = await prepared(), configuration = cloudSettings(); put(f.root, postman.settingsPath, configuration);
   put(f.root, '.local/unrelated-answer.json', { answer: 'Keep the previous onboarding answer' });
   const answer = store.revision(f.root, '.local/unrelated-answer.json'), selection = store.revision(f.root, '.local/tool-selections.json');
@@ -234,7 +234,7 @@ for (const change of [{ region: 'eu' as const }, { credential: 'environment' as 
   assert.equal(registry.selectedCommand(f.root, 'postman').stamp, f.command.stamp);
 });
 
-test('resource access from a previous Postman account cannot pass onboarding after identity alone is reverified', async () => {
+test('resource access from a previous Postman account cannot pass capability assessment after identity alone is reverified', async () => {
   const f = await prepared(), configuration = cloudSettings(); put(f.root, postman.settingsPath, configuration);
   await postman.inspect(f.root, 'Synthetic account A with shared resources', fakeRunner());
   put(f.root, postman.settingsPath, { ...configuration, accountId: 'other-account', collections: [], environments: [] });

@@ -3,6 +3,8 @@ import './toolchain.test.js';
 import './email-aliases.test.js';
 import './coverage.test.js';
 import './flow-map.test.js';
+import './adaptive-tools.test.js';
+import './data-preparation.test.js';
 import './documents.test.js';
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync, renameSync, existsSync } from 'node:fs';
@@ -158,6 +160,7 @@ test('PR intake deduplicates events, preserves developer history and creates a n
   assert.equal(gh.ingestPr(r, pr(), rule, 'Synthetic repeated event').action, 'unchanged');
   assert(readFileSync(s.contained(r, first.ticket!), 'utf8').includes('[QA Process Context](../../QA%20Process%20Context/README.md)'));
   assert(readFileSync(s.contained(r, first.ticket!), 'utf8').includes('[Application Flow Map](../../Application%20Flow%20Map/README.md)'));
+  assert(readFileSync(s.contained(r, first.ticket!), 'utf8').includes('## Tool and data preparation'));
   const path = first.ticket!; writeFileSync(s.contained(r, path), readFileSync(s.contained(r, path), 'utf8') + '\nDeveloper response: preserve this.\n');
   assert.equal(gh.ingestPr(r, pr('b'.repeat(40)), rule, 'Synthetic changed PR').action, 'updated'); assert(readFileSync(s.contained(r, path), 'utf8').includes('preserve this'));
   assert.equal(gh.ingestPr(r, pr(), rule, 'Synthetic force-push back to an earlier head').action, 'updated');

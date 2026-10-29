@@ -83,3 +83,7 @@ After interruption or transfer, read the claim, checkpoint, actual approvals, op
 Use supplied documents and actual journey evidence to identify features, producers/consumers, prerequisites, permissions, events and shared components. Keep intended and observed states separate. If a connection is inferred, record the interpretation, supporting sources and specific gap. An unvisited feature or role is unknown, not missing. Do not infer hidden server architecture from a screen/request alone.
 
 After learning, link affected feature/relationship IDs, map revision, original OBS entries and questions from the request. Preserve corrections and actual owner responses. Refresh affected views after source changes; keep prior revisions and map gaps. A request completion records learning coverage, not exercised QA integration coverage. An empty board or a mapping template does not authorize more discovery.
+
+## Tools and exploration data
+
+Use [task-based selection](../automation/tools/task-selection.md) for the learning actions; discovery does not require a project-wide browser choice. Prepare suitable synthetic inputs and authorized accounts/state using [the data policy](../QA%20Process%20Context/Test%20Data%20Management/preparation-policy.md). Preserve learning authorization, actual starting-state evidence and original identities; escalate only affected missing rules/access/state. Discovery remains independent of QA test verdicts and gates.
