@@ -60,6 +60,18 @@ export function structured(value: unknown): Record<string, any> {
   const result = checkResponse(value) as Record<string, any>;
   return result.structuredContent && typeof result.structuredContent === 'object' ? result.structuredContent : result;
 }
+/** The upstream CLI can emit a text-error array with exit code zero. */
+export function decodeCliResponse(stdout: string): unknown {
+  if (stdout.length > 262_144) throw new BridgeFailure('unsupportedResponse', 'CLI response exceeded the integration limit. Inspect affected work before retry.');
+  let value: unknown;
+  try { value = JSON.parse(stdout); }
+  catch { throw new BridgeFailure('unsupportedResponse', 'CLI did not return supported JSON. Inspect the application outcome before retry.'); }
+  if (Array.isArray(value)) {
+    if (value.some(part => part && part.type === 'text' && typeof part.text === 'string' && /^Error:/m.test(part.text))) throw new BridgeFailure('toolError', 'The browser tool reported an explicit error despite CLI exit code zero. Inspect the application outcome before retry.');
+    throw new BridgeFailure('unsupportedResponse', 'CLI returned legacy text without the required structured result.');
+  }
+  return checkResponse(value);
+}
 export function responseMessage(value: unknown): string {
   const result = structured(value);
   if (typeof result.message === 'string') return result.message;
@@ -147,7 +159,7 @@ export function cliBridge(root: string, id: string, runner: Runner = runProcess)
       if (result.code !== 0) throw new BridgeFailure(!result.error && /^Error:/m.test(result.stderr) ? 'toolError' : 'transport', 'Browser call did not complete successfully; inspect actual application state before retry.');
       const after = await runner(value.command, ['status', '--sessionId', id], { cwd: root, env: cliEnvironment(root, value) });
       if (after.code !== 0 || after.stdout.match(/pid=(\d+)/)?.[1] !== identity[1]) throw new Error('Daemon changed during the call. Investigate the application outcome before retry.');
-      try { return checkResponse(JSON.parse(result.stdout)); } catch { throw new Error('CLI did not return a supported bounded structured result.'); }
+      return decodeCliResponse(result.stdout);
     }) };
 }
 export async function stopCliSession(root: string, id: string, runner: Runner = runProcess): Promise<void> {

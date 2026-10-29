@@ -7,7 +7,7 @@ import * as store from '../shared/store.js';
 import * as registry from '../tools/registry.js';
 import { bindHarness } from '../tools/runtime.js';
 import { nodeCompatible, validateSettings, configurationObject, settingsHash, settingsPath, type ChromeSettings } from '../chrome-devtools/config.js';
-import { type Bridge, type Scope, startCliSession, stopCliSession, cliBridge, structured, responseMessage } from '../chrome-devtools/transport.js';
+import { type Bridge, type Scope, startCliSession, stopCliSession, cliBridge, structured, responseMessage, decodeCliResponse, BridgeFailure } from '../chrome-devtools/transport.js';
 import { captureInventory, importHostInventory, assessInventory, execute, confirmOutcome, redacted, invocationOutcome, type Target, type Invocation } from '../chrome-devtools/webmcp.js';
 import { assessTaskTools, type TaskToolPlan } from '../tools/task.js';
 import { integrationStatus } from '../onboarding/integrations.js';
@@ -189,6 +189,12 @@ test('MCP and CLI structured snapshots preserve visible-outcome assertions', () 
   assert(responseMessage({ structuredContent: { snapshot } }).includes('Saved Synthetic QA'));
   assert(responseMessage({ snapshot }).includes('Saved Synthetic QA'));
   assert.equal(responseMessage({ structuredContent: {}, content: [{ type: 'text', text: 'actual snapshot' }] }), 'actual snapshot');
+});
+test('CLI exit-zero text errors remain failures and unsupported output never becomes success', () => {
+  assert.throws(() => decodeCliResponse(JSON.stringify([{ type: 'text', text: 'Error: net::ERR_ABORTED at a synthetic fixture' }])), (err: unknown) => err instanceof BridgeFailure && err.kind === 'toolError');
+  assert.throws(() => decodeCliResponse(JSON.stringify({ isError: true, content: [] })), (err: unknown) => err instanceof BridgeFailure && err.kind === 'toolError');
+  for (const value of ['not-json', '[]', 'x'.repeat(262_145)]) assert.throws(() => decodeCliResponse(value), (err: unknown) => err instanceof BridgeFailure && err.kind === 'unsupportedResponse');
+  assert.deepEqual(decodeCliResponse('{"pages":[]}'), { pages: [] });
 });
 test('native cancellation retains its status when the browser also supplies an error reason', () => {
   assert.equal(invocationOutcome({ message: JSON.stringify({ status: 'Canceled', error: 'Tool execution cancelled by a form reset' }) }), 'canceled');

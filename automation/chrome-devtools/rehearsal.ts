@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, realpathSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { existsSync, mkdirSync, realpathSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { chromium } from 'playwright';
 import { save, evidence, type Evidence } from '../shared/store.js';
@@ -35,7 +35,12 @@ export async function rehearseChrome(root: string, provider: 'mcpServer' | 'cli'
     const run = async (bridge: Bridge) => {
       const checks: { check: string; outcome: string; evidence?: Evidence }[] = [];
       const require = (ok: boolean, name: string) => { if (!ok) throw new Error(`Native rehearsal failed: ${name}`); checks.push({ check: name, outcome: 'passed' }); };
-      const opened = structured(await bridge.call('new_page', { url: fixture.url }));
+      // A started daemon is not yet evidence of an initialized browser. Establish
+      // that read capability explicitly before the first navigation; never retry
+      // a failed action automatically.
+      const initial = structured(await bridge.call('list_pages', {}));
+      require(Array.isArray(initial.pages), 'browser initialization and page listing');
+      await bridge.call('new_page', { url: fixture.url });
       const pages = structured(await bridge.call('list_pages', {})).pages;
       const page = Array.isArray(pages) ? pages.find((p: any) => p.url === fixture.url) : null;
       require(!!page, 'navigation and exact page identity');
@@ -91,13 +96,6 @@ export async function rehearseChrome(root: string, provider: 'mcpServer' | 'cli'
     };
     if (provider === 'mcpServer') return await withMcpSession(actualRoot, settings, scope, run);
     sessionId = (await startCliSession(actualRoot, settings, scope)).id;
-    return await run(cliBridge(actualRoot, sessionId, async (command, args, options) => {
-      const result = await runProcess(command, args, options);
-      if (args[0] === 'new_page') {
-        let object = false; try { const value = JSON.parse(result.stdout); object = !!value && typeof value === 'object' && !Array.isArray(value); } catch { /* Inspect synthetic fixture-only output. */ }
-        if (!object) console.log(JSON.stringify({ syntheticFixtureOnly: true, cliNewPageResponse: result.stdout.slice(0, 4000), exitCode: result.code }));
-      }
-      return result;
-    }));
+    return await run(cliBridge(actualRoot, sessionId));
   } finally { try { if (sessionId) await stopCliSession(actualRoot, sessionId); } finally { await fixture.close(); } }
 }
