@@ -8,7 +8,7 @@ import * as registry from '../tools/registry.js';
 import { bindHarness } from '../tools/runtime.js';
 import { nodeCompatible, validateSettings, configurationObject, settingsHash, settingsPath, type ChromeSettings } from '../chrome-devtools/config.js';
 import { type Bridge, type Scope, startCliSession, stopCliSession, cliBridge, structured, responseMessage } from '../chrome-devtools/transport.js';
-import { captureInventory, importHostInventory, assessInventory, execute, confirmOutcome, redacted, type Target, type Invocation } from '../chrome-devtools/webmcp.js';
+import { captureInventory, importHostInventory, assessInventory, execute, confirmOutcome, redacted, invocationOutcome, type Target, type Invocation } from '../chrome-devtools/webmcp.js';
 import { assessTaskTools, type TaskToolPlan } from '../tools/task.js';
 import { integrationStatus } from '../onboarding/integrations.js';
 import { permittedWrite } from '../onboarding/conversation.js';
@@ -178,6 +178,11 @@ test('MCP and CLI structured snapshots preserve visible-outcome assertions', () 
   assert(responseMessage({ structuredContent: { snapshot } }).includes('Saved Synthetic QA'));
   assert(responseMessage({ snapshot }).includes('Saved Synthetic QA'));
   assert.equal(responseMessage({ structuredContent: {}, content: [{ type: 'text', text: 'actual snapshot' }] }), 'actual snapshot');
+});
+test('native cancellation retains its status when the browser also supplies an error reason', () => {
+  assert.equal(invocationOutcome({ message: JSON.stringify({ status: 'Canceled', error: 'Tool execution cancelled by a form reset' }) }), 'canceled');
+  assert.equal(invocationOutcome({ message: JSON.stringify({ status: 'Error', error: 'Invalid input' }) }), 'reportedError');
+  assert.equal(invocationOutcome({ message: JSON.stringify({ status: 'InProgress' }) }), 'awaitingSubmission');
 });
 test('native host reuse imports only fresh evidence from the matching verified connection', () => {
   const f = fixture(); f.settings.connection = { mode: 'host', connectionReference: 'actual-host-fixture' };

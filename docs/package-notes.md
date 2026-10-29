@@ -1,6 +1,10 @@
 # Package notes
 
-**Version:** 1.8.0. **Created:** 22 October 2026. **Updated:** 29 October 2026. **State:** reusable workflow package; no configured product, live discovery or QA execution history.
+**Version:** 1.9.0. **Created:** 22 October 2026. **Updated:** 29 October 2026. **State:** reusable workflow package; no configured product, live discovery or QA execution history.
+
+## Version 1.9.0 — Chrome DevTools and WebMCP
+
+Adds pinned Chrome DevTools MCP/CLI, named entry-point discovery, source-bound session settings, native-host reuse/import, contextual tool inventories, reserved invocation identities and separate application verification. Integrates with task selection, optional onboarding, context/map/process records and existing review gates. [Validation evidence](webmcp-validation.md) distinguishes helper checks, browser rehearsals, native-harness access and product testing. No adopting-project connection, live ticket, profile, requirement or schedule is preconfigured.
 
 ## Version 1.8.0: agent-selected methods and data initiative
 
@@ -163,6 +167,3 @@ The following eight written-procedure scenarios were reviewed for consistency:
 
 These checks assess package structure and the written procedures. No staging URL was supplied, so no browser walkthrough, sign-in, account creation, product tests or actual owner confirmation was performed. Ownership controls are agent instructions, not filesystem access enforcement. Existing MustPayroll repositories, evidence and the configured source-project check-in were not changed. No discovery schedule was activated.
 
-## Version 1.9.0 — Chrome DevTools and WebMCP
-
-Adds pinned Chrome DevTools MCP/CLI, named entry-point discovery, source-bound session settings, native-host reuse/import, contextual tool inventories, reserved invocation identities and separate application verification. Integrates with task selection, optional onboarding, context/map/process records and existing review gates. [Validation evidence](webmcp-validation.md) distinguishes helper checks, browser rehearsals, native-harness access and product testing. No adopting-project connection, live ticket, profile, requirement or schedule is preconfigured.

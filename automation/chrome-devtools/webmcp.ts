@@ -171,8 +171,8 @@ export function invocationOutcome(value: unknown): InvocationRecord['invocation'
   const message = responseMessage(value); let result: any;
   try { result = JSON.parse(message); } catch { return 'unknown'; }
   const status = String(result.status ?? '').toLowerCase();
-  if (result.error || ['error', 'failed'].includes(status)) return 'reportedError';
   if (['canceled', 'cancelled'].includes(status)) return 'canceled';
+  if (result.error || ['error', 'failed'].includes(status)) return 'reportedError';
   if (['pending', 'inprogress', 'in_progress', 'awaitingsubmission'].includes(status)) return 'awaitingSubmission';
   return ['completed', 'success'].includes(status) ? 'reportedCompleted' : 'unknown';
 }

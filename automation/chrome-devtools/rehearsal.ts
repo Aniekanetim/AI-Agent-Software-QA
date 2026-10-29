@@ -68,12 +68,7 @@ export async function rehearseChrome(root: string, provider: 'mcpServer' | 'cli'
       const manual = await captureInventory(actualRoot, bridge, settings, target, scope.source);
       const timer = setTimeout(() => { void fetch(new URL('/cancel', fixture.url), { method: 'POST' }); }, 1200);
       try {
-        const diagnostic: Bridge = { ...bridge, call: async (name, args) => {
-          const result = await bridge.call(name, args);
-          if (name === 'execute_webmcp_tool') console.log(JSON.stringify({ syntheticFixtureOnly: true, manualFormResponse: result }));
-          return result;
-        } };
-        const canceled = await execute(actualRoot, diagnostic, settings, { ...invocation, id: 'manual-profile', inventory: manual.reference, toolName: 'prepare_profile', input: { name: 'Unsubmitted Profile' } });
+        const canceled = await execute(actualRoot, bridge, settings, { ...invocation, id: 'manual-profile', inventory: manual.reference, toolName: 'prepare_profile', input: { name: 'Unsubmitted Profile' } });
         require(canceled.invocation === 'canceled' && fixture.state.profiles.length === 1, `manual form cancellation preserves unsubmitted state (${canceled.invocation}, ${fixture.state.profiles.length} saved)`);
       } finally { clearTimeout(timer); }
       const beforeRole = await captureInventory(actualRoot, bridge, settings, target, scope.source);
