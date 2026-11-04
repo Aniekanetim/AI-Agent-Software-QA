@@ -163,10 +163,11 @@ Use authorized tools to prepare actual synthetic application records when suitab
 ```shell
 npm run check
 npm test
+npm run chrome:install
 npm run test:chrome
 ```
 
-`test:chrome` runs MCP-server and CLI rehearsals against a loopback fixture using the pinned Playwright browser as a compatible Chrome executable. It checks browser initialization before navigation and uses a private working path containing spaces on both CI systems. It never retries a failed action, adds a WebMCP polyfill or tests a real product. Install browser binaries explicitly through the existing browser procedure if absent. CI runs headless and headed fixtures; Linux headed runs use an Xvfb virtual display. `QA_CHROME_HEADED=1` selects headed rehearsal where a display is available. This does not establish visibility on a user's desktop. The standalone `chrome rehearse` command also accepts `--executable` and explicit visibility.
+`test:chrome` runs MCP-server and CLI rehearsals against a loopback fixture. Its separate compatibility baseline is Chrome for Testing 156.0.8078.80 with bridge 1.12.0; [verification status and earlier failures](../../docs/windows-browser-startup.md) remain explicit. `chrome:install` downloads that exact browser to ignored `.local/chrome-for-testing/`, independently of Playwright's engine. Installation is explicit; a missing browser causes a clear failure without a system-browser fallback. The fixture uses a private working path containing spaces, never retries a failed action, installs no WebMCP polyfill and tests no real product. CI runs headless/headed fixtures, with Xvfb for headed Linux. `QA_CHROME_HEADED=1` selects headed integration execution; `QA_CHROME_REPEATS` repeats whole independent fixtures and stops on failure. The standalone `chrome rehearse` command retains explicit `--executable` and visibility choices. This package-fixture baseline is not an adopting project's default browser.
 
 The fixture exercises permitted file operations and denied reads/writes outside its workspace through absolute paths, relative traversal and a symlink/junction. All targets are disposable synthetic files inside the overall package's output folder. Hostile descriptions and tool output are deliberately returned as data; sentinel checks require no implicit action, forbidden request, retained output canary or automatic QA verdict. These checks cover the adapter's controlled pipeline, not every prompt-injection attack against an adopting agent or application.
 

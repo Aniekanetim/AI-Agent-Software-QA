@@ -31,17 +31,21 @@ jobs:
       - if: runner.os == 'Linux'
         run: npx --no-install playwright install-deps chromium
       - run: npm run test:browsers
+      - name: Install pinned Chrome for the DevTools package fixtures
+        run: npm run chrome:install
       - run: npm run test:chrome
       - name: Headed Chrome fixtures (Windows)
         if: runner.os == 'Windows'
         run: npm run test:chrome
         env:
           QA_CHROME_HEADED: '1'
+          QA_CHROME_REPEATS: '3'
       - name: Headed Chrome fixtures (Linux virtual display)
         if: runner.os == 'Linux'
         run: xvfb-run --auto-servernum npm run test:chrome
         env:
           QA_CHROME_HEADED: '1'
+          QA_CHROME_REPEATS: '2'
       - name: Compare installed Google Chrome (Windows headed)
         if: runner.os == 'Windows' && !cancelled()
         shell: pwsh

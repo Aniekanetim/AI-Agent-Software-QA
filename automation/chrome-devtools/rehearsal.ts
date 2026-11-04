@@ -1,7 +1,6 @@
 import { existsSync, mkdirSync, realpathSync, readFileSync, writeFileSync, symlinkSync } from 'node:fs';
 import { resolve, relative } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { chromium } from 'playwright';
 import { save, evidence, type Evidence } from '../shared/store.js';
 import { bindHarness } from '../tools/runtime.js';
 import { probe, readRecord, saveRecord, packageCommand, runProcess } from '../tools/registry.js';
@@ -9,14 +8,9 @@ import { startWebMcpFixture } from './fixture.js';
 import { withMcpSession, startCliSession, cliBridge, stopCliSession, structured, responseMessage, BridgeFailure, type Bridge } from './transport.js';
 import { type ChromeSettings } from './config.js';
 import { captureInventory, execute, confirmOutcome, type Target } from './webmcp.js';
+import { fixtureBrowser } from './fixture-browser.js';
+export { fixtureBrowser } from './fixture-browser.js';
 
-export function fixtureBrowser(root: string): string {
-  const global = chromium.executablePath(), suffix = global.replaceAll('\\', '/').match(/(chromium-\d+\/.*)$/)?.[1];
-  const local = suffix ? resolve(root, '.local/browsers', suffix) : '';
-  const actual = local && existsSync(local) ? local : global;
-  if (!existsSync(actual)) throw new Error('Install the pinned Playwright browser for the package fixture, or pass an actual compatible --executable. No browser was installed automatically.');
-  return actual;
-}
 export async function rehearseChrome(root: string, provider: 'mcpServer' | 'cli', visibility: 'headed' | 'headless', executable = fixtureBrowser(root)) {
   const fixture = await startWebMcpFixture();
   // Exercise real argument/configuration handling with spaces on both CI systems.
@@ -132,7 +126,7 @@ export async function rehearseChrome(root: string, provider: 'mcpServer' | 'cli'
       let reloadRejected = false;
       try { await execute(actualRoot, bridge, settings, { ...invocation, id: 'stale-document', inventory: beforeReload.reference }); } catch { reloadRejected = true; }
       require(reloadRejected, 'same-URL document replacement requires a fresh inventory');
-      const record = { synthetic: true, provider, toolVersion: installation.version, executionContext: context, visibility, browser: catalogue.inventory.browser, checks,
+      const record = { synthetic: true, provider, toolVersion: installation.version, executionContext: context, visibility, browser: catalogue.inventory.browser, browserExecutable: executable, checks,
         nativeHarnessConnection: 'Not verified: this is terminal SDK/CLI execution', productVerdict: 'Not assessed', checkedAt: new Date().toISOString() };
       save(actualRoot, '.local/result.json', record, null);
       const capabilities = Object.fromEntries(['navigate', 'inspect', 'interact', 'webmcp:discover', 'webmcp:execute', `visibility:${visibility}`, provider === 'cli' ? 'cliRehearsal' : 'serverRehearsal'].map(name => [name, { status: 'verified' as const, evidence: [evidence(actualRoot, '.local/result.json')] }]));
