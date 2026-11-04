@@ -2,7 +2,7 @@
 
 This record identifies the reusable package's synthetic integration checks and the separately executed native-harness rehearsal. It is not a product test report or release approval for an adopting application.
 
-## Current disposition — 4 November 2026
+## Current disposition — 5 November 2026
 
 | Area | Latest supported conclusion |
 | --- | --- |
@@ -10,10 +10,13 @@ This record identifies the reusable package's synthetic integration checks and t
 | Native browser and application tools | Exact fixture navigation, native API/catalogue, saved draft and automatic form submission verified independently |
 | Filesystem and hostile-content controls | Permitted controls succeeded; six escape attempts and another origin were denied; the controlled hostile-content scenario produced no forbidden action |
 | Manual form cancellation | Explicit recovery and cancellation confirmation passed; the original pending attempt remains recorded with its actual limits |
-| Windows Chromium-headed CI | Initial navigation still fails intermittently; unresolved, with failed runs retained |
-| Delivery | PR 8 remains a draft; native success does not close the CI reliability issue or approve an adopting product |
+| Windows headed CI | Verified on the separate pinned Chrome for Testing 156.0.8078.80 baseline with bridge 1.12.0; three complete headed repetitions per MCP/CLI route passed in each of two CI runs |
+| Earlier browser combinations | 156.0.8078.4 and 156.0.8078.47 failures remain recorded; their internal cancellation cause is unconfirmed |
+| Delivery | Prepared in PR 8; package verification, merging and adopting-product release approval remain separate decisions |
 
 See [the completed native checks](#completed-native-harness-checks--4-november-2026) for the exact environment, checks, recovery and limitations. Earlier evidence below retains its original dates and scope.
+
+The [Windows startup investigation and correction](windows-browser-startup.md) records the controlled comparisons, rejected candidates, 60 successful local startup navigations across two runs, the separate disk-space interruption/recovery, 141 passing helper rechecks and both successful Windows/Ubuntu CI runs at f3cc14d. The fixture now installs its own exact browser explicitly and preserves all 26 assertions and operating restrictions. The earlier failure history below is retained rather than rewritten as successful execution.
 
 ## Scope and authorization
 
@@ -164,4 +167,4 @@ The first manual-form attempt remained pending: its concurrently scheduled cance
 
 Hostile descriptions and returned instructions were treated as application data. The synthetic output value was redacted by the agent before local evidence retention; this is not a claim that the native server automatically redacts every output. The retained focused record is ignored `.local/native-webmcp-recheck/native-validation-2026-11-04.json`, with actual native call returns and independent state. Its 22 checks differ from the 26-check terminal SDK/CLI suite: wrapper-specific invocation deduplication and stale-inventory rejection retain their separately identified helper/CI evidence. No real product, authentication role, production permission or release decision was tested.
 
-At the preceding documentation revision 8a19e4a, both [branch CI](https://github.com/Aniekanetim/AI-Agent-Software-QA/actions/runs/41838343306) and [PR CI](https://github.com/Aniekanetim/AI-Agent-Software-QA/actions/runs/41838350877) still failed the original Windows Chromium-headed startup with `ERR_ABORTED`, zero fixture requests and the owned page blank. Ubuntu jobs passed. The separate installed-Google-Chrome headed comparison passed 26/26 for each MCP/CLI route in both Windows jobs, using product version 156.0.8078.80. The current native success therefore resolves native access, while Windows Chromium CI reliability remains open and PR 8 remains in draft.
+At the preceding documentation revision 8a19e4a, both [branch CI](https://github.com/Aniekanetim/AI-Agent-Software-QA/actions/runs/41838343306) and [PR CI](https://github.com/Aniekanetim/AI-Agent-Software-QA/actions/runs/41838350877) still failed the original Windows Chromium-headed startup with `ERR_ABORTED`, zero fixture requests and the owned page blank. Ubuntu jobs passed. The separate installed-Google-Chrome headed comparison passed 26/26 for each MCP/CLI route in both Windows jobs, using product version 156.0.8078.80. Native access was resolved then; Windows reliability was still open and PR 8 stayed in draft. The subsequent [5 November compatibility correction](windows-browser-startup.md) has separate verification evidence.

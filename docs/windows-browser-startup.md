@@ -20,9 +20,11 @@ At source revision `9a2fa7668d5257c0fdb7a9a59706a090a77858c8`, the unmodified lo
 
 The supported failure boundary is the browser/embedded-driver stack below the QA framework. The precise internal Chromium cancellation cause has not been established. Timing, instrumentation and available resources can affect reproduction; no specific Chromium change is claimed as the cause or fix.
 
-## Compatibility candidate
+## Verified package-fixture baseline — 5 November 2026
 
-Chrome for Testing **156.0.8078.80** is being evaluated as a separate, pinned package-fixture baseline with bridge **1.12.0**. It is the same product version that passed the previous installed-Chrome CI comparison. Its first 48 local MCP startup attempts passed. Attempt 49 was interrupted during setup by local `ENOSPC`, before navigation. Duplicate diagnostic downloads exhausted available storage; they were removed with version-specific browser uninstall operations, preserving the working browser and evidence. Resumed startup and full integration verification are pending; do not describe this file as release approval.
+The package's CI startup issue is resolved for the explicitly tested combination of Chrome for Testing **156.0.8078.80** and bridge **1.12.0**. The correction is an independently selected, pinned and verified browser baseline. Borrowing Playwright's engine, or assuming Puppeteer's default download would suffice, did not establish compatibility for this headed Windows path. This does not claim a repair to the older browser's internal cancellation behavior.
+
+Its first 48 local MCP startup attempts passed. Attempt 49 was interrupted during setup by local `ENOSPC`, before navigation. Duplicate diagnostic downloads exhausted available storage; they were removed with version-specific browser uninstall operations, preserving the working browser and evidence. After recovery, 12 additional independent startup attempts passed: **60 successful navigations across the two runs**, with the setup interruption retained separately. Complete local MCP/CLI routes also passed all 26 assertions each.
 
 The implementation separates this browser from Playwright's independently pinned engine, requires explicit installation, preserves explicit executable overrides and fails clearly when the fixture browser is missing. No startup sleep, navigation retry, removed assertion, disabled origin restriction or global browser preference is introduced.
 
@@ -34,7 +36,21 @@ npm run test:chrome
 
 `chrome:install` downloads the exact browser into ignored `.local/chrome-for-testing/`. New downloads require at least 2 GiB free; a known empty cached executable is rejected. Complete existing caches are reused. Installation alone remains unverified operation evidence. It does not install system dependencies, change system Chrome, copy authentication or connect a native harness. Linux CI separately prepares browser dependencies; headed Linux execution uses Xvfb.
 
-The local helper run affected by `ENOSPC` recorded 74 passes and 67 failures. It is retained as interrupted environmental evidence, not passing package verification. Rechecks after storage recovery are separate executions.
+The local helper run affected by `ENOSPC` recorded 74 passes and 67 failures. It is retained as interrupted environmental evidence, not passing package verification. The separate recheck after storage recovery passed **all 141 helpers** and checked **509 Markdown targets/anchors** at that checkpoint.
+
+The completed delivery-documentation check resolved **514 local Markdown targets/anchors**; it is separate from browser execution.
+
+At implementation [f3cc14daaabea20b397e3f97b2d5809a638920c8](https://github.com/Aniekanetim/AI-Agent-Software-QA/commit/f3cc14daaabea20b397e3f97b2d5809a638920c8), both the [branch CI run](https://github.com/Aniekanetim/AI-Agent-Software-QA/actions/runs/41930817058) and [PR CI run](https://github.com/Aniekanetim/AI-Agent-Software-QA/actions/runs/41930825894) passed on Windows and Ubuntu. They retained TypeScript, the full helper suite and the existing Postman/Playwright fixtures, plus:
+
+| Browser execution in each CI run | Independent repetitions per MCP/CLI route | Assertions per execution |
+| --- | --- | --- |
+| Windows, pinned Chrome 80, headless | 1 | 26/26 passed |
+| Windows, pinned Chrome 80, headed | 3 | 26/26 passed |
+| Ubuntu 22.04, pinned Chrome 80, headless | 1 | 26/26 passed |
+| Ubuntu 22.04, pinned Chrome 80, headed under Xvfb | 2 | 26/26 passed |
+| Windows, separately installed Google Chrome 156.0.8078.80, headed | 1 | 26/26 passed |
+
+The original failures remain evidence about the older combinations. These results establish the tested package baseline, not universal compatibility with all Chrome builds, a native-harness connection or product release approval. Delivery is through [PR 8](https://github.com/Aniekanetim/AI-Agent-Software-QA/pull/8); merging remains a separate review decision.
 
 ## Reproduce independently
 

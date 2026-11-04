@@ -175,6 +175,7 @@ Fixture startup navigates only the blank tab in its own newly launched isolated 
 
 | Finding | Action |
 | --- | --- |
+| Initial headed Windows navigation aborts | Record the actual browser/version, navigation response and server request count; compare the [verified package baseline](../../docs/windows-browser-startup.md) before repeating work. Earlier 156.0.8078.4/.47 combinations have retained failures. Keep affected capability evidence unverified and use other suitable demonstrated tools for independent work. |
 | Child process denied (`EPERM`/access denied) | Preserve installation and report the harness restriction; do not bypass it or mark browser execution verified |
 | Missing package/browser or incompatible version | Identify the exact dependency; reuse a compatible existing selection or prepare only what is missing |
 | No native MCP tools exposed | Keep native-host access unverified; use another permitted demonstrated route when suitable |
