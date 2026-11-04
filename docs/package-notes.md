@@ -1,6 +1,6 @@
 # Package notes
 
-**Version:** 1.9.1. **Created:** 22 October 2026. **Updated:** 29 October 2026. **State:** reusable workflow package; no configured product, live discovery or QA execution history.
+**Version:** 1.9.1. **Created:** 22 October 2026. **Updated:** 4 November 2026. **State:** reusable workflow package; no configured product, live discovery or QA execution history.
 
 ## Version 1.9.1 — remaining validation recheck
 
@@ -11,6 +11,10 @@ Validation passed 138 helpers, 498 document links/anchors and all 26 native chec
 Repeat Windows-headed runs exposed intermittent initial navigation failures, including after switching to the owned blank startup tab. Successful executions above remain historical evidence; current Windows-headed reliability is unresolved. The exact-page assertion stays enforced, and a synthetic-fixture diagnostic records future failures. This candidate must not be described as a clean completion of every planned operational check.
 
 Two later CI runs also compared the runner's installed Google Chrome 156.0.8078.48. Both original Chromium and installed-Chrome headed routes passed all 26 assertions in those runs. That demonstrates headed capability but does not establish a cause or correction for the earlier intermittent failure. Current native-harness access still lacks verification, and the repeated local version probe still returned `EPERM`.
+
+Added a [supported native connection procedure](native-webmcp-connection.md) after researching the host's setup and bridge requirements. A direct pinned-server preflight advertised both WebMCP tools; actual native registration/browser verification remains pending a concrete user setup action. The latest Windows Chromium-headed repeat still failed startup while its installed-Chrome comparison passed. Preserve that limitation and the separate protocol/harness evidence in the validation record.
+
+After the user registered the separate native server and restarted Codex, its tools became available and actual native page listing reached the isolated browser. Application navigation was then refused by the host's noninteractive approval policy; application WebMCP/outcome verification remains pending an interactive approval mode. Setup guidance now accounts for desktop versions without an individual Restart button and records tool approvals separately from connection availability. No host permission or existing connection was changed by the agent.
 
 ## Version 1.9.0 — Chrome DevTools and WebMCP
 

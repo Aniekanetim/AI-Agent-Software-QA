@@ -76,6 +76,8 @@ npm run qa -- chrome mcp-config
 
 The output uses the selected executable, explicit Chrome feature/category flags and project constraints. Add it through the harness's supported configuration procedure only when authorized. It does not itself register or connect an MCP server. Native-host mode already has a connection and does not need this command.
 
+If the harness loads a different server or exposes no WebMCP operations, follow [native connection diagnosis and setup](../../docs/native-webmcp-connection.md). It covers the actual loaded version, Windows command paths, preserving existing connections, restart requirements and separate protocol/browser/outcome evidence. A timed-out `--autoConnect` probe is not a reason to reinstall compatible tooling or weaken the sandbox.
+
 For CLI operation, prepare `.local/chrome-scope.json` containing `source` and `authorization`, an array of actual evidence references to the reviewed action scope. Then:
 
 ```shell
