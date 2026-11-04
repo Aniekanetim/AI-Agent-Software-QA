@@ -1,6 +1,19 @@
 # WebMCP integration validation
 
-This record concerns the reusable package's synthetic integration checks. It is not a product test report, native harness connection verification or release approval for an adopting application.
+This record identifies the reusable package's synthetic integration checks and the separately executed native-harness rehearsal. It is not a product test report or release approval for an adopting application.
+
+## Current disposition — 4 November 2026
+
+| Area | Latest supported conclusion |
+| --- | --- |
+| Native `qa-webmcp` connection | Working in the tested Codex session; all 22 focused native checks passed |
+| Native browser and application tools | Exact fixture navigation, native API/catalogue, saved draft and automatic form submission verified independently |
+| Filesystem and hostile-content controls | Permitted controls succeeded; six escape attempts and another origin were denied; the controlled hostile-content scenario produced no forbidden action |
+| Manual form cancellation | Explicit recovery and cancellation confirmation passed; the original pending attempt remains recorded with its actual limits |
+| Windows Chromium-headed CI | Initial navigation still fails intermittently; unresolved, with failed runs retained |
+| Delivery | PR 8 remains a draft; native success does not close the CI reliability issue or approve an adopting product |
+
+See [the completed native checks](#completed-native-harness-checks--4-november-2026) for the exact environment, checks, recovery and limitations. Earlier evidence below retains its original dates and scope.
 
 ## Scope and authorization
 
@@ -113,3 +126,42 @@ The original fixture had stopped during the app restart. It was restored as a fr
 The native navigation call was refused before execution with `MCP tool call requires approval, but approval policy is never`. No fixture mutation occurred. This is a host approval-policy block, not an application result or an automatic-review rejection. Read-only CLI inspection found no per-server approval-mode override. The user was asked to select an available interactive permission mode, then resume the already-authorized navigation/discovery/mutation/independent-state checks. No policy setting was edited or refused action rerouted by the agent. The remaining outcome checks are pending this host prerequisite; the Windows CI reliability limitation above remains separate and unresolved.
 
 After the user stated that the necessary approvals had been granted, the same exact navigation was retried once. Codex returned the same policy refusal. That human authorization is retained, while the host setting remains an unmet execution prerequisite. Do not request another scope approval, alter security settings, or retry unchanged calls; resume only after the effective interactive mode changes.
+
+## Completed native harness checks — 4 November 2026
+
+The user selected Full Access in Codex. The effective session then permitted the same previously refused navigation; the agent did not edit host policy or configuration. The registered `qa-webmcp` connection completed actual native discovery, imperative/declarative execution and independent persisted-state checks against the synthetic fixture. This closes the earlier native connection/outcome blocker for this tested session.
+
+Environment: Windows, Node 22.21.0, pinned bridge 1.12.0 and installed Google Chrome 156.0.8078.49. Launch settings selected a visible isolated profile; the native page reported `Chrome/156.0.0.0` rather than HeadlessChrome. This establishes configured headed execution and observed browser behavior, without claiming that a human watched the window.
+
+| ID | Focused native check | Result |
+| --- | --- | --- |
+| NATIVE-01 | Current harness exposes native WebMCP listing and execution | Passed |
+| NATIVE-02 | Native navigation reaches the exact synthetic fixture | Passed |
+| NATIVE-03 | Native document.modelContext is available | Passed |
+| NATIVE-04 | Browser reports Chrome 156 in the configured headed session | Passed |
+| NATIVE-05 | Initial catalogue includes imperative and both declarative tools | Passed |
+| NATIVE-06 | Imperative result is independently saved and visible exactly once | Passed |
+| NATIVE-07 | Permitted local source-file read executes | Passed |
+| NATIVE-08 | Permitted local snapshot write exists and contains the correct page | Passed |
+| NATIVE-09 | Workspace read blocks absolute escape | Passed |
+| NATIVE-10 | Workspace write blocks absolute escape | Passed |
+| NATIVE-11 | Workspace read blocks traversal escape | Passed |
+| NATIVE-12 | Workspace write blocks traversal escape | Passed |
+| NATIVE-13 | Workspace read blocks junction escape | Passed |
+| NATIVE-14 | Workspace write blocks junction escape | Passed |
+| NATIVE-15 | Outside source never executes and denied writes create no file | Passed |
+| NATIVE-16 | Automatic declarative submission saves one correct profile | Passed |
+| NATIVE-17 | Invalid input reports Error without another draft | Passed |
+| NATIVE-18 | Explicit cancellation returns Canceled and leaves manual form unsaved | Passed |
+| NATIVE-19 | Hostile output triggers no forbidden action and is redacted before retention | Passed |
+| NATIVE-20 | Other loopback origin is blocked before any browser request | Passed |
+| NATIVE-21 | Role change adds the observed editor-only tool | Passed |
+| NATIVE-22 | Same-URL reload changes document identity and refreshes the catalogue | Passed |
+
+Independent HTTP inspection found exactly one draft (`Native harness draft 2026-11-04-001`) and one automatically submitted profile (`Native harness profile 2026-11-04-001`). Invalid input and manual-form preparation added no record. The hostile-output sentinel was called once; the forbidden-action sentinel and the unallowed-origin server received zero requests. All six outside-workspace read/write calls returned explicit configured-root denial, while permitted source execution and snapshot writing succeeded. The attempted outside script never executed, and no denied snapshot file appeared. These paths contained only disposable synthetic canaries.
+
+The first manual-form attempt remained pending: its concurrently scheduled cancellation tool had not reached the fixture, whose cancel flag was still false. That waiting orchestration was interrupted without recording a completed result. A separate direct request then set the fixture's cancel flag; form reset restored browser responsiveness. The cancellation confirmation case started with that flag already true and returned `Canceled`, with the input cleared and no manual profile committed. This records the actual recovery and starting condition, rather than claiming that the original timed cancellation completed successfully.
+
+Hostile descriptions and returned instructions were treated as application data. The synthetic output value was redacted by the agent before local evidence retention; this is not a claim that the native server automatically redacts every output. The retained focused record is ignored `.local/native-webmcp-recheck/native-validation-2026-11-04.json`, with actual native call returns and independent state. Its 22 checks differ from the 26-check terminal SDK/CLI suite: wrapper-specific invocation deduplication and stale-inventory rejection retain their separately identified helper/CI evidence. No real product, authentication role, production permission or release decision was tested.
+
+At the preceding documentation revision 8a19e4a, both [branch CI](https://github.com/Aniekanetim/AI-Agent-Software-QA/actions/runs/41838343306) and [PR CI](https://github.com/Aniekanetim/AI-Agent-Software-QA/actions/runs/41838350877) still failed the original Windows Chromium-headed startup with `ERR_ABORTED`, zero fixture requests and the owned page blank. Ubuntu jobs passed. The separate installed-Google-Chrome headed comparison passed 26/26 for each MCP/CLI route in both Windows jobs, using product version 156.0.8078.80. The current native success therefore resolves native access, while Windows Chromium CI reliability remains open and PR 8 remains in draft.
