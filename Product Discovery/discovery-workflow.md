@@ -1,6 +1,6 @@
 # Product discovery workflow
 
-Use this independent pipeline to learn how an application behaves and preserve that knowledge for later work. [Discovery requests](README.md) supply the learning objective. The [AI-managed context](Project%20Context/README.md) holds the learning; the [human-maintained context](../Project%20Context/README.md) holds the team's product baseline. The QA workflow retains its own testing gates and five-folder board.
+Use this independent pipeline to learn how an application behaves and preserve that knowledge for later work. [Discovery requests](README.md) supply the learning objective. The [AI-managed context](Project%20Context/README.md) holds the learning; the [human-maintained context](../Project%20Context/README.md) holds the team's product baseline. The QA workflow retains its own testing gates and seven-folder board.
 
 ## 1. Read the request and existing knowledge
 

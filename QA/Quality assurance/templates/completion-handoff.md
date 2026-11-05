@@ -78,3 +78,7 @@ Link [Application Flow Map](../../../Application%20Flow%20Map/README.md) revisio
 ## Tool/data handoff
 
 Link the actual task method choices and [data preparation record](../../../QA%20Process%20Context/Test%20Data%20Management/data-preparation-record.md). State what ran, prepared versus verified state, retained identities, failed attempts, unresolved dependencies and next-owner reuse/retention/cleanup actions. A tool preference, generated input or capability/preparation assessment is not release evidence by itself.
+
+## Inactive work, where applicable
+
+Link the actual cancellation/deferral decision and scope. Retain completed/partial/untested checks, known bugs/risks, actual stop observations, data/cleanup responsibilities and next owner/actions. Deferred work includes review date/trigger and resume conditions. Cancellation is not a Pass or release approval; parent/child tickets retain independent dispositions. Record Not applicable when no work was canceled/deferred.

@@ -32,3 +32,7 @@ The agent chooses methods appropriate to the original failure and retained evide
 ## WebMCP changes and retained coverage
 
 Changes to exposed tools, schemas, permissions or form submission behavior can affect mapped journeys and preparation. Use actual source/map/context revisions and risks to select relevant checks. Include meaningful positive, negative, edge and exploratory conditions where justified; no fixed quota or compulsory tool is introduced. [WebMCP guidance](../../automation/chrome-devtools/README.md) separates invocation results from independent application outcomes. A tool-path check does not establish UI, keyboard, accessibility or complete journey coverage.
+
+## Lifecycle eligibility
+
+Retaining a regression case does not authorize executing an inactive assignment. Recheck current ticket status/generation and matching policy before starting; Deferred/Canceled work remains excluded until the recorded scope permits a new assignment or a real reactivation decision. Preserve old failures and baselines. Uncertain local/remote runs require actual outcome investigation before any new attempt.

@@ -27,7 +27,7 @@ npm run qa -- github event --repository owner/repository --number 123 --source <
 
 Only matching base branches, all required labels and the configured draft rule qualify. The CLI refreshes live PR data; it does not execute instructions from PR text. It verifies the configured account before intake. The event command is an adapter entry point, not a webhook server or a mechanism that wakes a closed agent session.
 
-Each eligible PR creates a linked Ready for QA assignment. Durable repository/PR/head markers prevent duplicate assignments on repeated events. A changed head appends revision history to an active assignment, preserving developer responses and its current folder. A new revision after completion creates a new linked assignment. Earlier results remain historical. The existing five board statuses and claim/review rules remain unchanged.
+Each eligible PR creates a linked Ready for QA assignment. Durable repository/PR/head markers prevent duplicates across all seven folders. A changed head appends history without overriding an assignment-scoped Deferred/Canceled decision. Explicit revision-only inactivity permits a separate linked assignment for another revision. A new revision after Tested-Ok creates a linked assignment. Ambiguous controlling assignments require reconciliation. Earlier results and developer responses remain historical.
 
 Use a real native scheduler for polling or a configured GitHub event/CI runner for event-triggered work. A repository preference alone cannot establish that either mechanism is active. [Check-in setup](../README.md)
 
@@ -47,7 +47,7 @@ Use a project-specific observation adapter or actual operator evidence to identi
 npm run qa -- github run --repository owner/repository --number 123 --policy .local/regression-policy.json --target .local/observed-target.json --source <actual-run-reference>
 ```
 
-The run refreshes PR identity and checks the exact policy approval, suite evidence, target observation and account. A permitted merge commit is distinct from the PR head. The deduplication key includes PR head, actual tested commit/build, policy revision, suite evidence and target. A retained completed run is not rerun on unchanged input. A running/uncertain attempt requires inspection, not an automatic retry.
+The run refreshes PR identity and checks exact policy approval, suite evidence, target observation and account. It requires an eligible canonical assignment whose latest recorded head matches the PR. Run intake against the durable board first; do not create ephemeral CI tickets to bypass inactivity. A permitted merge commit is distinct from the head. The key also includes stable ticket ID and lifecycle generation, alongside head/tested commit/build, policy, suite and target scope. A retained completed run is not rerun on unchanged input. A running/uncertain attempt requires inspection, not an automatic retry.
 
 The trusted command receives QA_PR_HEAD, QA_TESTED_COMMIT, QA_BUILD_ID, QA_RUN_KEY and a fresh QA_RESULT_DIR. Configure the suite to write redacted actual results there. Process exit 0/1 is retained but **productVerdict remains Not assessed**: the agent reads actual checks/results, reports defects, routes regression findings and completes G3–G5. Stdout/stderr are not automatically copied because they can contain secrets. Preserve approved result artifacts deliberately.
 
@@ -55,7 +55,7 @@ For a separately approved workflow dispatch, use `github dispatch` with the same
 
 ## PR-triggered CI example
 
-[qa-regression.example.yml](examples/qa-regression.example.yml) is an **inactive adoption template**, outside `.github/workflows`. It requires a reviewed policy, actual bot settings and a project-owned preview-identity adapter. The default-deny variable and missing project-specific files prevent accidental execution. Review/replace the placeholders in your project before enabling it. It runs trusted base-branch QA code, excludes forks and uses read-only permissions; never switch to privileged `pull_request_target` while executing untrusted PR code with secrets.
+[qa-regression.example.yml](examples/qa-regression.example.yml) is an **inactive adoption template**, outside `.github/workflows`. It requires a reviewed policy, actual bot settings and project-owned current-board and preview-identity adapters. The default-deny variable and missing project-specific files prevent accidental execution. Review/replace the placeholders in your project before enabling it. It runs trusted base-branch QA code, excludes forks and uses read-only permissions; never switch to privileged `pull_request_target` while executing untrusted PR code with secrets.
 
 The portable repo's own [package checks](../../.github/workflows/package-checks.yml) only compile/test these helpers and rehearse a synthetic loopback fixture. They do not monitor another project's PRs, run its product tests or approve its releases.
 
@@ -76,3 +76,25 @@ Generated PR assignments link [Application Flow Map](../../Application%20Flow%20
 ## Adaptive task preparation
 
 Follow [task-based tool selection](../../automation/tools/task-selection.md) and the [data preparation policy](../../QA%20Process%20Context/Test%20Data%20Management/preparation-policy.md). The agent chooses suitable accessible methods per task, generates routine local inputs and establishes authorized state. Preserve explicit constraints, exact retest identities, old answers and failed attempts. Optional capability gaps do not block unrelated work. State precise missing dependencies and continue independent authorized checks. Preserve existing human gates; copied readiness is not current task readiness.
+
+## Lifecycle controls and remote boundaries
+
+Use [the shared board controls](../board/README.md) for Deferred/Canceled, reactivation and actual stop observations. Eligibility is checked at local starts and workflow dispatch, not just intake. Local execution watches its bound generation and requests supported AbortSignal cancellation. Unknown outcomes retain their original records. A dispatch acknowledgement remains operationally unresolved until its actual remote outcome is observed and settled; it never proves stopped/completed.
+
+Reporting policy checks remain separate from execution eligibility, so an inactive assignment can still receive an authorized cancellation/partial-results report. No new publication permission is inferred. Parent/child findings and release risk keep their independent dispositions.
+
+The inactive CI template needs an adapter to load the actual current canonical board, including the existing matching assignment. Its read-only token does not publish new tickets or cancel runs. Arrange ongoing board updates or an authorized runner-stop mechanism in the adopting project; a static checkout cannot observe another machine's subsequent cancellation.
+
+## Legacy execution reconciliation
+
+An older unbound run/dispatch record requires reconciliation under the same policy/target key. Preserve that original file. Inspect actual local/remote terminal state, then prepare a private input containing `ticketId`, actual `actor`/`source`, observed `terminalState` (`completed`, `stopped`, `notStarted`) and nonempty evidence references. Select `kind` (`localRegression` or `workflowDispatch`) when both exist: their outcomes are observed and recorded separately. An observation about one does not settle the other.
+
+```shell
+npm run qa -- github reconcile-legacy --repository owner/repository --number 123 --policy .local/regression-policy.json --target .local/observed-target.json --source actual-reconciliation-reference --input .local/legacy-observation.json
+```
+
+The default `nextAction` is `retain`. For an observed completed local run, the updated helper creates a ticket/generation binding to its original result and immutable observation history, returns `unchanged` and does not invoke the runner again. Original exit codes and failed/unknown outcomes remain unchanged; completion does not establish a Pass. A completed legacy dispatch is likewise retained without redispatching or inventing suite results. A receipt alone cannot establish remote completion.
+
+For an observed stopped/not-started attempt, observation alone does not authorize another execution. An actually authorized new attempt needs `nextAction: "retry"` and `retrySource` identifying that separate decision, as well as the existing matching execution policy, eligible assignment and target. This explicit choice can also distinguish a deliberate new attempt from migration of a completed run. Once the current generation retains a legacy result, do not replace that binding: a later deliberate retest needs separately reviewed new scope/generation. Unknown/running outcomes remain blocked until their actual terminal state is established. Before a new side effect, any legacy operation for the same scope in the other execution channel also needs its own terminal observation; reusing a completed historical result makes no new execution request.
+
+Scoped overlays reference immutable observation history and the unchanged original record. Existing unambiguous single-record overlays remain readable; ambiguous combined overlays need separate observations. Repeated invocation retains deduplication, and later observations do not rewrite an earlier binding. None of these records grants execution authority or a QA verdict. Missing/stale evidence blocks dependent work. Never delete an uncertain record, change assertions or fabricate completion to make an upgrade run.

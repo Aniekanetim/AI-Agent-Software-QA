@@ -10,7 +10,7 @@ This board gives the AI QA agent and developers tickets to work on. Each ticket 
 
 ## Requesting product discovery
 
-This five-folder board continues to manage QA assignments and defects. Learning requests belong in the independent [Product Discovery pipeline](../Product%20Discovery/README.md). When a QA ticket needs exploration, identify the question/affected check and link a targeted discovery request in both directions. Record its required output and separate authorization; keep the QA ticket's current folder and checkpoint. Continue independent authorized checks.
+This seven-folder board continues to manage QA assignments and defects. Learning requests belong in the independent [Product Discovery pipeline](../Product%20Discovery/README.md). When a QA ticket needs exploration, identify the question/affected check and link a targeted discovery request in both directions. Record its required output and separate authorization; keep the QA ticket's current folder and checkpoint. Continue independent authorized checks.
 
 Keep a QA-origin question and responses on its original ticket and question index; the discovery request links that conversation rather than repeating it. Discovery returns knowledge entries, human/discovery revisions, served identity and gaps. It cannot supply an invented requirement, approve tests or move the QA ticket to Tested-Ok. Humans publish baseline changes; agents maintain their own discoveries and operational records.
 
@@ -23,20 +23,40 @@ Keep a QA-origin question and responses on its original ticket and question inde
 | Tested-Ok | Completed work | Tickets that meet their completion criteria and required QA review |
 | Retest | AI QA | Existing bug tickets returned with a developer fix or refutation |
 | Rework | Developer | Existing bug tickets whose original failure persists after retesting |
+| Deferred | Decision/review owner | Work deliberately removed from execution until reconsidered |
+| Canceled | Decision owner / history | Assignments no longer being pursued; not a test pass |
 
 The live board starts empty. Existing project evidence remains separate; it is not automatically new queued work. `.gitkeep` files retain empty folders in Git and are not tickets. Templates below are reference material, not queued work.
 
-Configured [GitHub PR intake](../automation/github/README.md) may create linked Ready for QA assignments. It deduplicates repository/PR/head and preserves revision history and current folder. It does not execute tests or change the five statuses. The agent determines coverage from the ticket/context/risks; onboarding does not impose a testing-category choice. Existing reviewed regression policy applies only to matching scope/revision/target; other work follows the usual gates.
+Configured [GitHub PR intake](../automation/github/README.md) may create linked Ready for QA assignments. It deduplicates repository/PR/head and preserves revision history and current folder. It does not execute tests or change the seven statuses. The agent determines coverage from the ticket/context/risks; onboarding does not impose a testing-category choice. Existing reviewed regression policy applies only to matching scope/revision/target; other work follows the usual gates.
+
+## Deferred, canceled and lower-priority work
+
+Lower priority changes urgency while keeping a ticket in its working queue. Deferred removes it from executable work until its owner reviews it. Canceled ends pursuit of the recorded assignment without establishing a pass, fix or release approval. Ordinary missing information/environment blockers keep their existing waiting reason unless an actual decision changes the work plan.
+
+Record the actual instruction or applicable reviewed policy, actor, reason, checkpoint, next owner/action and partial-work/data handoff. A direct instruction to cancel or defer is the decision; do not ask for the same permission again. The agent proposes a decision when authority is missing. A developer refutation, PR closure, inactivity or silence does not supply it.
+
+Use assignment scope by default. Revision-only scope explicitly names the exact commit: it stops that revision, while a later revision may get a separate linked assignment under existing intake/review rules. An assignment-scoped decision survives new PR commits until reactivation. Never broaden a cancellation from one ticket to an entire feature, PR family or linked bug set by assumption.
+
+Preserve the same ID/file/history. Use the [lifecycle helper](../automation/board/README.md) for recoverable transitions. It rebases the ticket's own current navigation and returns incoming changes as proposals. Only explicitly authorized mutable board-index navigation can be edited automatically; human context, immutable decisions, approved suites and historical evidence stay unchanged. Each lifecycle entry records the original checkpoint, previous owner/waiting reason, actual decision and scope. Inactive folders block execution even when a manually moved ticket has incomplete decision metadata; resolve that missing record without inventing approval.
+
+Deferred needs a review owner, date or trigger, and resume conditions. Check due reviews during check-ins, brief the owner once and acknowledge the actual briefing reference. A due date or a new answer does not reactivate work. Canceled has no routine execution pickup. Unfinished stop/cleanup observations may still need follow-up within existing authority.
+
+To reactivate, record the actual decision and route the same assignment to Ready for QA, or the same defect to Retest, Dev Todo or Rework according to its next action. Recheck affected sources/build/data and applicable approvals. Keep old results; never restore an old continuation just because an approval reply arrived later. Unresolved execution must be observed and settled before reactivation.
+
+For in-flight work, stop scheduling steps, request supported safe cancellation and inspect actual process/workflow state. A local abort error, a CI dispatch receipt or a folder move does not prove all work stopped. Retain partial results and next-owner cleanup/recovery actions. Remote runners need the canonical board changes or an authorized cancellation request delivered to them; this package cannot stop an arbitrary remote job by moving a local file.
+
+Canceling a parent does not cancel its bugs. A deferred/canceled defect retains its original failure and known release risk unless an actual responsible-owner disposition establishes otherwise. Keep untested conditions visible; change the agreed coverage scope only through its owner decision. Tested-Ok retains its existing verification/handoff criteria.
 
 ## Create and maintain a ticket
 
-Use a unique ID and a descriptive filename: `QA-001-feature-verification.md` for a testing assignment, or `BUG-001-duplicate-record-on-retry.md` for a bug. Choose the next unused number across all five folders. Preserve the ID and filename through moves. One ticket exists in one folder at a time.
+Use a unique ID and a descriptive filename: `QA-001-feature-verification.md` for a testing assignment, or `BUG-001-duplicate-record-on-retry.md` for a bug. Choose the next unused number across all seven folders. Preserve the ID and filename through moves. One ticket exists in one folder at a time.
 
 Create assignments in Ready for QA using the build/feature template below. Describe the testing objective and provide the exact target and acceptance criteria. Link the relevant Project Context sources, their Git revision or immutable version and BR/AC IDs; identify an applicable design handoff or the missing reference. Record the served build separately. Testing types can include UI, API, usability, performance, accessibility or security; the agent selects methods through the existing workflow rather than assuming every assignment needs one fixed regression suite.
 
 When the AI finds a defect, it creates a separate ticket in Dev Todo using the bug template. Link the new bug and its parent assignment in both directions. Future bug tickets are the authoritative reports; link their supporting suites and results rather than maintaining duplicate reports elsewhere. Existing reports remain preserved.
 
-Ticket references include stable IDs. When a file moves, keep its ID, contents and dated entries, and update incoming relative navigation links to its new path. Check the destination first; never overwrite another ticket. Record ownership and workflow progress in the ticket. These details do not add board statuses.
+Ticket references include stable IDs. When a file moves, keep its ID, contents and dated entries. Review proposed incoming links and maintain authorized mutable navigation; never rewrite immutable evidence to repair an old path. Resolve historical references by stable ID. Check the destination first; never overwrite another ticket. Record ownership and workflow progress in the ticket. These details do not add board statuses. Malformed actual lifecycle metadata blocks affected work, while ordinary report examples do not disable unrelated assignments.
 
 ## Initial testing and defect reporting
 
@@ -65,12 +85,12 @@ An original bug can reach Tested-Ok while a separate regression remains open. Li
 ## AI check-in procedure
 
 1. Read [AGENTS.md](../AGENTS.md), [shared progress](../unified_project_context.md), the [human context index](../Project%20Context/README.md), the [discovery context index](../Product%20Discovery/Project%20Context/README.md), the [process-context index](../QA%20Process%20Context/README.md), this README and the [QA workflow](../QA/Quality%20assurance/qa-workflow.md).
-2. Inspect ticket Markdown files directly inside Ready for QA and Retest. Read their ownership, waiting reason, linked blockers, clarification responses and existing decisions before selecting work. Consult the ticket's applicable source revisions/BR/AC IDs, rather than assuming the latest implementation defines expected behavior.
+2. Inspect ticket Markdown files directly inside Ready for QA and Retest. Read current lifecycle/unfinished-operation state before resuming a claim; inspect due Deferred reviews without selecting inactive work for execution. Read their ownership, waiting reason, linked blockers, clarification responses and existing decisions before selecting work. Consult the ticket's applicable source revisions/BR/AC IDs, rather than assuming the latest implementation defines expected behavior.
 3. Resume eligible unfinished work owned by this QA chat first. Otherwise choose an unclaimed actionable ticket across both queues by priority P0, P1, P2, P3, then oldest creation time, then ticket ID. If priority or essential input is missing, request that information once and record what is needed.
 4. Respect another worker's claim. Before claiming, re-read the ticket and record the owner, claim time, workflow checkpoint and next action. Handle one ticket at a time and verify that its ID is not duplicated elsewhere on the board.
-5. Follow the workflow from the recorded checkpoint. Reuse an applicable scoped approval; explain any changed scope before seeking a new decision. For a necessary missing/conflicting source, append and index one clarification on the existing ticket, then wait only on affected work. Board placement is not execution authorization.
+5. Recheck the canonical folder and lifecycle generation before each execution start/dispatch and after waits or approval replies. Follow the workflow from the recorded checkpoint. Reuse an applicable scoped approval; explain any changed scope before seeking a new decision. For a necessary missing/conflicting source, append and index one clarification on the existing ticket, then wait only on affected work. Board placement is not execution authorization.
 6. When a human decision is required, prepare the complete conversational briefing, record the requested gate/build/scope and waiting reason, and stop dependent execution. A later check-in does not treat silence as approval or resend the same unanswered request. Resume when an actual response or relevant change is available.
-7. Create or move tickets according to the rules above, preserve all prior entries, refresh links and update the parent assignment's blockers and next action. Record completed checks, observed results and actual decisions.
+7. Create or move tickets according to the rules above, preserve all prior entries, review link proposals and maintain authorized mutable navigation. Keep immutable evidence unchanged and update the parent assignment's blockers and next action. Record completed checks, observed results and actual decisions.
 8. Report meaningful findings, movements or decisions needed. If no ticket is actionable, leave all files unchanged and end the check-in. Do not create empty-run commits or invent work.
 
 Ownership, waiting reason and workflow checkpoint describe ongoing work inside a folder. They do not replace the folder's board status. The QA agent does not implement product fixes unless separately authorized; it does not act as the developer merely because Dev Todo contains tickets.
@@ -96,8 +116,12 @@ Record the waiting reason and next action in the ticket's fields. Keep it in its
 
 **Current state: none.** Keep this summary accurate when adding or resolving entries. When raising a question, add a row here linking directly to the original ticket comment. Developers check this index during their routine board visit, including questions on Ready for QA or Retest tickets. A local comment does not send a notification. This index exposes the conversation without duplicating it or requiring another status folder.
 
+<!-- qa-navigation:start -->
+
 | Ticket / question ID | Original comment | Needed from | Affected work | Raised |
 | --- | --- | --- | --- | --- |
+
+<!-- qa-navigation:end -->
 
 Append the actual answer, retaining the conversation. Resolve intent with the responsible owner, who maintains/publishes any canonical change. The agent links the actual decision/source revision without editing root Project Context. Record the answer and resumption checkpoint. Remove the index row only when resolved; clear only its waiting reason. Changed criteria may require revised cases and approval. Refresh question links if the ticket moves.
 
@@ -160,6 +184,9 @@ Record pending review requests and their scope so check-ins can resume.
 None yet. Append dated questions/responses with ticket-local Q IDs,
 checked sources/revisions, affected checks, needed owner and next action.
 Index unanswered developer questions in the board README.
+
+## Lifecycle decisions
+No deferral/cancellation/reactivation recorded. Preserve actual decision/source, scope, checkpoint, next owner, review conditions and partial-work handoff using the lifecycle procedure above.
 
 ## Completion
 Not completed. Link the versioned release-notes/sign-off/handoff packet.
@@ -243,6 +270,9 @@ Index unanswered developer questions in the board README.
 Not run. Append each attempt with build/date/executor, the authorized
 original-failure check, selected regression, expected/actual results,
 evidence, new bug IDs and required human decisions.
+
+## Lifecycle decisions
+No deferral/cancellation/reactivation recorded. Preserve actual decision/source, scope, checkpoint, next owner, review conditions and partial-work handoff using the lifecycle procedure above.
 
 ## Completion
 Not completed. Record the actual scoped disposition and human decision.

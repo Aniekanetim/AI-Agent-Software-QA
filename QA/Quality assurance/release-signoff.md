@@ -66,3 +66,9 @@ Include applicable [Application Flow Map](../../Application%20Flow%20Map/README.
 ## Tool/data handoff
 
 Link the actual task method choices and [data preparation record](../../QA%20Process%20Context/Test%20Data%20Management/data-preparation-record.md). State what ran, prepared versus verified state, retained identities, failed attempts, unresolved dependencies and next-owner reuse/retention/cleanup actions. A tool preference, generated input or capability/preparation assessment is not release evidence by itself.
+
+## Inactive-work handoff
+
+A cancellation decision closes pursuit of the assignment; it is not a Ready verdict or a substitute for Tested-Ok criteria. For started work, retain a concise cancellation handoff with the actual decision/scope, completed/partial/untested coverage, known defects/risks, process/workflow stop observations, data retention/cleanup and next owner/actions. Deferred work retains a pause checkpoint and review conditions rather than a completed release claim.
+
+Canceling/deferring a ticket does not remove agreed conditions or release blockers. Scope changes and risk acceptance need the responsible owner's actual decision. Keep parent/child dispositions independent and preserve prior failures. A folder move cannot establish delivery, receiver acceptance, process termination or deployment approval.

@@ -1,6 +1,14 @@
 # Package notes
 
-**Version:** 1.9.1. **Created:** 22 October 2026. **Updated:** 5 November 2026. **State:** reusable workflow package; no configured product, live discovery or QA execution history.
+**Version:** 1.10.0. **Created:** 22 October 2026. **Updated:** 5 November 2026. **State:** reusable workflow package; no configured product, live discovery or QA execution history.
+
+## Version 1.10.0 — deferred and canceled work
+
+Adds two empty status folders and [shared board lifecycle controls](../automation/board/README.md): stable ID lookup, accountable decisions, recoverable moves, incoming-link proposals, narrowly authorized mutable-index maintenance, deferred reviews and explicit reactivation. Existing onboarding, schedules, product contexts and historical records remain preserved. Active instructions use seven statuses; dated earlier five-folder validation remains historical evidence.
+
+GitHub intake deduplicates inactive tickets and respects assignment/revision scope. Local starts and CI dispatch require eligible ticket bindings; local runners request supported cancellation while actual process/remote outcomes remain separately observed. Reporting permission remains independent. Legacy executions require an evidence-backed reconciliation overlay instead of deletion/reset. [Validation and limits](board-lifecycle-validation.md) distinguish synthetic package checks from adopting-project work.
+
+Pre-merge regression review reproduced evidence mutation by broad link repair, duplicate completed runs during migration and unrelated intake blocked by ordinary code fences. The corrections preserve immutable evidence, stop unsafe old recovery patches, reuse completed legacy results with their original outcomes, require a separate retry decision, and isolate actual malformed lifecycle records from independent work. The new regression cases retain the original failures and distinguish those fixes from the earlier green checkpoints.
 
 ## Version 1.9.1 — remaining validation recheck
 

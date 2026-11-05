@@ -68,3 +68,7 @@ Record the actual harness/profile/context, reused executable/connection selectio
 If relevant, identify actual selected MCP/CLI/native-host routes, browser version/visibility, source-bound settings and operation evidence. Separate package installation, fixture rehearsal, native host connection and current-application tool support. Link remaining access/context gaps and exact next actions; use Not assessed or Not applicable with reasons when appropriate. Do not invent a catalogue or product execution during onboarding.
 
 Distinguish observation-only inventories from execution-ready document bindings. Record opaque/disabled/legacy inspection as an affected capability gap, preserve prior evidence and explain the scoped next verification or suitable alternative method.
+
+## Board lifecycle preparation
+
+Identify the canonical seven-status board, actual cancellation/deferral/review owners, decision policy/source and runner access to current state. Link upgrade/recovery needs, inactive reviews and unresolved operation observations where they actually exist. Do not seed example tickets, invent owner decisions, activate scheduling or claim a snapshot checkout receives live cancellations.

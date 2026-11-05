@@ -32,7 +32,7 @@ Run [guided onboarding](../Onboarding/onboarding-workflow.md) before assigned wo
 
 For learning, create a real discovery request using its template. Explain questions/actions, reasons, expected knowledge, limits and exact next authorization; then explore within recorded scope. A hosted URL needs no local application checkout. Use authorized accounts/registration or human-assisted sign-in, excluding secrets/session state from Git. Record gaps on the originating request or existing linked QA question. Human owners publish accepted baseline changes; discovery completion is not a test pass.
 
-Create a real build/feature ticket in Ready for QA only from the user's testing request. Preserve the five status folders and unique ticket IDs. Do not populate queues with example incidents, previous project results or template files. The board supplies the next work; the workflow determines how it is performed and reviewed.
+Create a real build/feature ticket in Ready for QA only from the user's testing request. Preserve the seven status folders and unique ticket IDs. Do not populate queues with example incidents, previous project results or template files. The board supplies the next work; the workflow determines how it is performed and reviewed.
 
 ## 4. Perform the selected procedure
 
@@ -46,7 +46,7 @@ At G5, prepare release notes, completion/exit-criteria evidence, a scoped sign-o
 
 ## 5. Arrange optional check-ins
 
-Use [manual QA check-ins or native scheduling setup](../automation/README.md) when requested. The five-folder board and QA gates apply independently of the scheduler. Discovery remains explicitly request-driven, with no schedule activated by this package. Do not expand a QA-board check-in into discovery polling or a crawl without separate authorization.
+Use [manual QA check-ins or native scheduling setup](../automation/README.md) when requested. The seven-folder board and QA gates apply independently of the scheduler. Discovery remains explicitly request-driven, with no schedule activated by this package. Do not expand a QA-board check-in into discovery polling or a crawl without separate authorization.
 
 Configured [GitHub PR intake](../automation/github/README.md) can create linked assignments. Matching automatic regression requires an actual reviewed policy for the exact scope; settings do not manufacture permission. Preserve tested-head/build identity, deduplication, findings decisions and final handoff. The inactive CI example requires project-specific configuration; it is not an already running service.
 
@@ -74,3 +74,7 @@ Copy [Application Flow Map](../Application%20Flow%20Map/README.md) alongside the
 ## Adaptive task preparation
 
 Follow [task-based tool selection](../automation/tools/task-selection.md) and the [data preparation policy](../QA%20Process%20Context/Test%20Data%20Management/preparation-policy.md). The agent chooses suitable accessible methods per task, generates routine local inputs and establishes authorized state. Preserve explicit constraints, exact retest identities, old answers and failed attempts. Optional capability gaps do not block unrelated work. State precise missing dependencies and continue independent authorized checks. Preserve existing human gates; copied readiness is not current task readiness.
+
+## Lifecycle upgrades
+
+The current board has seven folders, including Deferred and Canceled. Use [the explicit upgrade](../automation/board/README.md#upgrade-an-existing-copy) for older copies; retain tickets, IDs, evidence, local setup and schedule choices. Copying updated instructions does not modify an already installed native scheduler prompt: review/update that prompt through its supported interface when authorized. No schedule is changed automatically.

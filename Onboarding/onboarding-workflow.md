@@ -84,3 +84,7 @@ Prepare the [handoff](templates/onboarding-handoff.md), review it with the human
 ## Optional Chrome DevTools preparation
 
 During tools/access preparation, follow [Chrome DevTools/WebMCP](../automation/chrome-devtools/README.md). Inspect existing native connections and executable selections before setup questions. Reuse available access and prior answers. Establish only missing visibility, connection/profile, exact allowed origins and privacy settings in `.local/chrome-devtools-settings.json`; this is optional preparation, not a mandatory browser choice. Settings, installation, terminal operation, native harness connection and current-application support have separate evidence. Refresh affected checkpoints after changes, keeping schemaVersion 1 and the existing question/recovery history. The next task determines whether WebMCP is useful.
+
+## Board lifecycle readiness
+
+Verify the seven status folders and use [board upgrade](../automation/board/README.md#upgrade-an-existing-copy) for older five-folder copies without resetting onboarding or moving existing tickets. Establish actual decision/review owners and canonical board location/freshness for each runner. Explain that Deferred/Canceled are not executable work, review dates do not authorize resumption, and remote job stopping needs actual runner access/confirmation. Keep existing answers and schedules.

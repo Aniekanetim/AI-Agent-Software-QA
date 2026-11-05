@@ -8,6 +8,7 @@ import { status as postmanStatus } from '../postman/postman.js';
 import { assessInventory, type Target } from '../chrome-devtools/webmcp.js';
 import { readSettings as chromeSettings } from '../chrome-devtools/config.js';
 import { requireDocumentBinding } from '../chrome-devtools/document-context.js';
+import { boardRoot, tickets, assertExecutable } from '../board/board.js';
 
 export interface TaskToolPlan {
   schemaVersion: 1; id: string; revision: string; task: Evidence; objective: string; executionContext: ExecutionContext;
@@ -27,6 +28,14 @@ export function assessTaskTools(root: string, plan: TaskToolPlan) {
   uniqueTexts(plan.selections.map(s => s.requirementId), 'Selection bindings');
   if (plan.selections.some(s => !ids.includes(s.requirementId))) throw new Error('Selection points to an unknown requirement.');
   const globalIssues: string[] = [];
+  if (plan.task.path.startsWith(boardRoot + '/')) {
+    try {
+      const all = tickets(root), exact = all.find(t => t.path === plan.task.path), moved = all.filter(t => t.path.split('/').at(-1) === plan.task.path.split('/').at(-1));
+      const ticket = exact ?? (moved.length === 1 ? moved[0] : undefined);
+      if (!ticket) throw new Error('Ticket missing');
+      assertExecutable(root, ticket.id);
+    } catch { globalIssues.push('The board task is inactive, missing or inconsistent; resolve its actual lifecycle before execution.'); }
+  }
   try { verifyEvidence(root, plan.task); currentHarness(root, plan.executionContext); } catch { globalIssues.push('Task source or calling harness changed; revalidate affected preparation.'); }
   let policy: ReturnType<typeof readToolPolicy> = null;
   let visibility: ToolPolicy['visibility'] = 'any';
