@@ -51,7 +51,7 @@ Retain the original question and actual answer after resolution; remove only its
 
 ## Connection to QA
 
-The [five-folder QA board](../QA%20task%20management%20Board/README.md) continues to manage testing assignments and defects. A QA ticket can request targeted discovery with the question, affected check and required output; the resulting discovery request links back to it. On completion, return the knowledge references, both context revisions, target identity and unresolved limits to that ticket.
+The [seven-folder QA board](../QA%20task%20management%20Board/README.md) continues to manage testing assignments and defects. A QA ticket can request targeted discovery with the question, affected check and required output; the resulting discovery request links back to it. On completion, return the knowledge references, both context revisions, target identity and unresolved limits to that ticket.
 
 A suspected problem found while learning is an observation pending QA assessment. Link its evidence to a related assignment or propose a new QA assignment. Do not create a confirmed defect from an inferred expectation or bypass the existing findings/retest gates. Separately authorized testing can establish an actionable defect through the normal workflow.
 

@@ -29,6 +29,12 @@ jobs:
           QA_GITHUB_SETTINGS: ${{ vars.QA_GITHUB_SETTINGS }}
         run: |
           node --input-type=module -e "import fs from 'node:fs'; const v=JSON.parse(process.env.QA_GITHUB_SETTINGS); fs.mkdirSync('.local',{recursive:true}); fs.writeFileSync('.local/github-settings.json',JSON.stringify(v));"
+      # Project-owned: load the current authoritative board and matching assignment.
+      # Do not manufacture ephemeral tickets or infer live updates from checkout.
+      # Arrange continuing updates or actual remote cancellation in the project.
+      - name: Load current canonical board
+        run: node qa-project/refresh-canonical-board.mjs
+      - run: npm run qa -- board status
       # This adapter must observe the preview actually deployed for the event head.
       # It writes .local/observed-target.json plus its hashed observation source.
       # It is project-owned; this package cannot invent a universal build endpoint.

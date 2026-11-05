@@ -2,7 +2,7 @@
 
 A portable workflow for an AI QA agent to join a project, build product understanding and perform assigned QA work with human review. Guided onboarding prepares context, tools and access. Product Discovery learns how an application behaves. QA evaluates assigned work against an agreed test basis, investigates findings and proposes readiness. Humans maintain the product baseline and own scoped decisions; developers fix or refute reported defects.
 
-**Package version:** 1.9.1 — updated 5 November 2026. **Project state:** unconfigured. **Live tickets/discovery requests:** none. **Product schedules/PR regression:** not activated. Start with [SETUP.md](SETUP.md) and [guided onboarding](Onboarding/README.md).
+**Package version:** 1.10.0 — updated 5 November 2026. **Project state:** unconfigured. **Live tickets/discovery requests:** none. **Product schedules/PR regression:** not activated. Start with [SETUP.md](SETUP.md) and [guided onboarding](Onboarding/README.md).
 
 ## Use with your AI agent
 
@@ -151,3 +151,7 @@ The included context and record files are templates, not project requirements, r
 ## License
 
 The workflow files and templates are available under the [MIT license](LICENSE). Linked external standards and documentation remain with their respective publishers.
+
+## Deferred and canceled work
+
+The [board](QA%20task%20management%20Board/README.md) has seven statuses. Deferred parks work for an owner review; Canceled records work no longer being pursued. Both preserve ticket identity/history and are excluded from execution. A lower priority alone keeps work in its working queue. [Lifecycle helpers and upgrade guidance](automation/board/README.md) cover transitions, due reviews, recovery, current-ticket execution checks and uncertain running operations. Cancellation is not a test pass or release approval.

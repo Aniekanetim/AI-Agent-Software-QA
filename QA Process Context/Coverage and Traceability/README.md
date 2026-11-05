@@ -44,3 +44,7 @@ For accessibility evaluation, consult [W3C's scope and sampling guidance](https:
 ## Map links and actual exercise
 
 Link [Application Flow Map](../../Application%20Flow%20Map/README.md) feature/relationship IDs and revision to relevant conditions/cases/charters. A path considered during impact analysis is not yet exercised coverage. Actual runs identify the conditions/path segments investigated and supporting evidence. Missing map areas stay explicit gaps. Keep canonical matrix/results and map facts in their own locations; never count one multiply-labelled or multiply-linked case several times.
+
+## Deferred and canceled assignments
+
+Keep ticket work disposition separate from check outcomes. Deferred/Canceled is never counted as Pass, exercised coverage or fixed behavior. Preserve prior actual executions and untested included conditions. Only an actual owner-approved scope change revises the denominator; record its source/revision without rewriting historical results or human requirements. Linked defects and release risks retain independent dispositions.

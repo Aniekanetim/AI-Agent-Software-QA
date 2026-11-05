@@ -7,6 +7,7 @@ import './adaptive-tools.test.js';
 import './data-preparation.test.js';
 import './chrome-devtools.test.js';
 import './chrome-fixture-browser.test.js';
+import './board.test.js';
 import './documents.test.js';
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync, renameSync, existsSync } from 'node:fs';
@@ -21,6 +22,7 @@ import * as menu from '../settings/menu.js';
 import * as mail from '../email/email.js';
 import { AgentMailAdapter, GmailAdapter, htmlText } from '../email/adapters.js';
 import * as gh from '../github/github.js';
+import { upgradeBoard } from '../board/board.js';
 import { artifact, expectedChecksum, archiveDirectory } from '../github/install.js';
 import { validateReport, type BrowserReport } from '../browser/tools.js';
 import { bindHarness } from '../tools/runtime.js';
@@ -156,7 +158,7 @@ test('AgentMail paginates inbox metadata and refuses unsupported narrowing filte
 });
 const rule: gh.RepositoryRule = { repository: 'fixture/product', branches: ['main'], labels: ['qa-ready'], includeDrafts: false, reporting: 'localOnly' };
 function pr(head = 'a'.repeat(40)): gh.PullRequest { return { repository: rule.repository, number: 1, title: 'Synthetic PR', url: 'https://github.com/fixture/product/pull/1', head, base: 'main', labels: ['qa-ready'], draft: false, mergeCommit: null, fromFork: false }; }
-function board(r: string) { for (const f of ['Ready for QA', 'Dev Todo', 'Retest', 'Rework', 'Tested-Ok']) mkdirSync(s.contained(r, `QA task management Board/${f}`), { recursive: true }); }
+function board(r: string) { upgradeBoard(r, 'Synthetic board fixture'); }
 test('PR intake deduplicates events, preserves developer history and creates a new completed-revision assignment', () => {
   const r = root(); board(r); const first = gh.ingestPr(r, pr(), rule, 'Synthetic event'); assert.equal(first.action, 'created');
   assert.equal(gh.ingestPr(r, pr(), rule, 'Synthetic repeated event').action, 'unchanged');
@@ -171,6 +173,7 @@ test('PR intake deduplicates events, preserves developer history and creates a n
   assert.equal(gh.ingestPr(r, { ...pr(), draft: true }, rule, 'Synthetic draft').action, 'ineligible');
 });
 function reviewedPolicy(r: string) {
+  board(r); gh.ingestPr(r, pr(), rule, 'Synthetic assignment fixture; not live authorization');
   const suite = put(r, '.local/fixture-suite.txt', 'Synthetic suite fingerprint');
   const observation = { id: 'fixture-target', commit: pr().head, buildId: 'fixture-build', observedAt: new Date().toISOString(), source: 'Synthetic build observation' };
   const target: gh.ObservedTarget = { id: observation.id, commit: observation.commit, buildId: observation.buildId, evidence: put(r, '.local/target-observation.json', observation) };

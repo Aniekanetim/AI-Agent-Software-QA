@@ -13,6 +13,7 @@ import { prepareTestAccount, readTestAccounts, type AccountRequest } from './ema
 import { AgentMailAdapter, GmailAdapter } from './email/adapters.js';
 import * as github from './github/github.js';
 import { installGh } from './github/install.js';
+import * as board from './board/board.js';
 import * as registry from './tools/registry.js';
 import { bindHarness, currentHarness, readHarness, harnessKey, type ExecutionContext } from './tools/runtime.js';
 import * as postman from './postman/postman.js';
@@ -48,6 +49,7 @@ async function currentPr(repository: string, number: number) {
   const raw = JSON.parse(await github.runGh(['api', `repos/${repository}/pulls/${number}`])); return github.normalizePr(repository, raw);
 }
 const help = {
+  board: 'status [--ticket ID] | upgrade --source | transition --input | recover --id | reviews [--at ISO] [--trigger key] | acknowledge-review --input | assert-executable --ticket ID [--generation ID] | operations --ticket ID | settle-operation --input : lifecycle controls preserve actual human decisions; no test authorization',
   'flow-map': 'validate --input | trace --input --features id,id [--direction upstream/downstream/both] [--max-depth 8] : read-only candidate impact; no test execution or approval',
   coverage: 'assess --input : read-only consistency/count check of a canonical-record snapshot; no execution, approval or product verdict',
   tools: 'bind --input | scan --source [--tool] | select --input | status --tool [--requires operation,operation] | import-host --input | assess-task --input : read-only assessment of agent-selected capabilities',
@@ -58,7 +60,7 @@ const help = {
   settings: 'open --source | show | choose --area | edit --input | present | save --input | cancel | back | close',
   browser: 'versions | install | mcp-config | check --provider library/cli/mcpServer [--headless] [--context interactive/scheduled/ci] | import-report --input | fixture',
   email: 'policy | account --input | accounts | options --input | discover --provider gmailApi/agentmail --source | create-inbox --input | select --input | verify --input | begin --input | outcome --input',
-  github: 'install --source | check --repository | check-in --source | event --repository --number --source | policy-digest --policy | run/dispatch --policy --target --repository --number --source | comment --policy --target --repository --number --body --source',
+  github: 'reconcile-legacy --input --repository --number --policy --target --source | install --source | check --repository | check-in --source | event --repository --number --source | policy-digest --policy | run/dispatch --policy --target --repository --number --source | comment --policy --target --repository --number --body --source',
   evidence: '--path [--pointer] : calculate an evidence reference; no product verdict is inferred',
   note: 'Use project-private JSON under .local/ for inputs. The agent presents questions and performs authorized host connections. CLI output is a model, not an actual human conversation or approval. See Onboarding/README.md.',
 };
@@ -66,6 +68,24 @@ async function main() {
   const [area, action] = positional;
   if (!area || area === 'help') { output(help); return; }
   if (area === 'evidence') { output(store.evidence(root, option('path'), options.get('pointer'))); return; }
+  if (area === 'board') {
+    if (action === 'upgrade') output(board.upgradeBoard(root, option('source')));
+    else if (action === 'status') {
+      const missing = board.missingFolders(root), pending = board.pendingTransitions(root);
+      if (missing.length || pending.length) output({ missing, pending, next: missing.length ? 'Run board upgrade with the actual instruction.' : 'Recover the original transition ID; do not reset its journal.' });
+      else output({ tickets: board.tickets(root).filter(t => !options.has('ticket') || t.id === option('ticket')).map(({ text, ...ticket }) => ({ ...ticket, issues: board.inactive(ticket.status) && !ticket.lifecycle ? ['Actual lifecycle decision is missing; execution remains blocked.'] : [] })), authorization: 'Not established by folder placement or metadata.' });
+    } else if (action === 'transition' || action === 'recover') {
+      const record = action === 'transition' ? board.transitionTicket(root, input<board.Transition>()) : board.recoverTransition(root, option('id'));
+      output({ id: record.id, ticketId: record.ticketId, state: record.state, recordedDestination: record.to, ownerUpdates: record.ownerUpdates });
+    }
+    else if (action === 'assert-executable') { const t = board.assertExecutable(root, option('ticket'), options.get('generation')); output({ ticketId: t.id, status: t.status, generation: t.generation, authorization: 'Actual test scope/review still required.' }); }
+    else if (action === 'operations') output(board.operations(root, option('ticket')));
+    else if (action === 'settle-operation') output(board.settleOperation(root, input<Parameters<typeof board.settleOperation>[1]>()));
+    else if (action === 'reviews') output(board.reviews(root, options.get('at'), options.get('trigger')));
+    else if (action === 'acknowledge-review') { const value = input<{ ticketId: string; generation: string; source: string }>(); board.acknowledgeReview(root, value.ticketId, value.generation, value.source); output({ recorded: true, execution: 'Not authorized by a review notification.' }); }
+    else throw new Error('Unknown board operation; use help.');
+    return;
+  }
   if (area === 'data') {
     if (action !== 'assess') throw new Error('Use data assess --input.');
     const report = assessData(root, input<DataPreparation>()); output(report);
@@ -233,7 +253,8 @@ async function main() {
     const repository = option('repository'); if (!configuration.repositories.some(r => r.repository === repository)) throw new Error('This repository was not selected.');
     const pr = await currentPr(repository, Number(option('number'))), policy = fromFile<github.RegressionPolicy>(option('policy')), target = fromFile<github.ObservedTarget>(option('target'));
     const access = await github.inspectConnection(repository); if (access.account !== configuration.account) throw new Error('GitHub is authenticated as a different account.');
-    if (action === 'run') output(await github.executeRegression(root, policy, pr, target, source));
+    if (action === 'reconcile-legacy') output(github.reconcileLegacy(root, policy, pr, target, input<Parameters<typeof github.reconcileLegacy>[4]>()));
+    else if (action === 'run') output(await github.executeRegression(root, policy, pr, target, source));
     else if (action === 'dispatch') output(await github.dispatchRegression(root, policy, pr, target));
     else if (action === 'comment') output(await github.publishComment(root, policy, pr, target, option('body')));
     else throw new Error('Unknown GitHub command.');

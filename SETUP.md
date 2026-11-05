@@ -73,7 +73,7 @@ Use the [bootstrap prompt](docs/bootstrap-prompt.md) to route the objective. Bef
 
 ## 5. Verify a manual check-in
 
-For QA, use the [check-in prompt](automation/check-in-prompt.md) with the actual root. Verify the five status folders, question index and ownership/checkpoints. An empty board produces a no-op with no file changes and does not trigger discovery. A new ticket produces preparation and an informed briefing, not silent tests.
+For QA, use the [check-in prompt](automation/check-in-prompt.md) with the actual root. Verify the seven status folders, question index and ownership/checkpoints. An empty board produces a no-op with no file changes and does not trigger discovery. A new ticket produces preparation and an informed briefing, not silent tests.
 
 For discovery, give the agent a real request ID and follow its start/resume procedure. Verify that it reads both contexts, preserves history/scope and keeps original observations in its own context. Source-linked map updates follow the same authorized learning scope and do not change human requirements. Reviewing templates does not demonstrate a live staging walkthrough.
 
@@ -94,3 +94,7 @@ Provide the [onboarding handoff](Onboarding/templates/onboarding-handoff.md) wit
 - Execution and completion await their required scoped human decisions.
 - For QA G5, use the [release sign-off procedure](QA/Quality%20assurance/release-signoff.md) and [packet template](QA/Quality%20assurance/templates/completion-handoff.md). Discovery has its own learning completion record; neither completion authorizes the other pipeline.
 - Any configured schedule points to this project and is recorded accurately.
+
+## Upgrade older board copies
+
+After deliberately adopting the updated workflow files, follow [the lifecycle upgrade](automation/board/README.md#upgrade-an-existing-copy). Add Deferred/Canceled without changing current tickets, private onboarding state or schedules. Inspect any legacy running/uncertain regression before enabling automatic execution. Existing policy approvals remain content-bound; copying an approval never grants authority to another project.

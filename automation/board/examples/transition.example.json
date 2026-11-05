@@ -1,0 +1,23 @@
+{
+  "id": "actual-unique-lifecycle-operation-id",
+  "ticketId": "QA-001",
+  "expectedRevision": "actual-hash-returned-by-board-status",
+  "to": "Deferred",
+  "decision": {
+    "actor": "actual-decision-owner",
+    "source": "actual-instruction-or-reviewed-policy-reference",
+    "reason": "actual-reason-for-changing-the-work-plan",
+    "evidence": [{ "path": "actual-immutable-decision-record.md", "sha256": "actual-record-hash" }],
+    "scope": { "kind": "assignment" },
+    "checkpoint": "actual-previous-workflow-checkpoint",
+    "nextOwner": "actual-review-or-follow-up-owner",
+    "nextAction": "actual-next-review-or-stop-observation-action",
+    "handoff": "actual-completed-partial-or-not-started-work-data-and-cleanup-state",
+    "review": {
+      "owner": "actual-review-owner",
+      "dueAt": null,
+      "trigger": "actual-owner-agreed-review-trigger",
+      "resumeWhen": "actual-conditions-and-decision-required-before-resumption"
+    }
+  }
+}

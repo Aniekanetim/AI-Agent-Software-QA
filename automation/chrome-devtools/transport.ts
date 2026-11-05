@@ -87,7 +87,7 @@ export async function withMcpSession<T>(root: string, settings: ChromeSettings, 
   selectCommand(root, 'chromeDevtoolsMcp', command, scope.source);
   const id = randomUUID();
   const run = async () => {
-    const client = new Client({ name: 'ai-agent-software-qa', version: '1.9.1' });
+    const client = new Client({ name: 'ai-agent-software-qa', version: '1.10.0' });
     const transport = new StdioClientTransport({ command: command.executable, args: [...command.prefix, ...launchArguments(root, settings)], cwd: root, env: chromeEnvironment(settings) as Record<string, string>, stderr: 'pipe' });
     const bridge: Bridge = { provider: 'mcpServer', connectionReference: `local-sdk:${harnessKey(harness)}:${id}`, configurationHash: settingsHash(settings),
       call: async (name, args) => {
