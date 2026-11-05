@@ -109,6 +109,8 @@ The optional [map helper](automation/flow-map/README.md) validates a temporary p
 
 The [Chrome DevTools bundle](automation/chrome-devtools/README.md) gives the agent MCP and CLI routes to inspect Chrome and use WebMCP actions exposed by the current application. The agent selects a suitable method per task; onboarding reuses working installations and native connections. Application tool availability depends on the page, role, state and compatible browser. Invocations, independent application verification and QA verdicts remain separate. [Validation evidence and limits](docs/webmcp-validation.md) distinguish helper tests, native browser rehearsals and current-harness access.
 
+The [origin and document guards](docs/webmcp-context-guards.md) require exact configured origins and a fresh inspectable document-tree binding before helper execution. Iframe navigation invalidates the old inventory even with unchanged tool definitions. Opaque or unverified frame context blocks dependent actions while observation and other suitable methods remain available.
+
 ## Agent-selected tools and test data
 
 The agent chooses suitable accessible tools for each task or step, explaining significant choices and limits. Onboarding discovers capabilities and establishes constraints/visibility; it does not impose a preferred browser or a fixed tool per testing category. Bundled and other permitted tools can be combined. Explicit task requirements and approved regression commands remain applicable. Read [the selection procedure](automation/tools/task-selection.md).

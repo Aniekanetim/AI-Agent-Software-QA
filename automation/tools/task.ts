@@ -7,6 +7,7 @@ import { validateReport, type BrowserReport } from '../browser/tools.js';
 import { status as postmanStatus } from '../postman/postman.js';
 import { assessInventory, type Target } from '../chrome-devtools/webmcp.js';
 import { readSettings as chromeSettings } from '../chrome-devtools/config.js';
+import { requireDocumentBinding } from '../chrome-devtools/document-context.js';
 
 export interface TaskToolPlan {
   schemaVersion: 1; id: string; revision: string; task: Evidence; objective: string; executionContext: ExecutionContext;
@@ -53,6 +54,7 @@ export function assessTaskTools(root: string, plan: TaskToolPlan) {
             try {
               const inventory = assessInventory(root, requirement.webmcp.inventory, requirement.webmcp.target, provider, chromeSettings(root) ?? undefined);
               if (requirement.operations.includes('webmcp:execute')) {
+                requireDocumentBinding(inventory);
                 const names = requirement.webmcp.toolNames;
                 if (!Array.isArray(names) || !names.length || names.some(name => !inventory.tools.some(t => t.name === name))) issues.push('Identify the actual required action names in this target catalogue.');
               }

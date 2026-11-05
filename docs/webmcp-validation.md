@@ -13,10 +13,21 @@ This record identifies the reusable package's synthetic integration checks and t
 | Windows headed CI | Verified on the separate pinned Chrome for Testing 156.0.8078.80 baseline with bridge 1.12.0; three complete headed repetitions per MCP/CLI route passed in each of two CI runs |
 | Earlier browser combinations | 156.0.8078.4 and 156.0.8078.47 failures remain recorded; their internal cancellation cause is unconfirmed |
 | Delivery | Prepared in PR 8; package verification, merging and adopting-product release approval remain separate decisions |
+| Origin/frame review follow-up | [Corrected guards and new 37-check routes](webmcp-context-guards.md); follow-up verification below is separate from the earlier 26-check evidence |
 
 See [the completed native checks](#completed-native-harness-checks--4-november-2026) for the exact environment, checks, recovery and limitations. Earlier evidence below retains its original dates and scope.
 
 The [Windows startup investigation and correction](windows-browser-startup.md) records the controlled comparisons, rejected candidates, 60 successful local startup navigations across two runs, the separate disk-space interruption/recovery, 141 passing helper rechecks and both successful Windows/Ubuntu CI runs at f3cc14d. The fixture now installs its own exact browser explicitly and preserves all 26 assertions and operating restrictions. The earlier failure history below is retained rather than rewritten as successful execution.
+
+## Origin and document follow-up — 5 November 2026
+
+The user authorized correction of the two failures reproduced during the official-guidance review. [The correction record](webmcp-context-guards.md) explains their causes, safeguards, native-host compatibility and remaining bridge limits.
+
+Local TypeScript and all 145 helpers passed, with zero failures, cancellations or skips; 521 Markdown targets/anchors resolved at that checkpoint. An earlier added native-host test supplied a different tool definition than its simulated live catalogue and was correctly rejected; its fixture was aligned and the full rerun passed. Original logs remain in ignored local evidence.
+
+The expanded headed MCP-server rehearsal passed all 37 assertions on Chrome for Testing 156.0.8078.80 and bridge 1.12.0. It demonstrated both stale-iframe rejection with no added record and successful execution after refresh. Dedicated native page-API checks also passed cross-origin permissions/exposure and imperative cancellation without the delayed commit. CLI and final hosted verification are pending at this implementation checkpoint; no updated CI success is inferred from older runs.
+
+Current-harness evidence remains the separately identified 4 November rehearsal. The added page-API checks are controlled terminal SDK/CLI browser execution, not a new native-harness or adopting-product sign-off.
 
 ## Scope and authorization
 
