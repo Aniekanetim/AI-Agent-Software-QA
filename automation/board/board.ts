@@ -13,11 +13,11 @@ export interface Decision {
   checkpoint: string; nextOwner: string; nextAction: string; review?: Review;
   handoff: string; waitingOn?: string;
 }
-export interface Transition { id: string; ticketId: string; expectedRevision: string; to: Status; decision: Decision }
+export interface Transition { id: string; ticketId: string; expectedRevision: string; to: Status; decision: Decision; navigation?: { path: string; expectedRevision: string; source: string }[] }
 export interface Lifecycle extends Decision { schemaVersion: 1; id: string; at: string; from: Status; to: Status; previousOwner: string; previousWaiting: string; previousCheckpoint: string }
-export interface Ticket { id: string; path: string; status: Status; text: string; revision: string; lifecycle: Lifecycle | null; generation: string }
-interface Patch { path: string; before: string; content: string }
-interface Journal { schemaVersion: 1; id: string; requestHash: string; ticketId: string; from: string; to: string; before: string; content: string; patches: Patch[]; ownerUpdates: { path: string; destination: string }[]; state: 'prepared' | 'completed' }
+export interface Ticket { id: string; path: string; status: Status; text: string; revision: string; lifecycle: Lifecycle | null; generation: string; issues: string[] }
+interface Patch { path: string; before: string; content: string; original?: string; source?: string }
+interface Journal { schemaVersion: 1 | 2; id: string; requestHash: string; ticketId: string; from: string; to: string; before: string; content: string; patches: Patch[]; ownerUpdates: { path: string; destination: string }[]; linkUpdates?: { path: string; destination: string; expectedRevision: string }[]; state: 'prepared' | 'completed' }
 const validId = (id: string) => /^[A-Z][A-Z0-9]{0,15}-\d{1,9}$/.test(id);
 function safeKey(id: string) { if (!/^[A-Za-z0-9_-]{1,100}$/.test(id)) throw new Error('Use a unique safe lifecycle operation ID.'); return id; }
 function entries(root: string, folder: string) { const path = contained(root, folder); return existsSync(path) ? readdirSync(path).filter(n => n.endsWith('.json')).map(n => `${folder}/${n}`) : []; }
@@ -49,13 +49,13 @@ function lifecycle(text: string): Lifecycle | null {
   const blocks: string[] = []; let fence: { char: string; length: number; capture: boolean; lines: string[] } | null = null;
   for (const line of text.split(/\r?\n/)) {
     if (!fence) {
-      const opening = line.match(/^(`{3,}|~{3,})(.*)$/);
+      const opening = line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
       if (opening) fence = { char: opening[1]![0]!, length: opening[1]!.length, capture: opening[2]!.trim() === 'qa-lifecycle', lines: [] };
-    } else if (new RegExp(`^${fence.char}{${fence.length},}\\s*$`).test(line)) {
+    } else if (new RegExp(`^ {0,3}${fence.char}{${fence.length},}\\s*$`).test(line)) {
       if (fence.capture) blocks.push(fence.lines.join('\n')); fence = null;
     } else if (fence.capture) fence.lines.push(line);
   }
-  if (fence) throw new Error('Unclosed fenced block in a ticket; preserve and reconcile its Markdown before a lifecycle change.');
+  if (fence?.capture) throw new Error('Unclosed lifecycle block; preserve it and reconcile the affected ticket.');
   if (!blocks.length) return null;
   let entry: Lifecycle;
   try { entry = JSON.parse(blocks.at(-1)!); } catch { throw new Error('Unreadable lifecycle history; preserve it for reconciliation.'); }
@@ -72,8 +72,10 @@ export function tickets(root: string): Ticket[] {
     const path = `${boardRoot}/${status}/${e.name}`, text = readFileSync(contained(root, path), 'utf8');
     const id = text.match(/^\uFEFF?#\s+([A-Z][A-Z0-9]{0,15}-\d{1,9})(?=[:\s]|$)/m)?.[1];
     if (!id || !validId(id)) throw new Error(`Record a stable ticket ID in the heading of ${path}.`);
-    const entry = lifecycle(text);
-    return { id, status, path, text, revision: digest(text), lifecycle: entry, generation: entry?.id ?? 'legacy' };
+    let entry: Lifecycle | null = null; const issues: string[] = [];
+    try { entry = lifecycle(text); if (entry && entry.to !== status) issues.push('The ticket folder and lifecycle history disagree.'); }
+    catch (error) { issues.push(error instanceof Error ? error.message : 'Unreadable lifecycle history.'); }
+    return { id, status, path, text, revision: digest(text), lifecycle: entry, generation: entry?.id ?? (issues.length ? `invalid-${digest(text)}` : 'legacy'), issues };
   }));
   if (new Set(found.map(t => t.id)).size !== found.length) throw new Error('Duplicate ticket IDs across the board; reconcile without overwriting history.');
   return found;
@@ -81,6 +83,7 @@ export function tickets(root: string): Ticket[] {
 export function findTicket(root: string, id: string) { const found = tickets(root).find(t => t.id === id); if (!found) throw new Error(`Ticket ${id} was not found on the canonical board.`); return found; }
 export function assertExecutable(root: string, id: string, generation?: string, role: 'qa' | 'developer' = 'qa') {
   const ticket = findTicket(root, id), allowed = role === 'qa' ? ['Ready for QA', 'Retest'] : ['Dev Todo', 'Rework'];
+  if (ticket.issues.length) throw new Error(`Reconcile lifecycle for ${id}: ${ticket.issues.join(' ')}`);
   if (!allowed.includes(ticket.status) || ticket.lifecycle && ticket.lifecycle.to !== ticket.status) throw new Error(`Ticket ${id} is not eligible for ${role} execution in ${ticket.status}; retain its actual decision and checkpoint.`);
   if (generation !== undefined && generation !== ticket.generation) throw new Error('Ticket lifecycle changed; an old approval continuation or running operation cannot resume automatically.');
   return ticket;
@@ -125,10 +128,11 @@ export function settleOperation(root: string, request: { id: string; source: str
 }
 function decisionValid(root: string, request: Transition, ticket: Ticket) {
   const d = request.decision; assertNonsecret(request);
+  if (ticket.issues.length) throw new Error(`Reconcile lifecycle for ${ticket.id}: ${ticket.issues.join(' ')}`);
   if (!statuses.includes(request.to) || request.expectedRevision !== ticket.revision) throw new Error('Reload the actual ticket revision and select a supported destination.');
   for (const value of [d.actor, d.source, d.reason, d.checkpoint, d.nextOwner, d.nextAction, d.handoff]) requireText(value, 'Actual lifecycle decision, checkpoint and handoff');
   if (!d.evidence?.length || !d.scope || !['assignment', 'revision'].includes(d.scope.kind)) throw new Error('Reference the actual decision and its assignment/revision scope.');
-  d.evidence.forEach(e => { if (e.path === ticket.path) throw new Error('Keep decision evidence in an immutable source/snapshot, not the ticket this transition changes.'); verifyEvidence(root, e); });
+  d.evidence.forEach(e => { if (resolve(root, e.path).toLowerCase() === resolve(root, ticket.path).toLowerCase()) throw new Error('Keep decision evidence in an immutable source/snapshot, not the ticket this transition changes.'); verifyEvidence(root, e); });
   if (d.scope.kind === 'revision' && !/^[a-f0-9]{40}$/.test(d.scope.revision)) throw new Error('Identify the exact revision covered by the inactive decision.');
   if (request.to === 'Deferred') {
     const r = d.review; if (!r) throw new Error('Deferral needs an owner, review date/trigger and resume conditions.');
@@ -150,8 +154,17 @@ function markdownFiles(root: string, folder = ''): string[] {
     return e.isDirectory() ? markdownFiles(root, path) : e.name.endsWith('.md') ? [path] : [];
   });
 }
+function proseLines(text: string, rewrite: (line: string) => string) {
+  let fence: { char: string; length: number } | null = null;
+  return text.split(/(?<=\n)/).map(line => {
+    if (fence) { if (new RegExp(`^ {0,3}${fence.char}{${fence.length},}\\s*$`).test(line.trimEnd())) fence = null; return line; }
+    const opening = line.match(/^ {0,3}(`{3,}|~{3,})(.*)/);
+    if (opening) { fence = { char: opening[1]![0]!, length: opening[1]!.length }; return line; }
+    return rewrite(line);
+  }).join('');
+}
 function rewriteLinks(root: string, text: string, oldFile: string, newFile: string, from: string, to: string) {
-  return text.split(/(```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`)/g).map((part, index) => index % 2 ? part : part.replace(/(!?\[[^\]\n]*\]\()(<[^>]+>|[^\s)]+)([^\n)]*\))/g, (full, prefix, raw, suffix) => {
+  return proseLines(text, line => line.split(/(`+[^\n]*?`+)/g).map((part, index) => index % 2 ? part : part.replace(/(!?\[[^\]\n]*\]\()(<[^>]+>|[^\s)]+)([^\n)]*\))/g, (full, prefix, raw, suffix) => {
     const url = raw.replace(/^<|>$/g, ''); if (/^[a-z][\w+.-]*:|^\/|^#/i.test(url)) return full;
     const at = url.search(/[?#]/), path = at < 0 ? url : url.slice(0, at), tail = at < 0 ? '' : url.slice(at);
     let target: string; try { target = resolve(root, dirname(oldFile), decodeURIComponent(path)); } catch { return full; }
@@ -159,7 +172,18 @@ function rewriteLinks(root: string, text: string, oldFile: string, newFile: stri
     const changed = relative(resolve(root, dirname(newFile)), moved ? resolve(root, to) : target).replaceAll('\\', '/');
     const result = changed.split('/').map(encodeURIComponent).join('/') + tail;
     return prefix + (raw.startsWith('<') ? `<${result}>` : result) + suffix;
-  })).join('');
+  })).join(''));
+}
+const navigationPath = `${boardRoot}/README.md`;
+function navigationContent(root: string, text: string, path: string, from: string, to: string) {
+  const start = '<!-- qa-navigation:start -->', end = '<!-- qa-navigation:end -->';
+  if (path !== navigationPath || text.split(start).length !== 2 || text.split(end).length !== 2) throw new Error('Authorize only the board index with one explicit mutable qa-navigation block.');
+  const visible: string[] = [];
+  proseLines(text, line => { if ([start, end].includes(line.trimEnd())) visible.push(line.trimEnd()); return line; });
+  if (visible.join('\n') !== `${start}\n${end}`) throw new Error('Mutable navigation markers must be standalone prose, outside code examples.');
+  const first = text.indexOf(start) + start.length, last = text.indexOf(end);
+  if (last < first) throw new Error('The mutable navigation markers are out of order.');
+  return text.slice(0, first) + rewriteLinks(root, text.slice(first, last), path, path, from, to) + text.slice(last);
 }
 function prepare(root: string, request: Transition): Journal {
   safeKey(request.id); const path = `.local/board-transitions/${request.id}.json`, hash = digest(JSON.stringify(request));
@@ -178,15 +202,27 @@ function prepare(root: string, request: Transition): Journal {
   content = rewriteLinks(root, content, ticket.path, destination, ticket.path, destination);
   content += `\n### Lifecycle: ${request.to} — ${event.at}\n\n\`\`\`qa-lifecycle\n${JSON.stringify(event, null, 2)}\n\`\`\`\n`;
   if (lifecycle(content)?.id !== request.id) throw new Error('The lifecycle entry could not be placed outside ticket examples; reconcile the Markdown first.');
-  const patches: Patch[] = [], ownerUpdates: Journal['ownerUpdates'] = [];
+  const patches: Patch[] = [], ownerUpdates: Journal['ownerUpdates'] = [], linkUpdates: NonNullable<Journal['linkUpdates']> = [];
+  const navigation = request.navigation ?? [];
+  if (!Array.isArray(navigation) || navigation.length > 1) throw new Error('Select at most the explicit mutable board navigation index.');
+  for (const permission of navigation) {
+    requireText(permission.source, 'Actual mutable-navigation maintenance authorization');
+    if (permission.path !== navigationPath || revision(root, permission.path) !== permission.expectedRevision || request.decision.evidence.some(e => resolve(root, e.path).toLowerCase() === resolve(root, permission.path).toLowerCase())) throw new Error('Mutable navigation cannot override evidence protection or an expected revision.');
+    navigationContent(root, readFileSync(contained(root, permission.path), 'utf8'), permission.path, ticket.path, destination);
+  }
   for (const file of markdownFiles(root)) {
     if (file === ticket.path) continue;
     const before = readFileSync(contained(root, file), 'utf8'), after = rewriteLinks(root, before, file, file, ticket.path, destination);
     if (before === after) continue;
     if (file.startsWith('Project Context/')) ownerUpdates.push({ path: file, destination });
-    else patches.push({ path: file, before: digest(before), content: after });
+    else {
+      const permission = navigation.find(n => n.path === file);
+      const mutable = permission ? navigationContent(root, before, file, ticket.path, destination) : before;
+      if (mutable !== before) patches.push({ path: file, before: digest(before), original: before, content: mutable, source: permission!.source });
+      if (mutable !== after) linkUpdates.push({ path: file, destination, expectedRevision: digest(mutable) });
+    }
   }
-  const journal: Journal = { schemaVersion: 1, id: request.id, requestHash: hash, ticketId: ticket.id, from: ticket.path, to: destination, before: ticket.revision, content, patches, ownerUpdates, state: 'prepared' };
+  const journal: Journal = { schemaVersion: 2, id: request.id, requestHash: hash, ticketId: ticket.id, from: ticket.path, to: destination, before: ticket.revision, content, patches, ownerUpdates, linkUpdates, state: 'prepared' };
   save(root, path, journal, null); return journal;
 }
 function complete(root: string, journal: Journal) {
@@ -199,9 +235,15 @@ function complete(root: string, journal: Journal) {
   };
   regularDirectory(root, boardRoot);
   for (const status of statuses) regularDirectory(root, `${boardRoot}/${status}`);
-  if (journal.schemaVersion !== 1 || !validId(journal.ticketId) || !validTicketPath(journal.from) || !validTicketPath(journal.to) || journal.from.split('/').at(-1) !== journal.to.split('/').at(-1) || !Array.isArray(journal.patches) || journal.patches.some(p => forbiddenPatch(p.path) || !p.path.endsWith('.md')) || !['prepared', 'completed'].includes(journal.state)) throw new Error('Unsupported or out-of-scope transition journal; preserve it for reconciliation.');
+  if (![1, 2].includes(journal.schemaVersion) || !validId(journal.ticketId) || !validTicketPath(journal.from) || !validTicketPath(journal.to) || journal.from.split('/').at(-1) !== journal.to.split('/').at(-1) || !Array.isArray(journal.patches) || journal.patches.some(p => forbiddenPatch(p.path) || !p.path.endsWith('.md')) || !['prepared', 'completed'].includes(journal.state)) throw new Error('Unsupported or out-of-scope transition journal; preserve it for reconciliation.');
   safeKey(journal.id);
   if (journal.state === 'completed') return journal;
+  if (journal.schemaVersion !== 2) throw new Error('This pending journal uses the old broad link-repair rules. Preserve it and obtain a reviewed reconciliation before any recovery writes.');
+  const entry = lifecycle(journal.content);
+  if (entry?.id !== journal.id || entry.to !== journal.to.split('/')[1]) throw new Error('The journal lifecycle does not match its recorded destination.');
+  for (const patch of journal.patches) {
+    if (patch.path !== navigationPath || !patch.source?.trim() || typeof patch.original !== 'string' || digest(patch.original) !== patch.before || entry.evidence.some(e => resolve(root, e.path).toLowerCase() === resolve(root, patch.path).toLowerCase()) || navigationContent(root, patch.original, patch.path, journal.from, journal.to) !== patch.content) throw new Error('An out-of-scope navigation patch cannot be replayed; preserve evidence and reconcile.');
+  }
   const after = digest(journal.content), fromHash = revision(root, journal.from), toHash = revision(root, journal.to);
   if (journal.from === journal.to) {
     if (fromHash !== after) replace(root, journal.from, journal.content, journal.before);

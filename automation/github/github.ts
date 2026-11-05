@@ -50,6 +50,8 @@ function controlsRevision(ticket: Ticket, head: string) {
   return ticket.status !== 'Tested-Ok' && !(inactive(ticket.status) && ticket.lifecycle?.scope.kind === 'revision' && ticket.lifecycle.scope.revision !== head);
 }
 function controllingTicket(related: Ticket[], head: string) {
+  const unresolved = related.find(t => t.issues.length);
+  if (unresolved) throw new Error(`Reconcile lifecycle for ${unresolved.id}: ${unresolved.issues.join(' ')}`);
   const controlling = related.filter(t => controlsRevision(t, head));
   if (controlling.length > 1) throw new Error('Multiple assignments control this PR; reconcile their scopes without dropping inactive decisions.');
   return controlling[0];
@@ -106,28 +108,80 @@ export function assertRegression(root: string, policy: RegressionPolicy, pr: Pul
 }
 interface RunRecord { schemaVersion: 1; key: string; head: string; testedCommit: string; buildId: string; status: 'running' | 'completed' | 'uncertain'; startedAt: string; completedAt?: string; exitCode?: number; productVerdict: 'Not assessed'; source: string; ticketId: string; generation: string; operationId: string; lifecycleStopRequested?: boolean }
 export type RegressionRunner = (command: { executable: string; args: string[] }, options: { cwd: string; windowsHide: boolean; timeout: number; maxBuffer: number; env: NodeJS.ProcessEnv; signal: AbortSignal }) => Promise<unknown>;
-function runBinding(root: string, policy: RegressionPolicy, pr: PullRequest, target: ObservedTarget) {
-  const base = assertRegression(root, policy, pr, target), ticket = executionAssignment(root, pr);
-  // An upgrade must not silently repeat legacy work whose ticket binding is unknown.
-  const legacy = [`.local/github-runs/${base}.json`, `.local/github-dispatch/${base}.json`].filter(path => revision(root, path));
-  if (legacy.length) {
-    const reconciliation = load<{ ticketId: string; legacyRecords: Evidence[]; evidence: Evidence[] } | null>(root, `.local/github-legacy-reconciliations/${base}.json`, () => null).value;
-    if (!reconciliation || reconciliation.ticketId !== ticket.id || !reconciliation.evidence?.length || reconciliation.legacyRecords?.length !== legacy.length) throw new Error('A legacy unbound run exists; use github reconcile-legacy with actual terminal-state evidence before a new ticket-bound attempt.');
+type LegacyKind = 'localRegression' | 'workflowDispatch';
+interface LegacyObservation { ticketId: string; generation?: string; kind?: LegacyKind; terminalState: 'completed' | 'stopped' | 'notStarted'; nextAction?: 'retain' | 'retry'; retrySource?: string; legacyRecords: Evidence[]; evidence: Evidence[]; history?: Evidence }
+function legacyPath(base: string, kind: LegacyKind) { return kind === 'localRegression' ? `.local/github-runs/${base}.json` : `.local/github-dispatch/${base}.json`; }
+function observedLegacy(root: string, base: string, kind: LegacyKind, ticket: Ticket) {
+  const path = legacyPath(base, kind);
+  let legacy: { ref: Evidence; observation: Evidence; value: LegacyObservation } | undefined;
+  if (revision(root, path)) {
+    const scoped = `.local/github-legacy-reconciliations/${base}-${kind}.json`, previous = `.local/github-legacy-reconciliations/${base}.json`;
+    const observationPath = revision(root, scoped) ? scoped : previous;
+    const reconciliation = load<LegacyObservation | null>(root, observationPath, () => null).value;
+    if (!reconciliation || reconciliation.ticketId !== ticket.id || reconciliation.generation && reconciliation.generation !== ticket.generation || reconciliation.kind && reconciliation.kind !== kind || !['completed', 'stopped', 'notStarted'].includes(reconciliation.terminalState) || reconciliation.nextAction !== undefined && !['retain', 'retry'].includes(reconciliation.nextAction) || !reconciliation.evidence?.length || reconciliation.legacyRecords?.length !== 1 || reconciliation.legacyRecords[0]?.path !== path) throw new Error('A legacy unbound run exists; use github reconcile-legacy for its actual kind and terminal state before reuse or a ticket-bound attempt.');
     [...reconciliation.legacyRecords, ...reconciliation.evidence].forEach(e => verifyEvidence(root, e));
-    if (legacy.some(path => !reconciliation.legacyRecords.some(e => e.path === path))) throw new Error('Legacy history changed; reconcile its actual outcome again.');
+    if (reconciliation.history) {
+      verifyEvidence(root, reconciliation.history);
+      const { history, ...observed } = reconciliation;
+      if (digest(JSON.stringify(load(root, history.path, () => null).value)) !== digest(JSON.stringify(observed))) throw new Error('The legacy observation does not match its immutable history.');
+    }
+    legacy = { ref: reconciliation.legacyRecords[0]!, observation: reconciliation.history ?? { path: observationPath, sha256: revision(root, observationPath)! }, value: reconciliation };
   }
-  return { ticket, key: digest(`${base}:${ticket.id}:${ticket.generation}`) };
+  return legacy;
 }
-export function reconcileLegacy(root: string, policy: RegressionPolicy, pr: PullRequest, target: ObservedTarget, request: { ticketId: string; actor: string; source: string; terminalState: 'completed' | 'stopped' | 'notStarted'; evidence: Evidence[] }) {
+function runBinding(root: string, policy: RegressionPolicy, pr: PullRequest, target: ObservedTarget, kind: LegacyKind) {
+  const base = assertRegression(root, policy, pr, target), ticket = executionAssignment(root, pr);
+  const key = digest(`${base}:${ticket.id}:${ticket.generation}`);
+  return { ticket, key, kind, base, legacy: undefined as ReturnType<typeof observedLegacy> };
+}
+function bindLegacy(root: string, binding: ReturnType<typeof runBinding>) {
+  const { ticket, key, kind, base } = binding, legacy = observedLegacy(root, base, kind, ticket);
+  if (legacy) {
+    if (legacy.value.nextAction === 'retry') {
+      requireText(legacy.value.retrySource, 'Actual separate authorization to start a new attempt');
+      if (revision(root, `.local/github-legacy-bindings/${key}-${kind}.json`)) throw new Error('This generation already retains a legacy result; use a separately reviewed new scope/generation rather than replacing its history.');
+    } else if (legacy.value.terminalState !== 'completed') throw new Error('The old attempt is terminal but no new attempt was authorized; reconcile with an actual retry decision or retain the stopped work.');
+  }
+  return { ticket, key, legacy, kind, base };
+}
+function assertLegacyStart(root: string, binding: ReturnType<typeof runBinding>) {
+  if (binding.legacy && (revision(root, `.local/github-legacy-bindings/${binding.key}-${binding.kind}.json`) || observedLegacy(root, binding.base, binding.kind, binding.ticket)?.value.nextAction !== 'retry')) throw new Error('The legacy binding/decision changed before the new attempt; reload rather than replace retained history.');
+  // A new side effect must not overlap an unresolved legacy operation in the other channel.
+  observedLegacy(root, binding.base, binding.kind === 'localRegression' ? 'workflowDispatch' : 'localRegression', binding.ticket);
+}
+export function reconcileLegacy(root: string, policy: RegressionPolicy, pr: PullRequest, target: ObservedTarget, request: { ticketId: string; actor: string; source: string; terminalState: 'completed' | 'stopped' | 'notStarted'; evidence: Evidence[]; kind?: LegacyKind; nextAction?: 'retain' | 'retry'; retrySource?: string }) {
   const base = assertRegression(root, policy, pr, target); requireText(request.actor); requireText(request.source);
-  if (!['completed', 'stopped', 'notStarted'].includes(request.terminalState) || !request.evidence?.length || !relatedTickets(root, pr).some(t => t.id === request.ticketId)) throw new Error('Identify the actual PR assignment and observed terminal outcome of its legacy execution.');
+  const ticket = relatedTickets(root, pr).find(t => t.id === request.ticketId);
+  if (!['completed', 'stopped', 'notStarted'].includes(request.terminalState) || !request.evidence?.length || !ticket || request.nextAction && !['retain', 'retry'].includes(request.nextAction)) throw new Error('Identify the actual PR assignment and observed terminal outcome of its legacy execution.');
+  if (request.nextAction === 'retry') requireText(request.retrySource, 'Actual separate retry decision');
   request.evidence.forEach(e => verifyEvidence(root, e));
-  const legacyRecords = [`.local/github-runs/${base}.json`, `.local/github-dispatch/${base}.json`].filter(path => revision(root, path)).map(path => ({ path, sha256: revision(root, path)! }));
-  if (!legacyRecords.length) throw new Error('No matching legacy execution was found; do not create a synthetic reconciliation.');
-  const path = `.local/github-legacy-reconciliations/${base}.json`;
-  const value = { ...request, legacyRecords, at: new Date().toISOString(), effect: 'Records an accountable observation only; task eligibility and matching execution authorization still apply.' };
+  const kinds = (['localRegression', 'workflowDispatch'] as const).filter(k => revision(root, legacyPath(base, k)));
+  const kind = request.kind ?? (kinds.length === 1 ? kinds[0] : undefined);
+  if (!kind || !kinds.includes(kind)) throw new Error('Select the actual legacy execution kind; local and dispatched outcomes must be reconciled separately.');
+  const legacyRecords = [{ path: legacyPath(base, kind), sha256: revision(root, legacyPath(base, kind))! }];
+  const path = `.local/github-legacy-reconciliations/${base}-${kind}.json`;
+  const value = { ...request, kind, generation: ticket.generation, nextAction: request.nextAction ?? 'retain', legacyRecords, at: new Date().toISOString(), effect: 'Preserves actual terminal evidence. Completed results are reused; a retry requires its separate decision and matching execution policy.' };
   const history = `.local/github-legacy-reconciliation-history/${base}-${digest(JSON.stringify(value)).slice(0, 20)}.json`;
-  save(root, history, value, null); save(root, path, value, revision(root, path)); return { base, ticketId: request.ticketId, history, legacyRecords: 'Preserved unchanged' };
+  return withLock(root, 'qa-board', () => { save(root, history, value, null); save(root, path, { ...value, history: { path: history, sha256: revision(root, history)! } }, revision(root, path)); return { base, kind, ticketId: request.ticketId, history, legacyRecords: 'Preserved unchanged' }; });
+}
+function retainLegacy(root: string, binding: ReturnType<typeof runBinding>) {
+  const legacy = binding.legacy;
+  if (!legacy || legacy.value.nextAction === 'retry') return null;
+  return withLock(root, 'qa-board', () => {
+    assertExecutable(root, binding.ticket.id, binding.ticket.generation);
+    const bound = binding.kind === 'localRegression' ? `.local/github-runs/${binding.key}.json` : `.local/github-dispatch/${binding.key}.json`;
+    if (revision(root, bound)) throw new Error('A ticket-bound attempt already exists; reload its actual state instead of substituting legacy history.');
+    verifyEvidence(root, legacy.ref); verifyEvidence(root, legacy.observation);
+    const path = `.local/github-legacy-bindings/${binding.key}-${binding.kind}.json`;
+    const record = { ticketId: binding.ticket.id, generation: binding.ticket.generation, legacy: legacy.ref, observedTerminalState: legacy.value.terminalState, observation: legacy.observation, productVerdict: 'Not assessed' };
+    const existing = load<typeof record | null>(root, path, () => null).value;
+    if (existing) {
+      if (existing.ticketId !== binding.ticket.id || existing.generation !== binding.ticket.generation || existing.legacy.path !== legacy.ref.path || existing.legacy.sha256 !== legacy.ref.sha256 || existing.observedTerminalState !== 'completed') throw new Error('The retained binding does not match this assignment and legacy result; preserve it for reconciliation.');
+      verifyEvidence(root, existing.legacy); verifyEvidence(root, existing.observation);
+    }
+    else save(root, path, record, null);
+    return existing ?? record;
+  });
 }
 function watchTicket(root: string, ticket: Ticket, operationId: string, onStop: () => void) {
   let requested = false;
@@ -140,11 +194,19 @@ function watchTicket(root: string, ticket: Ticket, operationId: string, onStop: 
   return { finish: () => { clearInterval(timer); check(); return requested; } };
 }
 export async function executeRegression(root: string, policy: RegressionPolicy, pr: PullRequest, target: ObservedTarget, source: string, runner: RegressionRunner = (command, options) => exec(command.executable, command.args, options)) {
-  requireText(source); const { ticket, key } = runBinding(root, policy, pr, target), path = `.local/github-runs/${key}.json`;
+  requireText(source); let binding = runBinding(root, policy, pr, target, 'localRegression');
+  const { ticket, key } = binding, path = `.local/github-runs/${key}.json`;
   const existing = load<RunRecord | null>(root, path, () => null);
   if (existing.value) {
     if (existing.value.status !== 'completed') throw new Error('A previous invocation is running or uncertain. Inspect its outcome before any retry.');
     return { action: 'unchanged', record: existing.value };
+  }
+  binding = bindLegacy(root, binding);
+  if (binding.legacy && binding.legacy.value.nextAction !== 'retry') {
+    const record = load<Omit<RunRecord, 'ticketId' | 'generation' | 'operationId'>>(root, binding.legacy.ref.path, () => { throw new Error('Missing legacy result.'); }).value;
+    if (record.schemaVersion !== 1 || record.head !== pr.head || record.testedCommit !== target.commit || record.buildId !== target.buildId || record.key !== assertRegression(root, policy, pr, target) || record.productVerdict !== 'Not assessed') throw new Error('The retained legacy result identity is incomplete or inconsistent; inspect it without rerunning.');
+    const retained = retainLegacy(root, binding)!;
+    return { action: 'unchanged', record, retained, next: 'Review original exit/results and the terminal observation. Missing suite outcomes remain unknown; migration is not a new run or QA verdict.' };
   }
   const operationId = `regression-${key}`, controller = new AbortController();
   const record: RunRecord = { schemaVersion: 1, key, head: pr.head, testedCommit: target.commit, buildId: target.buildId, status: 'running', startedAt: new Date().toISOString(), productVerdict: 'Not assessed', source, ticketId: ticket.id, generation: ticket.generation, operationId };
@@ -154,6 +216,7 @@ export async function executeRegression(root: string, policy: RegressionPolicy, 
     const work = withLock(root, 'qa-board', () => {
       assertExecutable(root, ticket.id, ticket.generation);
       if (revision(root, path)) throw new Error('Another worker already claimed this regression.');
+      assertLegacyStart(root, binding);
       startOperation(root, ticket, { id: operationId, source, kind: 'localRegression', resultPath: path });
       save(root, path, record, null);
       monitor = watchTicket(root, ticket, operationId, () => controller.abort());
@@ -174,14 +237,26 @@ export async function executeRegression(root: string, policy: RegressionPolicy, 
   return { action: 'executed', record, resultFolder, next: 'Retain redacted suite artifacts in QA_RESULT_DIR, inspect their actual checks and continue findings review; process exit alone is not a QA verdict.' };
 }
 export async function dispatchRegression(root: string, policy: RegressionPolicy, pr: PullRequest, target: ObservedTarget, runner: GhRunner = runGh) {
-  const { ticket, key } = runBinding(root, policy, pr, target); if (!policy.dispatch) throw new Error('No workflow dispatch was approved.');
+  let binding = runBinding(root, policy, pr, target, 'workflowDispatch');
+  const { ticket, key } = binding; if (!policy.dispatch) throw new Error('No workflow dispatch was approved.');
   const path = `.local/github-dispatch/${key}.json`;
+  const bound = load<{ state: string } | null>(root, path, () => null).value;
+  if (bound?.state === 'dispatched') return { ...bound, key, action: 'unchanged', result: 'Not yet observed' };
+  if (bound) throw new Error('A dispatch already exists and its outcome is uncertain. Inspect its actual GitHub run before repeating.');
+  binding = bindLegacy(root, binding);
+  if (binding.legacy && binding.legacy.value.nextAction !== 'retry') {
+    const receipt = load<{ key: string; head: string; testedCommit?: string }>(root, binding.legacy.ref.path, () => { throw new Error('Missing legacy receipt.'); }).value;
+    if (receipt.key !== assertRegression(root, policy, pr, target) || receipt.head !== pr.head || receipt.testedCommit && receipt.testedCommit !== target.commit) throw new Error('The original dispatch identity is inconsistent; inspect it without redispatching.');
+  }
+  const retained = retainLegacy(root, binding);
+  if (retained) return { key, action: 'unchanged', retained, result: 'Original dispatch and terminal observation retained; suite results and QA verdict require their actual evidence.' };
   const operationId = `dispatch-${key}`;
   const previous = withLock(root, 'qa-board', () => {
     assertExecutable(root, ticket.id, ticket.generation);
     const existing = load<{ state: string } | null>(root, path, () => null).value;
     if (existing?.state === 'dispatched') return existing;
     if (existing) throw new Error('A dispatch already exists and its outcome is uncertain. Inspect its actual GitHub run before repeating.');
+    assertLegacyStart(root, binding);
     startOperation(root, ticket, { id: operationId, source: `Reviewed policy ${policy.id}/${policy.revision}; ${pr.url}`, kind: 'workflowDispatch', resultPath: path });
     save(root, path, { key, state: 'invoking', head: pr.head, testedCommit: target.commit, ticketId: ticket.id, generation: ticket.generation, operationId, workflow: policy.dispatch!.workflow, ref: policy.dispatch!.ref }, null);
     return null;

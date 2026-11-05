@@ -15,6 +15,12 @@ status/generation before starts/dispatches and after waits. Inspect due Deferred
 reviews and prior notices; brief once and acknowledge only the actual message.
 Dates, new PR commits and late replies do not override an inactive decision.
 Preserve actual scope, history, partial results and independent linked bugs.
+Preserve hashed evidence during ticket moves; review incoming link proposals and
+edit only authorized mutable navigation. Reconcile older prepared broad-repair
+journals before recovery writes. Ordinary Markdown examples do not block unrelated
+assignments; actual malformed lifecycle decisions still block affected work.
+Reuse observed completed legacy results without rerunning. A terminal observation
+does not authorize a retry; keep the separate actual decision and policy scope.
 For in-flight work request supported safe stops and verify actual process/workflow
 state; folder moves/abort errors/dispatch receipts do not prove termination.
 Reactivation needs an actual decision, appropriate queue and affected prerequisite
@@ -74,5 +80,7 @@ Follow [task-based tool selection](../automation/tools/task-selection.md) and th
 ## Lifecycle eligibility and reviews
 
 Before resuming a claim, starting an action, dispatching CI or continuing after a reply, reread the canonical folder and lifecycle generation. Deferred/Canceled work is not executable; a lower priority alone does not remove active work. Inspect all seven folders for IDs/deduplication, and use [the board helper](board/README.md) for transitions/recovery. Do not restart an inactive ticket because a PR changed or a review date passed.
+
+Preserve immutable evidence when moving tickets; review incoming link proposals and edit only authorized mutable navigation. Reconcile older prepared broad-repair journals before recovery writes. Keep malformed lifecycle diagnostics local to affected work; ordinary report examples do not disable independent assignments. Reuse completed legacy results/dispatches after actual reconciliation without rerunning; observation alone does not authorize a retry.
 
 Inspect due Deferred reviews, provide one actual owner briefing, then acknowledge that briefing reference. Read prior notices and responses before asking again. Continue existing stop/cleanup follow-up without treating it as resumed testing. Preserve unknown outcomes and require actual terminal observations before reactivation. A manual file move does not cancel an already running external job. Existing schedules are not activated or rewritten by this package upgrade.

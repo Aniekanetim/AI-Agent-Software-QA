@@ -73,10 +73,10 @@ async function main() {
     else if (action === 'status') {
       const missing = board.missingFolders(root), pending = board.pendingTransitions(root);
       if (missing.length || pending.length) output({ missing, pending, next: missing.length ? 'Run board upgrade with the actual instruction.' : 'Recover the original transition ID; do not reset its journal.' });
-      else output({ tickets: board.tickets(root).filter(t => !options.has('ticket') || t.id === option('ticket')).map(({ text, ...ticket }) => ({ ...ticket, issues: board.inactive(ticket.status) && !ticket.lifecycle ? ['Actual lifecycle decision is missing; execution remains blocked.'] : [] })), authorization: 'Not established by folder placement or metadata.' });
+      else output({ tickets: board.tickets(root).filter(t => !options.has('ticket') || t.id === option('ticket')).map(({ text, ...ticket }) => ({ ...ticket, issues: [...ticket.issues, ...(board.inactive(ticket.status) && !ticket.lifecycle ? ['Actual lifecycle decision is missing; execution remains blocked.'] : [])] })), authorization: 'Not established by folder placement or metadata.' });
     } else if (action === 'transition' || action === 'recover') {
       const record = action === 'transition' ? board.transitionTicket(root, input<board.Transition>()) : board.recoverTransition(root, option('id'));
-      output({ id: record.id, ticketId: record.ticketId, state: record.state, recordedDestination: record.to, ownerUpdates: record.ownerUpdates });
+      output({ id: record.id, ticketId: record.ticketId, state: record.state, recordedDestination: record.to, ownerUpdates: record.ownerUpdates, linkUpdates: record.linkUpdates ?? [] });
     }
     else if (action === 'assert-executable') { const t = board.assertExecutable(root, option('ticket'), options.get('generation')); output({ ticketId: t.id, status: t.status, generation: t.generation, authorization: 'Actual test scope/review still required.' }); }
     else if (action === 'operations') output(board.operations(root, option('ticket')));
