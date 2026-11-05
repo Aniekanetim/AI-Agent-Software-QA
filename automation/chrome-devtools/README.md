@@ -76,6 +76,8 @@ npm run qa -- chrome mcp-config
 
 The output uses the selected executable, explicit Chrome feature/category flags and project constraints. Add it through the harness's supported configuration procedure only when authorized. It does not itself register or connect an MCP server. Native-host mode already has a connection and does not need this command.
 
+If the harness loads a different server or exposes no WebMCP operations, follow [native connection diagnosis and setup](../../docs/native-webmcp-connection.md). It covers the actual loaded version, Windows command paths, preserving existing connections, restart requirements and separate protocol/browser/outcome evidence. A timed-out `--autoConnect` probe is not a reason to reinstall compatible tooling or weaken the sandbox.
+
 For CLI operation, prepare `.local/chrome-scope.json` containing `source` and `authorization`, an array of actual evidence references to the reviewed action scope. Then:
 
 ```shell
@@ -126,15 +128,23 @@ The reviewed scope must cover the actual operation and inputs. A nonempty source
 
 Programmatic terminal SDK use is available through `withMcpSession`, `openPage`, `captureInventory`, `execute` and `confirmOutcome`. The SDK callback receives a `Bridge`; it is scoped to that owned connection and is closed after the callback. Do not classify it as `chromeDevtoolsHost`.
 
+For authorized local script-file evaluation, the CLI bridge accepts `evaluate_script` with `pageId` and `sourcePath` instead of an inline `function`. The browser bridge enforces its configured filesystem roots. This adapter rejects HTTP/file URLs for source retrieval; it does not grant remote script-fetch authority. Script evaluation still requires the actual task's JavaScript/data/access scope.
+
 ## Native harness evidence
 
 Use the harness's actual `list_webmcp_tools` / `execute_webmcp_tool` calls when accessible and suitable. Record actual call references and sanitized evidence. `tools import-host` accepts `chromeDevtoolsHost` records with a real `connectionReference` and per-operation evidence. Verify `hostConnection`, relevant operations and actual visibility separately. An MCP installation or terminal rehearsal cannot supply those observations.
 
-`chrome import-host-inventory --input` accepts a fresh `HostObservation`: source, matching connectionReference, target, channel, original checkedAt, tools, documentId/browser/apiObserved (or null when unverified), and actual native-call evidence. It requires the same verified host connection and discovery operation. It imports accountable observations; it cannot prove entered prose came from a real call. Agent-native integrations can alternatively implement the `Bridge` interface and use the same capture/execution helpers with actual host calls. Native tools' configuration and privacy state must be inspected through the host; saving desired settings does not change them.
+`chrome import-host-inventory --input` accepts a fresh `HostObservation`: source, matching connectionReference, target, channel, original checkedAt, tools, documentId/browser/apiObserved (or null when unverified), `documents`, and actual native-call evidence. Run the [document-context inspection function](document-context.ts) through the actual native `evaluate_script` call when authorized, and retain its returned `documents` array alongside the actual catalogue-call evidence. Each document has `path`, `documentId` and its full `url`; the helper hashes URLs in memory instead of persisting their query strings/fragments. Keep raw authentication URLs out of shared call evidence. Do not invent frame identities or a hash.
+
+It requires the same verified host connection and discovery operation. An older observation with no document-tree evidence remains readable history and supports discovery only; refresh it before helper execution. The importer cannot prove entered prose came from a real call. Agent-native integrations can alternatively implement the `Bridge` interface and use the same capture/execution helpers with actual host calls. Native tools' configuration and privacy state must be inspected through the host; saving desired settings does not change them.
 
 ## Interpret inventories and results
 
-Inventories expire after five minutes and retain page/role/state/build/source/configuration bindings. The local adapters relist tools immediately before execution. When JavaScript inspection is authorized, they also compare the document's time origin to detect same-URL reloads. If it is disabled, this additional browser/API/document inspection remains unverified and is recorded as a limitation. Reobserve navigation and actual browser compatibility through available means. The bridge catalogue does not supply frame IDs; ambiguous duplicate names are rejected.
+Inventories expire after five minutes and retain page/role/state/build/source/configuration bindings. The adapters relist tools and inspect documents immediately before execution. A hash binds the complete inspectable same-origin frame tree: frame positions, document time origins and full-URL hashes. Parent or iframe navigation, same-URL reload, addition, removal and reordering require a fresh inventory even if tool names and schemas stay unchanged. Ambiguous duplicate tool names remain rejected.
+
+The pinned bridge does not return tool frame IDs. This tree binding is a conservative preflight check, not an atomic browser-side handle to an individual tool's document. Opaque/cross-origin frames, oversized/deep trees, disabled JavaScript inspection and historical inventories without the binding remain observation-only; task readiness and helper execution fail closed. Use another suitable method for dependent work or obtain the missing inspection within existing scope. Never bypass a browser origin boundary to inspect a frame. Cross-origin delegation is not claimed as an executable helper capability.
+
+Settings accept exact HTTPS origins and loopback HTTP origins. Wildcard/pattern hosts are rejected before generating browser allowlist patterns. A saved setting is still distinct from the actual configuration of a native host connection.
 
 A matching catalogue cannot establish the same signed-in principal. Refresh role/account observations after login, logout, role switches, changes through another tool or other session changes. Retain prior inventories as history. Empty catalogues mean no tools were observed under those conditions; they do not prove permanent absence or a product defect.
 
@@ -159,13 +169,19 @@ Use authorized tools to prepare actual synthetic application records when suitab
 ```shell
 npm run check
 npm test
+npm run chrome:install
 npm run test:chrome
 ```
 
-`test:chrome` runs MCP-server and CLI rehearsals against a loopback fixture using the pinned Playwright browser as a compatible Chrome executable. It checks browser initialization before navigation and uses a private working path containing spaces on both CI systems. It never retries a failed action, adds a WebMCP polyfill or tests a real product. Install browser binaries explicitly through the existing browser procedure if absent. On Windows/Linux CI it uses headless operation; `QA_CHROME_HEADED=1` selects visible rehearsal where a display is available. The standalone `chrome rehearse` command also accepts `--executable` and explicit visibility.
+`test:chrome` runs MCP-server and CLI rehearsals against a loopback fixture. Its separate compatibility baseline is Chrome for Testing 156.0.8078.80 with bridge 1.12.0; [verification status and earlier failures](../../docs/windows-browser-startup.md) remain explicit. `chrome:install` downloads that exact browser to ignored `.local/chrome-for-testing/`, independently of Playwright's engine. Installation is explicit; a missing browser causes a clear failure without a system-browser fallback. The fixture uses a private working path containing spaces, never retries a failed action, installs no WebMCP polyfill and tests no real product. CI runs headless/headed fixtures, with Xvfb for headed Linux. `QA_CHROME_HEADED=1` selects headed integration execution; `QA_CHROME_REPEATS` repeats whole independent fixtures and stops on failure. The standalone `chrome rehearse` command retains explicit `--executable` and visibility choices. This package-fixture baseline is not an adopting project's default browser.
+
+The fixture exercises permitted file operations and denied reads/writes outside its workspace through absolute paths, relative traversal and a symlink/junction. All targets are disposable synthetic files inside the overall package's output folder. Hostile descriptions and tool output are deliberately returned as data; sentinel checks require no implicit action, forbidden request, retained output canary or automatic QA verdict. These checks cover the adapter's controlled pipeline, not every prompt-injection attack against an adopting agent or application.
+
+Fixture startup navigates only the blank tab in its own newly launched isolated browser. An intermittent Windows error when creating an additional initial tab is retained in the validation history; its upstream cause is unconfirmed. A real navigation/tool failure remains a failure that requires investigation before another attempt.
 
 | Finding | Action |
 | --- | --- |
+| Initial headed Windows navigation aborts | Record the actual browser/version, navigation response and server request count; compare the [verified package baseline](../../docs/windows-browser-startup.md) before repeating work. Earlier 156.0.8078.4/.47 combinations have retained failures. Keep affected capability evidence unverified and use other suitable demonstrated tools for independent work. |
 | Child process denied (`EPERM`/access denied) | Preserve installation and report the harness restriction; do not bypass it or mark browser execution verified |
 | Missing package/browser or incompatible version | Identify the exact dependency; reuse a compatible existing selection or prepare only what is missing |
 | No native MCP tools exposed | Keep native-host access unverified; use another permitted demonstrated route when suitable |

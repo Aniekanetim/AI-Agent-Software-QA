@@ -8,3 +8,5 @@ The workflow is MIT licensed. Dependencies retain their own licenses; installati
 - [Package release](https://github.com/ChromeDevTools/chrome-devtools-mcp/releases/tag/chrome-devtools-mcp-v1.12.0)
 
 Browser executables are installed separately under their applicable terms. No browser profiles, credentials, extension installations or model-service accounts are distributed with this repository.
+
+`@puppeteer/browsers` 3.2.6 is an Apache-2.0 development dependency used to install the explicitly pinned Chrome for Testing package fixture. Preserve its published LICENSE when redistributing that dependency. Browser downloads are separate from `npm ci --ignore-scripts` and do not change the system Chrome installation.

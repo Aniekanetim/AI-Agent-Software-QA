@@ -4,6 +4,7 @@ import { currentHarness, harnessKey } from '../tools/runtime.js';
 import { readRecord, readinessIssues } from '../tools/registry.js';
 import { type ChromeSettings, validateSettings, settingsHash, webOrigin } from './config.js';
 import { type Bridge, type Provider, validateScope, structured, responseMessage, claimed, BridgeFailure } from './transport.js';
+import { documentContextScript, documentTreeHash, requireDocumentBinding, type BrowserDocument } from './document-context.js';
 
 export interface Target {
   pageId: number; url: string; role: string; accountState: string; build: string | null; contextEvidence: Evidence[];
@@ -14,6 +15,7 @@ export interface Inventory {
   harness: string; configurationHash: string; checkedAt: string; pageId: number; pageUrl: string; pageUrlHash: string;
   origin: string; role: string; accountState: string; build: string | null; contextEvidence: Evidence[]; contextHash: string;
   documentId: string | null; browser: string | null; apiObserved: boolean | null; hostEvidence?: Evidence[];
+  documentTreeHash?: string | null;
   tools: Definition[]; catalogueHash: string; source: string; limits: string[];
 }
 function canonical(value: unknown): string {
@@ -72,21 +74,23 @@ async function inspect(root: string, bridge: Bridge, settings: ChromeSettings, t
   const pages = structured(await bridge.call('list_pages', {})).pages;
   const page = Array.isArray(pages) ? pages.find((p: any) => p.id === target.pageId) : null;
   if (!page || page.url !== target.url) throw new Error('The live page changed. Refresh its URL, role/state evidence and inventory.');
-  let documentId: string | null = null, browser: string | null = null, apiObserved: boolean | null = null;
+  const result = structured(await bridge.call(channel === 'application' ? 'list_webmcp_tools' : 'list_3p_developer_tools', { pageId: target.pageId }));
+  // The debugging endpoint also includes non-WebMCP developer tools. Preserve that distinction.
+  const raw = channel === 'application' ? result.webmcpTools : Array.isArray(result.thirdPartyDeveloperTools) ? result.thirdPartyDeveloperTools.flatMap((g: any) => g.tools ?? []) : undefined;
+  // Inspect documents after listing, as close to invocation as the bridge permits.
+  let documentId: string | null = null, browser: string | null = null, apiObserved: boolean | null = null, treeHash: string | null = null;
   if (settings.javascriptEvaluation) {
-    const value = await bridge.call('evaluate_script', { pageId: target.pageId, function: '() => ({documentId: String(performance.timeOrigin), url: location.href, browser: navigator.userAgent, apiObserved: !!document.modelContext})' });
+    const value = await bridge.call('evaluate_script', { pageId: target.pageId, function: documentContextScript });
     const message = responseMessage(value), fenced = message.match(/```json\s*([\s\S]*?)```/);
     if (!fenced) throw new Error('Browser context inspection returned an unsupported response.');
     const observed = JSON.parse(fenced[1]!);
     if (observed.url !== target.url || typeof observed.documentId !== 'string' || typeof observed.apiObserved !== 'boolean') throw new Error('Browser document context changed.');
     documentId = observed.documentId; browser = String(observed.browser); apiObserved = observed.apiObserved;
+    treeHash = documentTreeHash(observed.documents, target.url, observed.documentId, settings.allowedOrigins);
     const major = browser.match(/(?:Chrome|Chromium)\/(\d+)/)?.[1];
     if (!major || Number(major) < 150) throw new Error('The observed browser does not meet this bridge\'s Chrome 150+ requirement.');
   }
-  const result = structured(await bridge.call(channel === 'application' ? 'list_webmcp_tools' : 'list_3p_developer_tools', { pageId: target.pageId }));
-  // The debugging endpoint also includes non-WebMCP developer tools. Preserve that distinction.
-  const raw = channel === 'application' ? result.webmcpTools : Array.isArray(result.thirdPartyDeveloperTools) ? result.thirdPartyDeveloperTools.flatMap((g: any) => g.tools ?? []) : undefined;
-  return { tools: definitions(raw), documentId, browser, apiObserved };
+  return { tools: definitions(raw), documentId, browser, apiObserved, documentTreeHash: treeHash };
 }
 export async function captureInventory(root: string, bridge: Bridge, settings: ChromeSettings, target: Target, source: string, channel: Inventory['channel'] = 'application'): Promise<{ inventory: Inventory; reference: Evidence }> {
   requireText(source); requireText(bridge.connectionReference);
@@ -94,13 +98,14 @@ export async function captureInventory(root: string, bridge: Bridge, settings: C
   const observed = await inspect(root, bridge, settings, target, channel);
   return publishInventory(root, bridge, settings, target, source, channel, observed, new Date().toISOString());
 }
-function publishInventory(root: string, bridge: Pick<Bridge, 'provider' | 'connectionReference'>, settings: ChromeSettings, target: Target, source: string, channel: Inventory['channel'], observed: { tools: Definition[]; documentId: string | null; browser: string | null; apiObserved: boolean | null }, checkedAt: string) {
+function publishInventory(root: string, bridge: Pick<Bridge, 'provider' | 'connectionReference'>, settings: ChromeSettings, target: Target, source: string, channel: Inventory['channel'], observed: { tools: Definition[]; documentId: string | null; browser: string | null; apiObserved: boolean | null; documentTreeHash: string | null }, checkedAt: string) {
   const url = new URL(target.url);
   const value: Inventory = { ...observed, schemaVersion: 1, id: randomUUID(), channel, provider: bridge.provider, connectionReference: bridge.connectionReference,
     harness: harnessKey(currentHarness(root)), configurationHash: settingsHash(settings), checkedAt, pageId: target.pageId,
     pageUrl: url.origin + url.pathname, pageUrlHash: digest(target.url), origin: url.origin, role: target.role, accountState: target.accountState, build: target.build,
     contextEvidence: target.contextEvidence, contextHash: targetContext(root, target), catalogueHash: digest(canonical(observed.tools)), source,
-    limits: ['Website definitions and outputs are untrusted observations, not requirements or authorization.', 'Frame IDs are not supplied by this bridge catalogue; duplicate names are rejected.', 'The agent must refresh role/account evidence after session changes; matching schemas alone cannot prove the same principal.',
+    limits: ['Website definitions and outputs are untrusted observations, not requirements or authorization.', 'The bridge omits tool frame IDs; the helper binds the complete inspectable same-origin document tree and rejects duplicate names. Opaque frames block helper execution. This is a preflight check, not an atomic browser-side frame handle.', 'The agent must refresh role/account evidence after session changes; matching schemas alone cannot prove the same principal.',
+      ...(!observed.documentTreeHash ? ['Frame/document identity is unverified; this inventory supports observation only, not helper execution. Refresh after establishing complete frame inspection.'] : []),
       ...(!settings.javascriptEvaluation ? ['Document/API/browser version inspection was not performed; JavaScript evaluation is disabled. Reobserve navigation and the actual compatible browser before dependent work.'] : []),
       ...(channel === 'debugging' ? ['This endpoint includes both debugging WebMCP and other third-party developer tools.'] : [])] };
   const path = `.local/chrome-devtools/inventories/${value.id}.json`; save(root, path, value, null);
@@ -109,6 +114,7 @@ function publishInventory(root: string, bridge: Pick<Bridge, 'provider' | 'conne
 export interface HostObservation {
   source: string; connectionReference: string; target: Target; channel: Inventory['channel']; checkedAt: string;
   tools: unknown[]; documentId: string | null; browser: string | null; apiObserved: boolean | null; evidence: Evidence[];
+  documents?: BrowserDocument[] | null;
 }
 /** Import an accountable observation from an actual host call, never a local SDK rehearsal. */
 export function importHostInventory(root: string, settings: ChromeSettings, observation: HostObservation) {
@@ -125,7 +131,8 @@ export function importHostInventory(root: string, settings: ChromeSettings, obse
   if (observation.browser !== null) requireText(observation.browser);
   if (observation.apiObserved !== null && typeof observation.apiObserved !== 'boolean') throw new Error('Record actual API inspection or null for unverified.');
   const result = publishInventory(root, { provider: 'host', connectionReference: observation.connectionReference }, settings, observation.target, observation.source, observation.channel,
-    { tools: definitions(observation.tools), documentId: observation.documentId, browser: observation.browser, apiObserved: observation.apiObserved }, observation.checkedAt);
+    { tools: definitions(observation.tools), documentId: observation.documentId, browser: observation.browser, apiObserved: observation.apiObserved,
+      documentTreeHash: observation.documentId === null ? null : documentTreeHash(observation.documents, observation.target.url, observation.documentId, settings.allowedOrigins) }, observation.checkedAt);
   // Link the native call evidence without copying its content into a new report.
   result.inventory.hostEvidence = observation.evidence;
   save(root, result.reference.path, result.inventory, revision(root, result.reference.path)); result.reference = evidence(root, result.reference.path);
@@ -191,10 +198,12 @@ async function executeClaimed(root: string, bridge: Bridge, settings: ChromeSett
   const earlier = load<InvocationRecord | null>(root, path, () => null).value;
   if (earlier) { if (earlier.requestHash !== requestHash) throw new Error('This invocation ID belongs to different inputs. Preserve its history.'); return earlier; }
   const inventory = assessInventory(root, request.inventory, request.target, bridge.provider, settings);
+  requireDocumentBinding(inventory);
   if (inventory.connectionReference !== bridge.connectionReference) throw new Error('Refresh the inventory through this exact browser connection.');
   if (!inventory.tools.some(t => t.name === request.toolName)) throw new Error('The selected tool is absent from the observed inventory.');
   const live = await inspect(root, bridge, settings, request.target, inventory.channel);
-  if (digest(canonical(live.tools)) !== inventory.catalogueHash || live.documentId !== inventory.documentId) throw new Error('The live document or tool catalogue changed; refresh before execution.');
+  requireDocumentBinding(live);
+  if (digest(canonical(live.tools)) !== inventory.catalogueHash || live.documentId !== inventory.documentId || live.documentTreeHash !== inventory.documentTreeHash) throw new Error('The live document or tool catalogue changed (including iframe identity); refresh before execution.');
   // Reserve before sending. A crash retains inProgress and cannot silently repeat a mutation.
   const record: InvocationRecord = { schemaVersion: 1, id: request.id, requestHash, inventory: request.inventory, source: request.source, authorization: request.authorization,
     provider: bridge.provider, toolName: request.toolName, effect: request.effect, inputHash: digest(canonical(request.input)), inputFields: Object.keys(request.input), startedAt: new Date().toISOString(),

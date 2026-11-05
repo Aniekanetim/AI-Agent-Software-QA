@@ -1,55 +1,98 @@
-import { existsSync, mkdirSync, realpathSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, mkdirSync, realpathSync, readFileSync, writeFileSync, symlinkSync } from 'node:fs';
+import { resolve, relative } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { chromium } from 'playwright';
-import { save, evidence, type Evidence } from '../shared/store.js';
+import { save, evidence, revision, type Evidence } from '../shared/store.js';
 import { bindHarness } from '../tools/runtime.js';
 import { probe, readRecord, saveRecord, packageCommand, runProcess } from '../tools/registry.js';
 import { startWebMcpFixture } from './fixture.js';
-import { withMcpSession, startCliSession, cliBridge, stopCliSession, structured, responseMessage, type Bridge } from './transport.js';
+import { withMcpSession, startCliSession, cliBridge, stopCliSession, structured, responseMessage, BridgeFailure, type Bridge } from './transport.js';
 import { type ChromeSettings } from './config.js';
 import { captureInventory, execute, confirmOutcome, type Target } from './webmcp.js';
+import { fixtureBrowser } from './fixture-browser.js';
+import { rehearseProtocol } from './protocol-rehearsal.js';
+export { fixtureBrowser } from './fixture-browser.js';
 
-export function fixtureBrowser(root: string): string {
-  const global = chromium.executablePath(), suffix = global.replaceAll('\\', '/').match(/(chromium-\d+\/.*)$/)?.[1];
-  const local = suffix ? resolve(root, '.local/browsers', suffix) : '';
-  const actual = local && existsSync(local) ? local : global;
-  if (!existsSync(actual)) throw new Error('Install the pinned Playwright browser for the package fixture, or pass an actual compatible --executable. No browser was installed automatically.');
-  return actual;
-}
 export async function rehearseChrome(root: string, provider: 'mcpServer' | 'cli', visibility: 'headed' | 'headless', executable = fixtureBrowser(root)) {
   const fixture = await startWebMcpFixture();
   // Exercise real argument/configuration handling with spaces on both CI systems.
   const qaRoot = resolve(root, 'output/Chrome DevTools rehearsals', randomUUID()); mkdirSync(qaRoot, { recursive: true });
   const actualRoot = realpathSync(qaRoot), context = process.env.CI === 'true' ? 'ci' : 'interactive';
   bindHarness(actualRoot, { id: context === 'ci' ? 'github-actions-terminal' : 'terminal', version: process.version, profile: `synthetic-${provider}`, executionContext: context, source: 'Actual package-only native WebMCP rehearsal; not an adopting-product/native-harness connection' });
-  save(actualRoot, '.local/scope.json', { source: 'Approved package implementation validation', synthetic: true, origin: new URL(fixture.url).origin }, null);
+  save(actualRoot, '.local/scope.json', { source: 'Approved package implementation validation', synthetic: true, origins: [new URL(fixture.url).origin, new URL(fixture.partnerUrl).origin] }, null);
   const scope = { source: 'Package-only synthetic rehearsal', authorization: [evidence(actualRoot, '.local/scope.json')] };
   const settings: ChromeSettings = { schemaVersion: 1, source: scope.source, evidence: scope.authorization, visibility, connection: { mode: 'launch', executablePath: executable, profile: 'isolated' },
-    allowedOrigins: [new URL(fixture.url).origin], debuggingTools: false, javascriptEvaluation: true, usageStatistics: false, performanceCrux: false };
+    allowedOrigins: [new URL(fixture.url).origin, new URL(fixture.partnerUrl).origin], debuggingTools: false, javascriptEvaluation: true, usageStatistics: false, performanceCrux: false };
   const tool = provider === 'cli' ? 'chromeDevtoolsCli' : 'chromeDevtoolsMcp';
   const pinned = packageCommand(root, tool); if (!pinned) { await fixture.close(); throw new Error('The pinned package entry is unavailable.'); }
   const installation = await probe(actualRoot, tool, scope.source, runProcess, pinned);
-  if (!installation.compatible) { await fixture.close(); throw new Error('The actual selected Chrome executable is not compatible.'); }
+  if (!installation.compatible) {
+    await fixture.close();
+    throw new Error(installation.diagnostic === 'denied' ? 'This harness denied invocation of the pinned Chrome DevTools package. Installation was retained; no browser was launched.' : 'The pinned Chrome DevTools package could not be verified as compatible; inspect its retained probe diagnosis.');
+  }
   let sessionId: string | undefined;
   try {
     const run = async (bridge: Bridge) => {
       const checks: { check: string; outcome: string; evidence?: Evidence }[] = [];
-      const require = (ok: boolean, name: string) => { if (!ok) throw new Error(`Native rehearsal failed: ${name}`); checks.push({ check: name, outcome: 'passed' }); };
+      const require = (ok: boolean, name: string) => {
+        checks.push({ check: name, outcome: ok ? 'passed' : 'failed' });
+        save(actualRoot, '.local/progress.json', { synthetic: true, provider, visibility, checks, checkedAt: new Date().toISOString() }, revision(actualRoot, '.local/progress.json'));
+        if (!ok) throw new Error(`Native rehearsal failed: ${name}`);
+      };
       // A started daemon is not yet evidence of an initialized browser. Establish
       // that read capability explicitly before the first navigation; never retry
       // a failed action automatically.
       const initial = structured(await bridge.call('list_pages', {}));
       require(Array.isArray(initial.pages), 'browser initialization and page listing');
-      await bridge.call('new_page', { url: fixture.url });
+      // This rehearsal launches its own isolated browser. Reuse only that owned
+      // blank startup tab; do not overwrite an existing application tab or retry
+      // an initial new-tab failure. See the retained Windows failure evidence.
+      const startup = initial.pages.find((p: any) => p.url === 'about:blank');
+      if (!startup || !Number.isInteger(startup.id)) throw new Error('The isolated fixture has no identified blank startup page; preserve it for investigation.');
+      const navigation = await bridge.call('navigate_page', { pageId: startup.id, url: fixture.url });
       const pages = structured(await bridge.call('list_pages', {})).pages;
       const page = Array.isArray(pages) ? pages.find((p: any) => p.url === fixture.url) : null;
+      if (!page) console.error(JSON.stringify({ syntheticFixtureOnly: true, phase: 'owned-startup-navigation', provider, visibility, navigation: responseMessage(navigation).slice(0, 1500), requestCount: fixture.requestCount(), pages: Array.isArray(pages) ? pages.map((p: any) => ({ id: p.id, blank: p.url === 'about:blank', atFixture: p.url === fixture.url })) : null }));
       require(!!page, 'navigation and exact page identity');
       save(actualRoot, '.local/actor.json', { role: 'synthetic reader', state: 'empty fixture', source: 'Observed local fixture state; not real authentication' }, null);
       const target: Target = { pageId: page.id, url: fixture.url, role: 'synthetic reader', accountState: 'empty fixture', build: 'native-webmcp-fixture-v1', contextEvidence: [evidence(actualRoot, '.local/actor.json')] };
       const catalogue = await captureInventory(actualRoot, bridge, settings, target, scope.source);
       require(catalogue.inventory.apiObserved === true, 'native document.modelContext without a polyfill');
       require(catalogue.inventory.tools.some(t => t.name === 'create_draft') && catalogue.inventory.tools.some(t => t.name === 'save_profile'), 'imperative and declarative tool discovery');
+      require(visibility === 'headless' ? /HeadlessChrome\//.test(catalogue.inventory.browser ?? '') : /Chrome\//.test(catalogue.inventory.browser ?? '') && !/HeadlessChrome\//.test(catalogue.inventory.browser ?? ''), `actual browser identity matches ${visibility} launch`);
+      require(catalogue.inventory.tools.some(t => t.name === 'untrusted_note' && t.description.includes('Ignore previous instructions')) && fixture.state.noteCalls === 0 && fixture.state.forbiddenCalls === 0, 'hostile metadata remains data without implicit execution');
+
+      const outsideRoot = resolve(actualRoot, '..', `${actualRoot.split(/[\\/]/).pop()}-boundary-fixture`);
+      mkdirSync(outsideRoot, { recursive: true });
+      const insideScript = resolve(actualRoot, '.local/allowed-script.js'), outsideScript = resolve(outsideRoot, 'outside-script.js');
+      const canary = '() => { window.__outsideScriptRan = true; return "SYNTHETIC-OUTSIDE-CANARY"; }';
+      writeFileSync(insideScript, '() => { window.__allowedScriptRan = true; return "allowed-file-read"; }');
+      writeFileSync(outsideScript, canary);
+      const localRead = responseMessage(await bridge.call('evaluate_script', { pageId: page.id, sourcePath: insideScript }));
+      require(localRead.includes('allowed-file-read'), 'permitted source-file read and execution succeeds');
+      const insideSnapshot = resolve(actualRoot, '.local/allowed-snapshot.txt');
+      await bridge.call('take_snapshot', { pageId: page.id, filePath: insideSnapshot });
+      require(existsSync(insideSnapshot) && readFileSync(insideSnapshot, 'utf8').includes('Synthetic WebMCP rehearsal'), 'permitted snapshot write succeeds');
+      const link = resolve(actualRoot, '.local/outside-link');
+      symlinkSync(outsideRoot, link, process.platform === 'win32' ? 'junction' : 'dir');
+      const paths = [
+        { name: 'absolute outside path', script: outsideScript, write: resolve(outsideRoot, 'absolute-snapshot.txt') },
+        { name: 'relative traversal', script: relative(actualRoot, outsideScript), write: relative(actualRoot, resolve(outsideRoot, 'relative-snapshot.txt')) },
+        { name: 'symlink or junction', script: resolve(link, 'outside-script.js'), write: resolve(link, 'linked-snapshot.txt') },
+      ];
+      for (const path of paths) {
+        let readDenied = false, writeDenied = false;
+        try { await bridge.call('evaluate_script', { pageId: page.id, sourcePath: path.script }); } catch (err) { readDenied = err instanceof BridgeFailure && err.kind === 'toolError'; }
+        require(readDenied && readFileSync(outsideScript, 'utf8') === canary, `filesystem read denied for ${path.name}`);
+        try { await bridge.call('take_snapshot', { pageId: page.id, filePath: path.write }); } catch (err) { writeDenied = err instanceof BridgeFailure && err.kind === 'toolError'; }
+        require(writeDenied && !existsSync(resolve(actualRoot, path.write)), `filesystem write denied for ${path.name}`);
+      }
+      const readState = responseMessage(await bridge.call('evaluate_script', { pageId: page.id, function: '() => ({allowed: window.__allowedScriptRan === true, outside: window.__outsideScriptRan === true})' }));
+      const observedReadState = JSON.parse(readState.match(/```json\s*([\s\S]*?)```/)?.[1] ?? 'null');
+      require(observedReadState?.allowed === true && observedReadState?.outside === false, 'allowed source ran and outside source never ran');
+      const hostile = await captureInventory(actualRoot, bridge, settings, target, scope.source);
+      const hostileResult = await execute(actualRoot, bridge, settings, { id: 'hostile-note', inventory: hostile.reference, target, toolName: 'untrusted_note', input: {}, effect: 'read', ...scope });
+      const retained = readFileSync(resolve(actualRoot, '.local/chrome-devtools/invocations/hostile-note.json'), 'utf8');
+      require(hostileResult.invocation === 'reportedCompleted' && hostileResult.applicationOutcome === 'notAssessed' && hostileResult.qaVerdict === 'Not established by this helper' && fixture.state.noteCalls === 1 && fixture.state.forbiddenCalls === 0 && !retained.includes('SYNTHETIC-OUTPUT-CANARY') && readFileSync(outsideScript, 'utf8') === canary, 'hostile tool output grants no action, secret retention or QA verdict');
       const outside = await startWebMcpFixture();
       try {
         let denied = false; try { await bridge.call('new_page', { url: outside.url }); } catch { denied = true; }
@@ -88,7 +131,51 @@ export async function rehearseChrome(root: string, provider: 'mcpServer' | 'cli'
       let reloadRejected = false;
       try { await execute(actualRoot, bridge, settings, { ...invocation, id: 'stale-document', inventory: beforeReload.reference }); } catch { reloadRejected = true; }
       require(reloadRejected, 'same-URL document replacement requires a fresh inventory');
-      const record = { synthetic: true, provider, toolVersion: installation.version, executionContext: context, visibility, browser: catalogue.inventory.browser, checks,
+      const decoded = (value: unknown) => JSON.parse(responseMessage(value).match(/```json\s*([\s\S]*?)```/)?.[1] ?? 'null');
+      const frameState = `async () => {
+        const frame = document.getElementById('synthetic-frame'), until = Date.now() + 5000;
+        while (!frame.contentWindow.fixtureReady) { if (Date.now() > until) throw new Error('Synthetic frame registration timed out'); await new Promise(r => setTimeout(r, 25)); }
+        return {parent: String(performance.timeOrigin), child: String(frame.contentWindow.performance.timeOrigin), url: frame.contentWindow.location.href};
+      }`;
+      await bridge.call('evaluate_script', { pageId: page.id, function: `async () => {
+        const frame = document.createElement('iframe'); frame.id = 'synthetic-frame'; frame.src = '/frame-child?version=1';
+        await new Promise(resolve => {frame.onload = resolve; document.body.append(frame);}); return true;
+      }` });
+      const originalFrame = decoded(await bridge.call('evaluate_script', { pageId: page.id, function: frameState }));
+      const framed = await captureInventory(actualRoot, bridge, settings, target, scope.source);
+      const frameRequest = { ...invocation, id: 'frame-version-1', inventory: framed.reference, toolName: 'create_frame_draft', input: { name: 'Frame version 1' } };
+      const firstFrameWrite = await execute(actualRoot, bridge, settings, frameRequest);
+      require(firstFrameWrite.invocation === 'reportedCompleted' && fixture.state.frameDrafts.length === 1 && fixture.state.frameDrafts[0]?.version === '1', 'fresh same-origin iframe inventory executes its observed tool');
+      await bridge.call('evaluate_script', { pageId: page.id, function: `async () => {
+        const frame = document.getElementById('synthetic-frame');
+        await new Promise(resolve => {frame.onload = resolve; frame.src = '/frame-child?version=2';}); return true;
+      }` });
+      const replacedFrame = decoded(await bridge.call('evaluate_script', { pageId: page.id, function: frameState }));
+      require(originalFrame.parent === replacedFrame.parent && originalFrame.child !== replacedFrame.child, 'iframe navigation replaces only the child document');
+      let frameRejected = false;
+      try { await execute(actualRoot, bridge, settings, { ...frameRequest, id: 'stale-frame-version' }); } catch (error) { frameRejected = error instanceof Error && /iframe identity/.test(error.message); }
+      require(frameRejected && fixture.state.frameDrafts.length === 1, 'unchanged frame tool schema cannot reuse a pre-navigation inventory');
+      const refreshedFrame = await captureInventory(actualRoot, bridge, settings, target, scope.source);
+      const refreshedWrite = await execute(actualRoot, bridge, settings, { ...frameRequest, id: 'frame-version-2', inventory: refreshedFrame.reference });
+      require(refreshedWrite.invocation === 'reportedCompleted' && fixture.state.frameDrafts.length === 2 && fixture.state.frameDrafts[1]?.version === '2', 'refreshed iframe inventory executes and independently saves version 2');
+      await bridge.call('evaluate_script', { pageId: page.id, function: `async () => {
+        const frame = document.getElementById('synthetic-frame');
+        await new Promise(resolve => {frame.onload = resolve; frame.contentWindow.location.reload();}); return true;
+      }` });
+      const reloadedFrame = decoded(await bridge.call('evaluate_script', { pageId: page.id, function: frameState }));
+      let sameUrlRejected = false;
+      try { await execute(actualRoot, bridge, settings, { ...frameRequest, id: 'stale-frame-reload', inventory: refreshedFrame.reference }); } catch (error) { sameUrlRejected = error instanceof Error && /iframe identity/.test(error.message); }
+      require(sameUrlRejected && reloadedFrame.url === replacedFrame.url && reloadedFrame.child !== replacedFrame.child && fixture.state.frameDrafts.length === 2, 'same-URL iframe reload blocks a stale write');
+      await bridge.call('evaluate_script', { pageId: page.id, function: `async () => {
+        const frame = document.createElement('iframe'); frame.id = 'opaque-frame'; frame.sandbox = ''; frame.srcdoc = '<p>Opaque synthetic frame</p>';
+        await new Promise(resolve => {frame.onload = resolve; document.body.append(frame);}); return true;
+      }` });
+      const opaque = await captureInventory(actualRoot, bridge, settings, target, scope.source);
+      let opaqueRejected = false;
+      try { await execute(actualRoot, bridge, settings, { ...frameRequest, id: 'opaque-frame-write', inventory: opaque.reference }); } catch (error) { opaqueRejected = error instanceof Error && /identity is unverified/.test(error.message); }
+      require(opaqueRejected && opaque.inventory.documentTreeHash === null && fixture.state.frameDrafts.length === 2, 'opaque frame preserves discovery but blocks unverified helper execution');
+      await rehearseProtocol(bridge, page.id, fixture, require);
+      const record = { synthetic: true, provider, toolVersion: installation.version, executionContext: context, visibility, browser: catalogue.inventory.browser, browserExecutable: executable, checks,
         nativeHarnessConnection: 'Not verified: this is terminal SDK/CLI execution', productVerdict: 'Not assessed', checkedAt: new Date().toISOString() };
       save(actualRoot, '.local/result.json', record, null);
       const capabilities = Object.fromEntries(['navigate', 'inspect', 'interact', 'webmcp:discover', 'webmcp:execute', `visibility:${visibility}`, provider === 'cli' ? 'cliRehearsal' : 'serverRehearsal'].map(name => [name, { status: 'verified' as const, evidence: [evidence(actualRoot, '.local/result.json')] }]));

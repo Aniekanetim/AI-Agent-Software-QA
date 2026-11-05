@@ -87,7 +87,7 @@ export async function withMcpSession<T>(root: string, settings: ChromeSettings, 
   selectCommand(root, 'chromeDevtoolsMcp', command, scope.source);
   const id = randomUUID();
   const run = async () => {
-    const client = new Client({ name: 'ai-agent-software-qa', version: '1.9.0' });
+    const client = new Client({ name: 'ai-agent-software-qa', version: '1.9.1' });
     const transport = new StdioClientTransport({ command: command.executable, args: [...command.prefix, ...launchArguments(root, settings)], cwd: root, env: chromeEnvironment(settings) as Record<string, string>, stderr: 'pipe' });
     const bridge: Bridge = { provider: 'mcpServer', connectionReference: `local-sdk:${harnessKey(harness)}:${id}`, configurationHash: settingsHash(settings),
       call: async (name, args) => {
@@ -150,7 +150,8 @@ export function cliBridge(root: string, id: string, runner: Runner = runProcess)
       const at = Array.isArray(actualArgs) ? actualArgs.indexOf('--config') : -1;
       const actualConfig = Array.isArray(actualArgs) ? at >= 0 ? actualArgs[at + 1] : actualArgs.find(a => typeof a === 'string' && a.startsWith('--config='))?.slice('--config='.length) : undefined;
       if (status.code !== 0 || !identity || actualConfig !== privatePath(root, value.configPath)) throw new Error('The owned daemon is unavailable or its settings changed. No tool call was sent.');
-      const positional: Record<string, string[]> = { new_page: ['url'], navigate_page: ['pageId'], list_webmcp_tools: ['pageId'], list_3p_developer_tools: ['pageId'], execute_webmcp_tool: ['pageId', 'toolName'], execute_3p_developer_tool: ['pageId', 'toolName'], take_snapshot: ['pageId'], evaluate_script: ['function'] };
+      if (name === 'evaluate_script' && args.sourcePath !== undefined && (typeof args.sourcePath !== 'string' || !args.sourcePath.trim() || /^(?:https?|file):/i.test(args.sourcePath))) throw new Error('Use an actual local source path for this filesystem operation; remote source retrieval is not supported by this adapter.');
+      const positional: Record<string, string[]> = { new_page: ['url'], navigate_page: ['pageId'], list_webmcp_tools: ['pageId'], list_3p_developer_tools: ['pageId'], execute_webmcp_tool: ['pageId', 'toolName'], execute_3p_developer_tool: ['pageId', 'toolName'], take_snapshot: ['pageId'], evaluate_script: args.sourcePath !== undefined ? [] : ['function'] };
       if (!['list_pages', ...Object.keys(positional)].includes(name)) throw new Error('Use a supported structured Chrome adapter operation.');
       const required = positional[name] ?? [], commandArgs = [name, ...required.map(key => { if (args[key] === undefined) throw new Error(`Missing ${key}.`); return String(args[key]); })];
       for (const [key, val] of Object.entries(args)) if (!required.includes(key)) commandArgs.push(`--${key}`, typeof val === 'string' ? val : JSON.stringify(val));

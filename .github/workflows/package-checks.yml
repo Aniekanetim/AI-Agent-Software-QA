@@ -14,7 +14,7 @@ jobs:
       matrix:
         os: [ubuntu-22.04, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -31,4 +31,30 @@ jobs:
       - if: runner.os == 'Linux'
         run: npx --no-install playwright install-deps chromium
       - run: npm run test:browsers
+      - name: Install pinned Chrome for the DevTools package fixtures
+        run: npm run chrome:install
       - run: npm run test:chrome
+      - name: Headed Chrome fixtures (Windows)
+        if: runner.os == 'Windows'
+        run: npm run test:chrome
+        env:
+          QA_CHROME_HEADED: '1'
+          QA_CHROME_REPEATS: '3'
+      - name: Headed Chrome fixtures (Linux virtual display)
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum npm run test:chrome
+        env:
+          QA_CHROME_HEADED: '1'
+          QA_CHROME_REPEATS: '2'
+      - name: Compare installed Google Chrome (Windows headed)
+        if: runner.os == 'Windows' && !cancelled()
+        shell: pwsh
+        run: |
+          $qaChromeCandidates = @("$env:ProgramFiles\Google\Chrome\Application\chrome.exe", "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe")
+          $qaChromeExecutable = $qaChromeCandidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+          if (-not $qaChromeExecutable) { throw 'No installed Google Chrome is available for the explicit comparison.' }
+          Write-Output "Comparison Google Chrome version: $((Get-Item -LiteralPath $qaChromeExecutable).VersionInfo.ProductVersion)"
+          $env:QA_CHROME_EXECUTABLE = $qaChromeExecutable
+          npm run test:chrome
+        env:
+          QA_CHROME_HEADED: '1'

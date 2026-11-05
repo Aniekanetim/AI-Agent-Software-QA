@@ -2,7 +2,7 @@
 
 A portable workflow for an AI QA agent to join a project, build product understanding and perform assigned QA work with human review. Guided onboarding prepares context, tools and access. Product Discovery learns how an application behaves. QA evaluates assigned work against an agreed test basis, investigates findings and proposes readiness. Humans maintain the product baseline and own scoped decisions; developers fix or refute reported defects.
 
-**Package version:** 1.9.0 — 29 October 2026. **Project state:** unconfigured. **Live tickets/discovery requests:** none. **Product schedules/PR regression:** not activated. Start with [SETUP.md](SETUP.md) and [guided onboarding](Onboarding/README.md).
+**Package version:** 1.9.1 — updated 5 November 2026. **Project state:** unconfigured. **Live tickets/discovery requests:** none. **Product schedules/PR regression:** not activated. Start with [SETUP.md](SETUP.md) and [guided onboarding](Onboarding/README.md).
 
 ## Use with your AI agent
 
@@ -108,6 +108,8 @@ The optional [map helper](automation/flow-map/README.md) validates a temporary p
 ## WebMCP as an additional capability
 
 The [Chrome DevTools bundle](automation/chrome-devtools/README.md) gives the agent MCP and CLI routes to inspect Chrome and use WebMCP actions exposed by the current application. The agent selects a suitable method per task; onboarding reuses working installations and native connections. Application tool availability depends on the page, role, state and compatible browser. Invocations, independent application verification and QA verdicts remain separate. [Validation evidence and limits](docs/webmcp-validation.md) distinguish helper tests, native browser rehearsals and current-harness access.
+
+The [origin and document guards](docs/webmcp-context-guards.md) require exact configured origins and a fresh inspectable document-tree binding before helper execution. Iframe navigation invalidates the old inventory even with unchanged tool definitions. Opaque or unverified frame context blocks dependent actions while observation and other suitable methods remain available.
 
 ## Agent-selected tools and test data
 

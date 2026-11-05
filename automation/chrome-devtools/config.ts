@@ -18,6 +18,7 @@ export function nodeCompatible(version = process.versions.node): boolean {
 }
 export function webOrigin(value: string): string {
   const url = new URL(value);
+  if (/[*{}()\\]/.test(url.hostname)) throw new Error('Specify an exact host; wildcard and URL-pattern origins are not supported.');
   if (url.username || url.password || !['http:', 'https:'].includes(url.protocol) || url.protocol === 'http:' && !['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)) throw new Error('Use HTTPS or a loopback HTTP origin, without credentials.');
   return url.origin;
 }
