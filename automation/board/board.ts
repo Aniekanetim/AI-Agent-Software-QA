@@ -14,7 +14,7 @@ export interface Decision {
   handoff: string; waitingOn?: string;
 }
 export interface Transition { id: string; ticketId: string; expectedRevision: string; to: Status; decision: Decision }
-export interface Lifecycle extends Decision { schemaVersion: 1; id: string; at: string; from: Status; to: Status; previousOwner: string; previousWaiting: string }
+export interface Lifecycle extends Decision { schemaVersion: 1; id: string; at: string; from: Status; to: Status; previousOwner: string; previousWaiting: string; previousCheckpoint: string }
 export interface Ticket { id: string; path: string; status: Status; text: string; revision: string; lifecycle: Lifecycle | null; generation: string }
 interface Patch { path: string; before: string; content: string }
 interface Journal { schemaVersion: 1; id: string; requestHash: string; ticketId: string; from: string; to: string; before: string; content: string; patches: Patch[]; ownerUpdates: { path: string; destination: string }[]; state: 'prepared' | 'completed' }
@@ -168,7 +168,7 @@ function prepare(root: string, request: Transition): Journal {
   const ticket = findTicket(root, request.ticketId); decisionValid(root, request, ticket);
   const destination = `${boardRoot}/${request.to}/${ticket.path.split('/').at(-1)}`;
   if (destination !== ticket.path && existsSync(contained(root, destination))) throw new Error('The destination already exists; never overwrite another ticket.');
-  const event: Lifecycle = { ...request.decision, schemaVersion: 1, id: request.id, at: new Date().toISOString(), from: ticket.status, to: request.to, previousOwner: field(ticket.text, 'Owner / claimed at'), previousWaiting: field(ticket.text, 'Waiting on') };
+  const event: Lifecycle = { ...request.decision, schemaVersion: 1, id: request.id, at: new Date().toISOString(), from: ticket.status, to: request.to, previousOwner: field(ticket.text, 'Owner / claimed at'), previousWaiting: field(ticket.text, 'Waiting on'), previousCheckpoint: field(ticket.text, 'Workflow checkpoint') };
   let content = ticket.text;
   if (!operations(root, ticket.id).length) content = setField(content, 'Owner / claimed at', 'Unassigned');
   content = setField(setField(content, 'Workflow checkpoint', event.checkpoint), 'Next action', event.nextAction);

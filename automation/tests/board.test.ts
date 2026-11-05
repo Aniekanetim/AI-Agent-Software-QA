@@ -38,6 +38,7 @@ test('deferral moves the original ticket, preserves history and repairs authoriz
   const baseline = `[Ticket](../${encodeURI(f.ticket)})\n`; put(f.root, 'Project Context/source.md', baseline);
   const moved = f.move('Deferred');
   const t = b.findTicket(f.root, 'QA-001'); assert.equal(t.status, 'Deferred'); assert(t.text.includes('retain this')); assert(t.text.includes('../Ready%20for%20QA/notes.txt'));
+  assert(t.lifecycle?.previousCheckpoint.startsWith('Intake;')); assert.equal(t.lifecycle?.checkpoint, f.d.checkpoint);
   assert(!existsSync(s.contained(f.root, f.ticket))); assert(readFileSync(s.contained(f.root, 'notes.md'), 'utf8').includes('/Deferred/'));
   assert.equal(readFileSync(s.contained(f.root, 'Project Context/source.md'), 'utf8'), baseline); assert.equal(moved.ownerUpdates.length, 1);
   assert.throws(() => b.assertExecutable(f.root, t.id), /not eligible/);
