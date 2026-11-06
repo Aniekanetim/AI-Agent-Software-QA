@@ -14,6 +14,9 @@ import { AgentMailAdapter, GmailAdapter } from './email/adapters.js';
 import * as github from './github/github.js';
 import { installGh } from './github/install.js';
 import * as board from './board/board.js';
+import * as attentionPreferences from './attention/preferences.js';
+import * as blockers from './attention/blockers.js';
+import * as attention from './attention/notifications.js';
 import * as registry from './tools/registry.js';
 import { bindHarness, currentHarness, readHarness, harnessKey, type ExecutionContext } from './tools/runtime.js';
 import * as postman from './postman/postman.js';
@@ -49,6 +52,7 @@ async function currentPr(repository: string, number: number) {
   const raw = JSON.parse(await github.runGh(['api', `repos/${repository}/pulls/${number}`])); return github.normalizePr(repository, raw);
 }
 const help = {
+  attention: 'status | proposal/configure --input | record --input | list --recipient [--offset N --limit N --snapshot hash --all] | index | update-index --input | preview --recipient --notifier [--at ISO] | reserve --input | preflight --id --notifier | receipt --input | respond --input : optional blocker reminders; no task execution, lifecycle move or approval',
   board: 'status [--ticket ID] | upgrade --source | transition --input | recover --id | reviews [--at ISO] [--trigger key] | acknowledge-review --input | assert-executable --ticket ID [--generation ID] | operations --ticket ID | settle-operation --input : lifecycle controls preserve actual human decisions; no test authorization',
   'flow-map': 'validate --input | trace --input --features id,id [--direction upstream/downstream/both] [--max-depth 8] : read-only candidate impact; no test execution or approval',
   coverage: 'assess --input : read-only consistency/count check of a canonical-record snapshot; no execution, approval or product verdict',
@@ -57,7 +61,7 @@ const help = {
   chrome: 'check --source | mcp-config | rehearse --provider cli/mcpServer [--headless] [--executable path] | session-start --input | page --input | inventory --input | import-host-inventory --input | execute --input | confirm --input | session-stop --id : explicit scoped WebMCP operations; no implicit product authorization',
   postman: 'check --source | login-instructions | run --input : detects/reuses the CLI; local runs need no login; cloud operations need selected account/reporting scope',
   onboarding: 'start | roadmap-shown --source | status | next | queue --input | shown/not-shown --id --source | reply --input | recover | reconcile --input | retire-tool-questions --input | pause/resume --source | clarify/defer --input | check/domains --input | finish --input',
-  settings: 'open --source | show | choose --area | edit --input | present | save --input | cancel | back | close',
+  settings: 'open --source | show | choose --area | edit --input | present | save --input | attention-shown --source | save-attention --input | cancel | back | close',
   browser: 'versions | install | mcp-config | check --provider library/cli/mcpServer [--headless] [--context interactive/scheduled/ci] | import-report --input | fixture',
   email: 'policy | account --input | accounts | options --input | discover --provider gmailApi/agentmail --source | create-inbox --input | select --input | verify --input | begin --input | outcome --input',
   github: 'reconcile-legacy --input --repository --number --policy --target --source | install --source | check --repository | check-in --source | event --repository --number --source | policy-digest --policy | run/dispatch --policy --target --repository --number --source | comment --policy --target --repository --number --body --source',
@@ -68,6 +72,22 @@ async function main() {
   const [area, action] = positional;
   if (!area || area === 'help') { output(help); return; }
   if (area === 'evidence') { output(store.evidence(root, option('path'), options.get('pointer'))); return; }
+  if (area === 'attention') {
+    if (action === 'status') output(attention.status(root));
+    else if (action === 'proposal') output(attentionPreferences.proposal(root, input()));
+    else if (action === 'configure') output(attentionPreferences.savePreferences(root, input()));
+    else if (action === 'record') output(blockers.recordBlocker(root, input()));
+    else if (action === 'list') output(blockers.page(root, { recipient: option('recipient'), offset: options.has('offset') ? Number(option('offset')) : undefined, limit: options.has('limit') ? Number(option('limit')) : undefined, snapshot: options.get('snapshot'), all: options.has('all') }));
+    else if (action === 'index') output({ markdown: blockers.indexText(root), effect: 'Read-only proposal; no shared document changed.' });
+    else if (action === 'update-index') output(blockers.updateIndex(root, input()));
+    else if (action === 'preview') output(attention.preview(root, { recipient: option('recipient'), notifier: option('notifier'), at: options.get('at') }));
+    else if (action === 'reserve') output(attention.reserve(root, input()));
+    else if (action === 'preflight') output({ delivery: attention.beforePresentation(root, option('id'), option('notifier')), effect: 'Presentation claim only. Use the selected actual host tool once, then record its observed outcome; this command sends no message.' });
+    else if (action === 'receipt') output(attention.outcome(root, input()));
+    else if (action === 'respond') output(attention.respond(root, input()));
+    else throw new Error('Use an attention command from help. CLI output is not proof of actual host presentation.');
+    return;
+  }
   if (area === 'board') {
     if (action === 'upgrade') output(board.upgradeBoard(root, option('source')));
     else if (action === 'status') {
@@ -183,6 +203,8 @@ async function main() {
     else if (action === 'edit') value = settings.startEdit(root, input());
     else if (action === 'present') value = settings.presentEdit(root);
     else if (action === 'save') value = settings.saveEdit(root, input());
+    else if (action === 'attention-shown') { attentionPreferences.markEdit(root, 'asked', option('source')); value = settings.showMenu(root); }
+    else if (action === 'save-attention') value = settings.saveAttentionEdit(root, input());
     else if (action === 'cancel' || action === 'back') value = settings.cancelEdit(root, action === 'back');
     else if (action === 'close') { settings.closeMenu(root); value = settings.showMenu(root); }
     else throw new Error('Unknown settings command.');

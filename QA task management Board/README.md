@@ -121,9 +121,27 @@ Record the waiting reason and next action in the ticket's fields. Keep it in its
 | Ticket / question ID | Original comment | Needed from | Affected work | Raised |
 | --- | --- | --- | --- | --- |
 
+Append the actual answer, retaining the conversation. Resolve intent with the responsible owner, who maintains/publishes any canonical change. The agent links the actual decision/source revision without editing root Project Context. Record the answer and resumption checkpoint. Remove the index row only when resolved; clear only its waiting reason. Changed criteria may require revised cases and approval. Refresh question links if the ticket moves.
+
+<!-- qa-attention-index:start -->
+
+### Needs your action
+
+No structured blocker actions are recorded in this reusable package. In an adopted project, this view links current ticket records; it never replaces the original questions or results. Use the optional [blocker notification procedure](../automation/attention/README.md) for a bounded summary and full backlog.
+
+<!-- qa-attention-index:end -->
+
 <!-- qa-navigation:end -->
 
-Append the actual answer, retaining the conversation. Resolve intent with the responsible owner, who maintains/publishes any canonical change. The agent links the actual decision/source revision without editing root Project Context. Record the answer and resumption checkpoint. Remove the index row only when resolved; clear only its waiting reason. Changed criteria may require revised cases and approval. Refresh question links if the ticket moves.
+### Optional reminders for human actions
+
+Record supported blocker facts on the original ticket with a stable question/blocker ID, affected work, actual owner, required action, context, established priority or Unknown, and immutable source evidence. Existing waiting reasons remain valid; inspect their original responses before normalizing them for notifications. A dependency without a current human action stays visible without asking the wrong person. The [attention helper](../automation/attention/README.md) appends those facts, not another task status or duplicate bug ticket.
+
+When configured, an eligible check-in can notify the responsible person about newly tracked, changed or reminder-due actions. Show the known backlog count and initially up to three groups; group only a shared dependency with matching action/owner/context. Full-list/paging access remains available. A summary is not an approval request, hidden items are not acknowledged by its count, and a selected decision still needs the full gate briefing. Recipient pacing and quiet hours apply independently of board check-in frequency.
+
+Acknowledgements and requested reminder times are recorded privately against explicitly covered current blockers. They do not resolve the blocker, move a task to Deferred or resume execution. Actual answers and prerequisite verification remain on the original ticket; record the applicable decision before affected work continues. Deferred tasks follow their explicit review/resumption arrangements. Canceled/Tested-Ok tasks do not enter ordinary blocker reminders; existing stop/handoff obligations stay separate.
+
+The Needs your action view is derived from canonical ticket records. Maintain only its marked mutable index under actual authorization and expected-revision checks. Unconfigured/disabled and unchanged no-action check-ins remain no-ops; an actually due authorized reminder is a separate communication action. Never update immutable evidence or treat a CLI preview as an actual delivered message.
 
 ## Build or feature ticket template
 

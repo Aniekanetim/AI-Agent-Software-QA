@@ -1,0 +1,19 @@
+{
+  "source": "Replace with the actual notification-policy discussion reference",
+  "evidence": [{ "path": ".local/actual-conversation-access-evidence.json", "sha256": "replace-with-actual-evidence-hash" }],
+  "notifierId": "replace-with-the-designated-notifier-id",
+  "recipients": [{
+    "id": "replace-with-actual-person-id",
+    "label": "Replace with the actual recipient",
+    "channelType": "hostConversation",
+    "channelReference": "replace-with-the-verified-project-conversation",
+    "timezone": "UTC",
+    "mode": "digest",
+    "batchSize": 3,
+    "reminderMinutes": 1440,
+    "cooldownMinutes": 1440,
+    "quietHours": { "start": "22:00", "end": "08:00" }
+  }],
+  "urgentPriorities": [],
+  "urgentDuringQuietHours": false
+}

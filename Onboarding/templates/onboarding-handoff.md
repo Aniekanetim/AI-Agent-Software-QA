@@ -36,6 +36,8 @@ Link existing records through [QA Process Context](../../QA%20Process%20Context/
 
 ## Usable capabilities
 
+Optional blocker notifications: <Not configured/disabled, or actual recipient/conversation, designated notifier, policy/evidence revision, pacing/timezone/quiet hours and limits>. Missing notification preparation does not reopen completed onboarding or block other eligible QA. Record an actual schedule/host operation separately; a policy save is not an activated reminder or delivered message. See [the attention procedure](../../automation/attention/README.md).
+
 | Capability | Actual method, account/mailbox or target | Evidence / check date / execution context | Status and limit |
 | --- | --- | --- | --- |
 | Browser/testing tools | Agent selects per task; capabilities not established | Not checked | Constraints/visibility not established |

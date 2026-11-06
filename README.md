@@ -2,7 +2,7 @@
 
 A portable workflow for an AI QA agent to join a project, build product understanding and perform assigned QA work with human review. Guided onboarding prepares context, tools and access. Product Discovery learns how an application behaves. QA evaluates assigned work against an agreed test basis, investigates findings and proposes readiness. Humans maintain the product baseline and own scoped decisions; developers fix or refute reported defects.
 
-**Package version:** 1.10.0 — updated 5 November 2026. **Project state:** unconfigured. **Live tickets/discovery requests:** none. **Product schedules/PR regression:** not activated. Start with [SETUP.md](SETUP.md) and [guided onboarding](Onboarding/README.md).
+**Package version:** 1.11.0 — updated 6 November 2026. **Project state:** unconfigured. **Live tickets/discovery requests:** none. **Product schedules/PR regression/notifications:** not activated. Start with [SETUP.md](SETUP.md) and [guided onboarding](Onboarding/README.md).
 
 ## Use with your AI agent
 
@@ -21,7 +21,7 @@ Read Application Flow Map for source-linked connections and impact reasoning.
 Read QA Process Context for maintained strategy, design, coverage, data/configuration
 and regression records; reuse existing records and identify actual owners.
 For a discovery objective, follow Product Discovery/discovery-workflow.md and use
-its request template; do not put discovery through the five QA status folders.
+its request template; do not put discovery through the seven QA status folders.
 Inspect existing setup; show the onboarding roadmap and ask one focused missing
 decision at a time. Reuse clear extra answers and preserve progress/settings.
 Let me provide context, choose discovery, or combine both. Account for business,
@@ -155,3 +155,9 @@ The workflow files and templates are available under the [MIT license](LICENSE).
 ## Deferred and canceled work
 
 The [board](QA%20task%20management%20Board/README.md) has seven statuses. Deferred parks work for an owner review; Canceled records work no longer being pursued. Both preserve ticket identity/history and are excluded from execution. A lower priority alone keeps work in its working queue. [Lifecycle helpers and upgrade guidance](automation/board/README.md) cover transitions, due reviews, recovery, current-ticket execution checks and uncertain running operations. Moves preserve immutable evidence and propose incoming link changes; only explicitly authorized mutable navigation is edited automatically. Completed legacy results are reused during migration, and ordinary report examples do not block unrelated work. Cancellation is not a test pass or release approval.
+
+## Blocked work needing attention
+
+Optional [blocker notifications](automation/attention/README.md) tell the responsible person what input or decision is needed. A summary reports the backlog and initially shows up to three action groups, grouping tasks only when they share a real action/dependency. The full list stays available; the agent helps resolve one selected question or decision at a time.
+
+Configure the actual host conversation, recipients, notifier, pacing and quiet hours once. Existing projects keep their behavior until enabled, and notification preferences preserve completed onboarding. Preparation, actual presentation, acknowledgement and resolution remain separate. Snoozing a reminder never moves a task to Deferred; a notification never approves testing or runs it. This package enables no notification schedule or outbound email channel.
