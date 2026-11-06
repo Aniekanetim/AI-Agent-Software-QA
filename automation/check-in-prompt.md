@@ -50,6 +50,18 @@ For missing or conflicting information, comment on the existing ticket for the
 developer, index its unanswered question in the board README, and wait only on
 dependent work. Read actual responses before resuming; retain the conversation
 and link responsible-owner clarifications or canonical source updates.
+If blocker notifications are actually configured, read automation/attention/README.md.
+Retain supported blocker facts and original question references on existing tickets.
+Route only a real remaining human action to its actual owner; do not guess ownership.
+For the verified designated notifier/conversation, assess current due actions under
+recipient pacing and quiet hours. Show a known count and initially up to three real
+action groups, with full-list/paging access. Reserve and atomically claim one actual
+presentation, call the selected host once, and retain its actual observation.
+CLI previews/reservations are not messages. Never expire an unknown send into a retry.
+Acknowledgements/snoozes cover only explicit current items; they do not approve,
+resolve, move or resume work. Selected decisions retain full informed gate briefings.
+Maintain only an authorized mutable attention index on material changes; preserve
+immutable evidence and other settings. Disabled/unconfigured reminders are no-ops.
 Do not invent requirements, owner decisions, human observations or approvals.
 Resume eligible claimed work or select one actionable unclaimed ticket by
 priority and age. Respect other owners and work from the recorded checkpoint.
@@ -66,8 +78,9 @@ Do not fix product code, act as a developer or publish externally without the
 applicable authorization. A folder move, fix claim or silence is not approval.
 Avoid duplicate tickets, repeated unchanged execution and repeated unanswered
 questions or approval requests. If no ticket is actionable, leave files unchanged
-and remain quiet unless periodic reports were explicitly requested. Report meaningful findings, movements or decisions
-needed. Update detailed records and shared progress when work materially changes.
+and remain quiet unless a configured, actually due reminder or explicitly requested
+periodic report applies. Report meaningful findings, movements or decisions needed.
+Update detailed records and shared progress when work materially changes.
 Preserve unrelated local work. If version control/publication is configured and
 authorized, commit only coherent changes for the actionable ticket; do not invent
 a repository, remote, publication permission or completed execution.
@@ -84,3 +97,7 @@ Before resuming a claim, starting an action, dispatching CI or continuing after 
 Preserve immutable evidence when moving tickets; review incoming link proposals and edit only authorized mutable navigation. Reconcile older prepared broad-repair journals before recovery writes. Keep malformed lifecycle diagnostics local to affected work; ordinary report examples do not disable independent assignments. Reuse completed legacy results/dispatches after actual reconciliation without rerunning; observation alone does not authorize a retry.
 
 Inspect due Deferred reviews, provide one actual owner briefing, then acknowledge that briefing reference. Read prior notices and responses before asking again. Continue existing stop/cleanup follow-up without treating it as resumed testing. Preserve unknown outcomes and require actual terminal observations before reactivation. A manual file move does not cancel an already running external job. Existing schedules are not activated or rewritten by this package upgrade.
+
+## Optional blocker notifications
+
+Use [the attention procedure](attention/README.md) only after actual recipient/access/preferences are established. Existing hourly check-ins do not imply hourly notifications. This template does not update installed schedules; review and change their actual prompts through the host interface only when authorized. Deferred reviews and cancellation/handoff obligations retain their separate procedures.

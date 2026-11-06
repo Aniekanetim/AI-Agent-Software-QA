@@ -1,6 +1,14 @@
 # Package notes
 
-**Version:** 1.10.0. **Created:** 22 October 2026. **Updated:** 5 November 2026. **State:** reusable workflow package; no configured product, live discovery or QA execution history.
+**Version:** 1.11.0. **Created:** 22 October 2026. **Updated:** 6 November 2026. **State:** reusable workflow package; no configured product, live discovery or QA execution history.
+
+## Version 1.11.0 — bounded blocker reminders
+
+Adds optional [blocker notifications](../automation/attention/README.md) without changing the seven board statuses or existing testing gates. Supported blocker facts remain on their original tickets. A recipient-specific summary initially presents up to three action groups, with full backlog/paging access. Only an actual shared dependency with matching owner, action and context is grouped. Missing ownership stays explicit; inactive tasks retain their separate review, stop and handoff duties.
+
+Actual preferences establish the designated notifier, host conversation, timezone, quiet hours and item/recipient pacing. Configuration and receipts stay private. The optional settings path preserves completed onboarding and unrelated preferences. Previewing sends nothing; actual presentation needs an atomic claim and host observation. Unknown sends remain held for investigation, while acknowledgements and snoozes never resolve, move or approve work. The shared index is derived and narrowly mutable; immutable evidence is preserved.
+
+Focused regression review reproduced duplicate concurrent presentation and a stale reminder after acknowledgement, then retained tests for both corrections. [Validation and limits](blocker-notification-validation.md) distinguish helper/CLI rehearsals, actual host presentation and adopting-project work. No recipient, ticket, outbound email channel or active schedule is configured by this package. Installed schedule prompts require a separate actual authorized update.
 
 ## Version 1.10.0 — deferred and canceled work
 

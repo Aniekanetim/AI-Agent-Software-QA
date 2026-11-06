@@ -10,6 +10,8 @@ Choose on-demand, scheduled, event-driven or combined operation during onboardin
 
 ## Native board check-ins
 
+Optional [blocker notifications](attention/README.md) extend an authorized check-in with bounded action summaries. Missing preferences leave existing behavior unchanged. A rendered CLI model is not a host message: reserve, claim, present through the actual selected conversation and retain its observed outcome. Local receipts prevent duplicate check-ins from sending the same attempt; unresolved delivery is investigated without blind resends. Notification policy does not activate a schedule, and delivery failure does not stop independent QA work.
+
 **Package state:** not configured. No schedule ID or target chat is included, and packaging this workflow does not create or change an automation.
 
 This procedure schedules QA-board work only. Product Discovery is an independent request-driven pipeline; no discovery polling is configured. Reading its context during QA does not authorize exploration. Any future discovery schedule needs an explicit separate request, target, cadence and scope; do not repurpose existing project check-ins automatically.

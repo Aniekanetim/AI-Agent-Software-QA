@@ -98,3 +98,9 @@ Provide the [onboarding handoff](Onboarding/templates/onboarding-handoff.md) wit
 ## Upgrade older board copies
 
 After deliberately adopting the updated workflow files, follow [the lifecycle upgrade](automation/board/README.md#upgrade-an-existing-copy). Add Deferred/Canceled without changing current tickets, private onboarding state or schedules. Inspect any legacy running/uncertain regression before enabling automatic execution. Reconcile actual completed results for reuse without rerunning, and treat retry intent as a separate decision. Moves propose incoming navigation changes while preserving immutable evidence; older pending broad-repair journals need reviewed reconciliation. Existing policy approvals remain content-bound; copying an approval never grants authority to another project.
+
+## Optional blocker notifications
+
+Follow [notification setup](automation/attention/README.md#configure-once-preserving-existing-setup) when wanted. Establish the actual host conversation and evidence, responsible recipients, one designated notifier, batch size, pacing, timezone and quiet hours. Reuse supplied answers and ask only focused missing questions. Enable only after reviewing the concrete policy; initial guidance is three action groups with full backlog access. No new mandatory onboarding stage is introduced.
+
+The Reporting settings area has an isolated notification editor. Its saves preserve existing onboarding, report preferences, mailbox bindings and schedules. Missing/disabled notification configuration leaves established QA work unchanged. The reusable package contains no live blocker, recipient, delivery receipt or active notification schedule. Existing installed check-in prompts need an authorized update through the host's supported scheduling interface; editing the repository template alone does not update them.

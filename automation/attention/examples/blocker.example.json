@@ -1,0 +1,20 @@
+{
+  "eventId": "replace-with-a-unique-blocker-event-id",
+  "ticketId": "QA-001",
+  "expectedRevision": "replace-with-the-current-ticket-hash",
+  "blocker": {
+    "id": "Q-001",
+    "state": "open",
+    "owner": "replace-with-actual-responsible-person-id-or-use-null",
+    "reason": "Briefly state the missing input, decision or prerequisite",
+    "action": "State exactly what the owner needs to provide; use null if no human action is available",
+    "impact": "Identify the affected checks or work and why they cannot proceed",
+    "context": "Actual environment, role, account/data state and relevant scope",
+    "dependencyId": null,
+    "priority": "Unknown",
+    "dueAt": null,
+    "originalQuestion": "Reference the original question/comment on this existing ticket",
+    "source": "Actual observation and owner/source reference",
+    "evidence": [{ "path": ".local/actual-immutable-blocker-source.json", "sha256": "replace-with-actual-evidence-hash" }]
+  }
+}

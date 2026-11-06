@@ -130,6 +130,8 @@ Keep the human confirmation and agent execution as separate records. A different
 
 ## Monitoring, change control and records
 
+When work needs a human input or decision, record the actual remaining blocker and original question on the existing ticket. Optional [blocker notifications](../../automation/attention/README.md) can surface a bounded recipient-specific summary under configured pacing/quiet hours. Read original answers first; a reminder links the same conversation instead of creating another request. Notification preparation, actual presentation, acknowledgement and verified resolution are distinct. An acknowledgement or snooze never authorizes execution, changes a board status or establishes a requirement. Continue independent authorized work; present the full informed gate briefing for the selected approval decision. Missing notification configuration or delivery errors do not change the existing QA gates.
+
 During execution, report planned versus completed checks, Pass/Fail/Blocked outcomes, requirement coverage, anomalies and any changed risk. Record unexpected harness or environment errors separately; an error that prevents valid observation is not evidence of a product failure.
 
 Suspend the affected checks if the build differs, data are invalid, the harness cannot test the intended rule, or an action exceeds the approved scope. Preserve the attempt and explain its impact. Repair within the approved preparation scope; obtain a revised decision when requirements, scope, method or risk materially change. Resume only when prerequisites are restored. Record any rerun separately; do not silently retry until green.
