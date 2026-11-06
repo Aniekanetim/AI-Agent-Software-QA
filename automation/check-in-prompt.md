@@ -52,6 +52,8 @@ dependent work. Read actual responses before resuming; retain the conversation
 and link responsible-owner clarifications or canonical source updates.
 If blocker notifications are actually configured, read automation/attention/README.md.
 Retain supported blocker facts and original question references on existing tickets.
+Use actual recorded times; stale imports cannot replace newer blocker states.
+Preserve original history and source evidence instead of restamping old updates.
 Route only a real remaining human action to its actual owner; do not guess ownership.
 For the verified designated notifier/conversation, assess current due actions under
 recipient pacing and quiet hours. Show a known count and initially up to three real

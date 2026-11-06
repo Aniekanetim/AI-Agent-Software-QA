@@ -10,6 +10,8 @@ Actual preferences establish the designated notifier, host conversation, timezon
 
 Focused regression review reproduced duplicate concurrent presentation, a stale reminder after acknowledgement and an older imported response overriding a newer reminder decision, then retained tests for all three corrections. [Validation and limits](blocker-notification-validation.md) distinguish helper/CLI rehearsals, actual host presentation and adopting-project work. No recipient, ticket, outbound email channel or active schedule is configured by this package. Installed schedule prompts require a separate actual authorized update.
 
+Further pre-merge review found an active optional edit could trap settings when its store became unreadable, and an older blocker event could replace a newer verified state. Settings can now leave that failed edit while preserving its data/recovery identity; restoration resumes the original question. Stale blocker writes are rejected and existing history is projected chronologically without mutation. Unrelated setup, legitimate later updates, idempotent replay and human gates remain intact. The validation record retains the original failures separately from corrected checks.
+
 ## Version 1.10.0 — deferred and canceled work
 
 Adds two empty status folders and [shared board lifecycle controls](../automation/board/README.md): stable ID lookup, accountable decisions, recoverable moves, incoming-link proposals, narrowly authorized mutable-index maintenance, deferred reviews and explicit reactivation. Existing onboarding, schedules, product contexts and historical records remain preserved. Active instructions use seven statuses; dated earlier five-folder validation remains historical evidence.

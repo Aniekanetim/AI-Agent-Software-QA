@@ -82,10 +82,10 @@ export function beginEdit(root: string, input: { id: string; prompt: string; sou
     save(root, preferencesPath, record.value, record.revision);
   });
 }
-export function markEdit(root: string, status: 'presenting' | 'asked' | 'canceled', source?: string) {
+export function markEdit(root: string, status: 'presenting' | 'asked' | 'canceled', source?: string, expectedId?: string) {
   withLock(root, 'attention', () => {
     const record = read(root), edit = record.value.edit;
-    if (!edit || ['answered', 'canceled'].includes(edit.status)) throw new Error('Select an unfinished notification preference question.');
+    if (!edit || expectedId && edit.id !== expectedId || ['answered', 'canceled'].includes(edit.status)) throw new Error('Select the same unfinished notification preference question; another edit must be preserved.');
     if (status === 'asked') { if (edit.status !== 'presenting') throw new Error('Present the actual notification setting question before recording it as shown.'); requireText(source, 'Actual question presentation reference'); edit.references.push(source); }
     edit.status = status; save(root, preferencesPath, record.value, record.revision);
   });

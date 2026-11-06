@@ -20,6 +20,12 @@ Choose **Back** to return to the area list, **Cancel this edit** to discard an u
 
 The agent uses `settings open`, `choose`, `edit`, `present`, `save`, `cancel`, `back` and `close`. Mailbox changes use the guarded email selection procedure rather than raw JSON replacement. After recovering a saved settings answer, `settings present` clears its completed focus without asking it again.
 
+## Optional notification recovery
+
+Reporting and evidence preferences also offers optional [blocker reminders](../automation/attention/README.md). Its dedicated save path preserves completed onboarding. If that preference file becomes unreadable during an edit, the agent explains the issue and still offers Back, Cancel this edit and Close settings. Leaving retains the original data and a recovery reference; it does not pretend the notification answer was saved or canceled. Other settings and independent authorized QA remain available.
+
+After actual data recovery, resume the original pending notification question using its retained identity and sources. Inspect earlier prompt/reply references before asking again. Historical recovery notes are not new mandatory onboarding decisions. Do not reset the preference store or replace another pending question to clear the menu.
+
 The [global mailbox policy](../automation/email/mailbox-policy.md) supplies the standard fresh-account/retest behavior. Show the selected physical inbox, alias-support source, read scope and saved account references when editing email preferences. Apply recipient-policy changes through guarded selection, retain original account aliases and recheck affected attempts. A changed inbox is not permission to redirect an existing account's verification email.
 
 Use [shared discovery](../automation/tools/README.md) to inspect/reuse the selected tool before proposing setup. API tools and Postman controls local/cloud mode, selected resources, credential source and reporting; it does not select a testing category. Changing the Postman account, region or credential source requires a matching identity/resource check. Adding a resource reopens its access check. Recheck before asking for sign-in; changed settings alone do not prove authentication is missing. A harness change reopens affected verification while retaining prior answers.

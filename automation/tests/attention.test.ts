@@ -12,6 +12,7 @@ import * as notices from '../attention/notifications.js';
 import * as menu from '../settings/menu.js';
 import { bindHarness } from '../tools/runtime.js';
 import { emptyState, statePath, readiness, readState } from '../onboarding/state.js';
+import { next, acknowledge } from '../onboarding/conversation.js';
 
 const at = '2026-01-01T08:00:00Z';
 const later = (minutes: number) => new Date(Date.parse(at) + minutes * 60_000).toISOString();
@@ -303,4 +304,81 @@ test('importing an older response preserves the newer explicit reminder decision
   notices.respond(f.root, { ...response, id: 'newer-reminder', kind: 'snooze', until: later(10), source: 'Synthetic newer explicit reminder request', at: later(3) });
   notices.respond(f.root, { ...response, id: 'late-old-ack', kind: 'acknowledge', until: null, source: 'Synthetic older response imported after interruption', at: later(2) });
   assert.equal(f.preview(later(9)).state, 'noAction'); assert.equal(f.preview(later(10)).state, 'ready');
+});
+
+function activeNotificationEdit() {
+  const f = fixture(false), question = { id: 'recoverable-notification', prompt: 'Synthetic reminder preference?', file: prefs.preferencesPath, source: 'Synthetic settings request' };
+  put(f.root, statePath, { ...emptyState(), completed: true }); put(f.root, '.local/reporting-settings.json', { retained: 'Synthetic existing reporting choice' });
+  menu.openMenu(f.root, 'Synthetic settings request'); menu.chooseArea(f.root, 'reporting'); menu.startEdit(f.root, question); menu.presentEdit(f.root);
+  return { ...f, question, originalPreferences: readFileSync(store.contained(f.root, prefs.preferencesPath), 'utf8'), onboardingRevision: store.revision(f.root, statePath) };
+}
+
+test('an unreadable active notification edit renders a recovery issue without altering its data', () => {
+  const f = activeNotificationEdit(), malformed = JSON.parse(f.originalPreferences); delete malformed.edit.references;
+  for (const value of ['{ synthetic unreadable optional edit', malformed]) {
+    put(f.root, prefs.preferencesPath, value); const before = files(f.root).map(path => [path, store.digest(readFileSync(path))]);
+    for (const result of [menu.showMenu(f.root), menu.presentEdit(f.root)]) { assert.equal(result.question, null); assert(result.questionIssue?.includes('reconciliation')); assert(result.choices.some(choice => choice === 'Close settings')); }
+    assert.deepEqual(files(f.root).map(path => [path, store.digest(readFileSync(path))]), before);
+  }
+});
+
+for (const navigation of ['cancel', 'back', 'close'] as const) test(`${navigation} escapes an unreadable notification edit and preserves unrelated setup`, () => {
+  const f = activeNotificationEdit(); put(f.root, prefs.preferencesPath, '{ synthetic unreadable optional edit');
+  const corrupt = store.revision(f.root, prefs.preferencesPath), reporting = store.revision(f.root, '.local/reporting-settings.json');
+  if (navigation === 'close') menu.closeMenu(f.root); else menu.cancelEdit(f.root, navigation === 'back');
+  const current = menu.menuState(f.root).value;
+  assert.equal(current.questionId, null); assert.equal(current.open, navigation !== 'close'); assert.equal(current.area, navigation === 'cancel' ? 'reporting' : null);
+  assert.equal(current.notificationRecoveryHistory?.length, 1); assert.equal(current.notificationRecoveryHistory?.[0]?.questionId, f.question.id); assert.equal(current.notificationRecoveryHistory?.[0]?.preferencesRevision, corrupt); assert.equal(current.notificationRecoveryHistory?.[0]?.action, 'leftWithoutUpdatingNotificationEdit');
+  assert.equal(store.revision(f.root, prefs.preferencesPath), corrupt); assert.equal(store.revision(f.root, statePath), f.onboardingRevision); assert.equal(store.revision(f.root, '.local/reporting-settings.json'), reporting);
+  if (navigation === 'close') { assert.notEqual(next(f.root).action, 'settings'); menu.openMenu(f.root, 'Synthetic independent settings request'); }
+  menu.chooseArea(f.root, 'browser'); menu.startEdit(f.root, { id: 'independent-browser-setting', prompt: 'Synthetic visibility choice?', file: '.local/browser-preferences.json', source: 'Synthetic independent request' }); menu.presentEdit(f.root); acknowledge(f.root, 'independent-browser-setting', 'Synthetic actual prompt fixture');
+  menu.saveEdit(f.root, { id: 'independent-answer', source: 'Synthetic actual response fixture', answers: [{ id: 'independent-browser-setting', path: '.local/browser-preferences.json', kind: 'answer' }], writes: [{ path: '.local/browser-preferences.json', expectedSha256: null, content: JSON.stringify({ synthetic: true, visibility: 'headed' }), origin: 'human' }] }); menu.closeMenu(f.root);
+  assert.equal(JSON.parse(readFileSync(store.contained(f.root, '.local/browser-preferences.json'), 'utf8')).visibility, 'headed'); assert.equal(store.revision(f.root, prefs.preferencesPath), corrupt);
+});
+
+test('a restored notification question can resume without discarding its recovery history', () => {
+  const f = activeNotificationEdit(); put(f.root, prefs.preferencesPath, '{ synthetic corruption'); menu.cancelEdit(f.root, true);
+  const retained = menu.menuState(f.root).value.notificationRecoveryHistory;
+  put(f.root, prefs.preferencesPath, f.originalPreferences); menu.chooseArea(f.root, 'reporting'); menu.startEdit(f.root, f.question); menu.presentEdit(f.root);
+  assert.equal(menu.showMenu(f.root).question?.id, f.question.id); assert.equal(prefs.editQuestion(f.root)?.status, 'presenting');
+  prefs.markEdit(f.root, 'asked', 'Synthetic original prompt verification'); menu.cancelEdit(f.root, true);
+  assert.equal(prefs.editQuestion(f.root)?.status, 'canceled'); assert.deepEqual(menu.menuState(f.root).value.notificationRecoveryHistory, retained); assert.equal(store.revision(f.root, statePath), f.onboardingRevision);
+});
+
+test('stale notification menu focus cannot display or cancel another pending question', () => {
+  const f = activeNotificationEdit(); prefs.markEdit(f.root, 'canceled'); prefs.beginEdit(f.root, { id: 'other-notification-question', prompt: 'Synthetic newer question?', source: 'Synthetic newer request' });
+  assert.equal(menu.showMenu(f.root).question, null); assert.throws(() => prefs.markEdit(f.root, 'canceled', undefined, f.question.id), /same unfinished/);
+  menu.cancelEdit(f.root, true); assert.equal(prefs.editQuestion(f.root)?.id, 'other-notification-question'); assert.equal(prefs.editQuestion(f.root)?.status, 'queued'); assert.equal(menu.menuState(f.root).value.notificationRecoveryHistory?.[0]?.questionId, f.question.id);
+});
+
+test('an unavailable optional writer does not prevent leaving its edit or invent cancellation', () => {
+  const f = activeNotificationEdit(), before = store.revision(f.root, prefs.preferencesPath);
+  store.withLock(f.root, 'attention', () => menu.cancelEdit(f.root, true));
+  assert.equal(store.revision(f.root, prefs.preferencesPath), before); assert.equal(prefs.editQuestion(f.root)?.status, 'presenting'); assert.equal(menu.menuState(f.root).value.questionId, null); assert.equal(menu.menuState(f.root).value.notificationRecoveryHistory?.length, 1);
+});
+
+for (const state of ['resolved', 'withdrawn', 'reassigned'] as const) test(`an older blocker update cannot replace a newer ${state} state`, () => {
+  const f = fixture(), task = f.add(1), original = records.scan(f.root).items[0]!.blocker;
+  const newer: records.Blocker = { ...task.blocker, state: state === 'reassigned' ? 'open' : state, owner: state === 'reassigned' ? 'dev' : 'qa', ...(state === 'resolved' ? { verification: { source: 'Synthetic actually checked prerequisite', evidence: [f.evidence] } } : {}) };
+  records.recordBlocker(f.root, { eventId: 'newer-state', ticketId: task.id, expectedRevision: board.findTicket(f.root, task.id).revision, blocker: newer, at: later(3) });
+  const revision = board.findTicket(f.root, task.id).revision;
+  assert.throws(() => records.recordBlocker(f.root, { eventId: 'stale-import', ticketId: task.id, expectedRevision: revision, blocker: task.blocker, at: later(2) }), /predates/); assert.equal(board.findTicket(f.root, task.id).revision, revision);
+  records.recordBlocker(f.root, { eventId: original.eventId, ticketId: task.id, expectedRevision: revision, blocker: task.blocker, at: original.recordedAt });
+  assert.equal(board.findTicket(f.root, task.id).revision, revision); const view = records.backlog(f.root); assert.equal(view.items.length, state === 'reassigned' ? 1 : 0); if (state === 'reassigned') assert.equal(view.items[0]?.blocker.owner, 'dev');
+});
+
+test('legitimate later reopening and equal-time explicit updates remain possible', () => {
+  const f = fixture(), task = f.add(1);
+  const append = (id: string, blocker: records.Blocker, at: string) => records.recordBlocker(f.root, { eventId: id, ticketId: task.id, expectedRevision: board.findTicket(f.root, task.id).revision, blocker, at });
+  append('resolved', { ...task.blocker, state: 'resolved', verification: { source: 'Synthetic prerequisite verified', evidence: [f.evidence] } }, later(3));
+  append('genuinely-reopened', { ...task.blocker, source: 'Synthetic genuinely new loss of access' }, later(4)); assert.equal(records.backlog(f.root).items.length, 1);
+  append('same-clock-tick', { ...task.blocker, owner: 'dev', source: 'Synthetic explicit current-revision reassignment in the same clock tick' }, later(4)); assert.equal(records.backlog(f.root).items[0]?.blocker.owner, 'dev');
+});
+
+test('legacy out-of-order blocker history is projected chronologically without rewriting evidence', () => {
+  const f = fixture(), task = f.add(1), older = records.scan(f.root).items[0]!.blocker;
+  records.recordBlocker(f.root, { eventId: 'verified-resolution', ticketId: task.id, expectedRevision: board.findTicket(f.root, task.id).revision, blocker: { ...task.blocker, state: 'resolved', verification: { source: 'Synthetic verified prerequisite', evidence: [f.evidence] } }, at: later(3) });
+  const ticket = board.findTicket(f.root, task.id), late = { ...older, eventId: 'historical-late-import', recordedAt: later(2) };
+  put(f.root, ticket.path, ticket.text + `\n\`\`\`qa-blocker\n${JSON.stringify(late, null, 2)}\n\`\`\`\n`); const before = store.revision(f.root, ticket.path);
+  assert.equal(records.backlog(f.root).items.length, 0); assert.equal(f.preview().state, 'noAction'); assert.equal(store.revision(f.root, ticket.path), before); assert(readFileSync(store.contained(f.root, ticket.path), 'utf8').includes('historical-late-import'));
 });

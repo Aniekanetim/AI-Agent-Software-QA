@@ -47,6 +47,7 @@ export function recordBlocker(root: string, request: { eventId: string; ticketId
     const previous = parsed.events.find(e => e.eventId === event.eventId);
     if (previous) { if (fingerprint(previous) !== fingerprint(event) || previous.source !== event.source) throw new Error('This blocker event ID has different content.'); return previous; }
     if (ticket.revision !== request.expectedRevision || parsed.unfinishedExample) throw new Error('Reload the current ticket and close its unfinished example before appending a blocker outside code samples.');
+    if (parsed.events.some(e => e.id === event.id && time(e.recordedAt) > time(event.recordedAt))) throw new Error('This blocker update predates its current recorded state. Retain the historical input and evidence without replacing the newer state.');
     verifyImmutable(root, [...event.evidence, ...(event.verification?.evidence ?? [])], [ticket.path, `${boardRoot}/README.md`]);
     replace(root, ticket.path, ticket.text + `\n### Blocker ${event.id} — ${at}\n\n\`\`\`qa-blocker\n${JSON.stringify(event, null, 2)}\n\`\`\`\n`, ticket.revision);
     return event;
@@ -67,7 +68,9 @@ export function scan(root: string) {
       }
       for (const e of events) {
         if (e.ticketId !== ticket.id) throw new Error('The blocker belongs to another ticket.');
-        if (!first.has(e.id)) first.set(e.id, e.recordedAt); last.set(e.id, e);
+        if (!first.has(e.id) || time(e.recordedAt) < time(first.get(e.id)!)) first.set(e.id, e.recordedAt);
+        const previous = last.get(e.id);
+        if (!previous || time(e.recordedAt) >= time(previous.recordedAt)) last.set(e.id, e);
       }
       for (const e of last.values()) {
         if (e.state !== 'open') continue;
