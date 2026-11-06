@@ -35,7 +35,7 @@ function lastPresented(state: State, recipient: string, item: Member) {
 }
 function due(state: State, recipient: Recipient, item: Item, at: string) {
   const target = member(item), now = time(at);
-  const control = state.controls.filter(c => c.recipient === recipient.id && c.members.some(m => matches(m, target))).at(-1);
+  const control = state.controls.filter(c => c.recipient === recipient.id && c.members.some(m => matches(m, target))).sort((a, b) => time(a.at) - time(b.at)).at(-1);
   const presented = lastPresented(state, recipient.id, target), shownAt = presented ? time(presentationTime(presented)) : null;
   if (control) {
     if (control.until === null || time(control.until) > now) return null;

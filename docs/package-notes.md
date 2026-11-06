@@ -8,7 +8,7 @@ Adds optional [blocker notifications](../automation/attention/README.md) without
 
 Actual preferences establish the designated notifier, host conversation, timezone, quiet hours and item/recipient pacing. Configuration and receipts stay private. The optional settings path preserves completed onboarding and unrelated preferences. Previewing sends nothing; actual presentation needs an atomic claim and host observation. Unknown sends remain held for investigation, while acknowledgements and snoozes never resolve, move or approve work. The shared index is derived and narrowly mutable; immutable evidence is preserved.
 
-Focused regression review reproduced duplicate concurrent presentation and a stale reminder after acknowledgement, then retained tests for both corrections. [Validation and limits](blocker-notification-validation.md) distinguish helper/CLI rehearsals, actual host presentation and adopting-project work. No recipient, ticket, outbound email channel or active schedule is configured by this package. Installed schedule prompts require a separate actual authorized update.
+Focused regression review reproduced duplicate concurrent presentation, a stale reminder after acknowledgement and an older imported response overriding a newer reminder decision, then retained tests for all three corrections. [Validation and limits](blocker-notification-validation.md) distinguish helper/CLI rehearsals, actual host presentation and adopting-project work. No recipient, ticket, outbound email channel or active schedule is configured by this package. Installed schedule prompts require a separate actual authorized update.
 
 ## Version 1.10.0 — deferred and canceled work
 

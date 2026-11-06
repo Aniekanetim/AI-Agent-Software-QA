@@ -79,6 +79,8 @@ Supply a unique `id`, actual `recipient`, explicitly covered `members` (from the
 
 An acknowledgement without a follow-up time stops unchanged reminders for those items; they remain open in the backlog. A snooze schedules one requested reminder at the next eligible check-in/quiet-hour boundary. After that reminder, normal pacing applies. Snoozing never moves a task to Deferred. Acknowledging the displayed summary covers only the explicitly identified shown items, not hidden groups. Materially changed actions need fresh attention; stale owner/fingerprint responses cannot acknowledge new work.
 
+Retain the actual response time when importing a reply after interruption. The latest response time governs reminder handling; a late import of an older reply cannot replace the newer decision. Both replies remain in history.
+
 Record actual answers on the original ticket, establish intended behavior with its responsible owner and verify affected prerequisites. Resume only existing authorized work; use the original review gate when a new decision is needed. Do not rewrite human requirements or regenerate an unanswered approval packet merely to send a reminder.
 
 ## Full backlog and shared index

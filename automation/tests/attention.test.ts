@@ -296,3 +296,11 @@ test('send-time revalidation respects quiet hours and changed backlog counts', (
   f.add(2); assert.throws(() => notices.beforePresentation(f.root, d.id, d.notifier, at), /eligibility|changed/);
   assert.equal(notices.status(f.root).unresolved[0]?.state, 'reserved');
 });
+
+test('importing an older response preserves the newer explicit reminder decision', () => {
+  const f = fixture(); f.add(1); const d = f.reserve(); f.presented(d);
+  const response = { recipient: 'qa', members: d.members, evidence: [f.evidence] };
+  notices.respond(f.root, { ...response, id: 'newer-reminder', kind: 'snooze', until: later(10), source: 'Synthetic newer explicit reminder request', at: later(3) });
+  notices.respond(f.root, { ...response, id: 'late-old-ack', kind: 'acknowledge', until: null, source: 'Synthetic older response imported after interruption', at: later(2) });
+  assert.equal(f.preview(later(9)).state, 'noAction'); assert.equal(f.preview(later(10)).state, 'ready');
+});

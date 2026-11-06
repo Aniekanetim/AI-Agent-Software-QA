@@ -14,8 +14,9 @@ Baseline `1685c72cc26556cb90f49e565fc997722e030d0b` passed all 183 package tests
 | --- | --- | --- |
 | Two concurrent callers presented the same reservation twice | A locked transition claims presentation once; an interrupted claim stays unresolved | Concurrent callbacks produce one actual synthetic send |
 | A prepared reminder still presented after the recipient acknowledged its items | Preflight repeats current eligibility, including acknowledgement, quiet hours, pacing and summary counts | Acknowledgement after reservation produces zero synthetic sends; quiet hours and changed counts reject stale messages |
+| Importing an older acknowledgement after a newer reminder request suppressed the requested reminder | Response selection follows actual response time while retaining import history | The newer reminder becomes due even when an older reply is imported afterwards |
 
-The original failing outputs are preserved locally in `.local/attention-concurrency-red.log` and `.local/attention-sendtime-red.log`. Passing totals from before these cases were added do not substitute for correction verification.
+The original failing outputs are preserved locally in `.local/attention-concurrency-red.log`, `.local/attention-sendtime-red.log` and `.local/attention-response-order-red.log`. Passing totals from before these cases were added do not substitute for correction verification.
 
 ## Verification coverage
 
@@ -28,13 +29,13 @@ Compatibility checks preserve completed onboarding bytes and readiness, unrelate
 | Check | Actual result |
 | --- | --- |
 | TypeScript | Passed |
-| Final full package suite | 223 passed: 183 retained checks and 40 attention checks; zero failed, canceled or skipped |
-| Focused attention checkpoint | All 40 passed; the final full suite includes the subsequent incomplete-board diagnostic guard |
+| Final full package suite | 224 passed: 183 retained checks and 41 attention checks; zero failed, canceled or skipped |
+| Focused attention checkpoints | Initial 40 passed; the later response-order regression failed before correction, then passed independently and in the final full suite |
 | Markdown targets/anchors | All 557 resolved |
 | Actual CLI integration rehearsal | 17 commands passed in an isolated synthetic project path containing spaces; zero real messages sent |
 | Reusable master | Board empty; notification preferences absent; no unresolved delivery, live recipient or active schedule created |
 
-The final local output is retained in `.local/attention-full-release.log`; the focused and CLI records remain separate. The CLI rehearsal exercised argument parsing, root relocation, proposal/configuration, canonical blocker append, paging/index previews, reservation/claim, an explicitly Not sent outcome and acknowledgement. It did not establish actual user-message access.
+The final local output is retained in `.local/attention-response-order-full.log`; the earlier 223-test checkpoint, original failures, focused checks and CLI records remain separate. The CLI rehearsal exercised argument parsing, root relocation, proposal/configuration, canonical blocker append, paging/index previews, reservation/claim, an explicitly Not sent outcome and acknowledgement. It did not establish actual user-message access.
 
 Windows/Linux browser and API fixtures remain part of the existing [package CI](https://github.com/Aniekanetim/AI-Agent-Software-QA/actions?query=branch%3Acodex%2Fblocked-task-attention). The delivery PR records exact tested revisions, completed run links and actual outcomes. A queued/in-progress run is not a pass. No local browser reinstall was performed for this feature.
 
