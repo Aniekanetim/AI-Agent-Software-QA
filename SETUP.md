@@ -4,6 +4,8 @@ Choose one QA root for each project. All links, discovery records and board fold
 
 When starting from the public repository URL, follow [agent repository adoption](docs/adopt-from-repository.md). Record the workflow source/revision in shared progress, separately from the application target. A fork or template repository can serve directly as the project-specific QA root.
 
+During operating preferences, select the [task source](automation/task-source/README.md) before setting the check-in schedule. Existing projects can use Settings → Task source.
+
 ## 1. Place the files
 
 Copy the complete package into a new project-specific directory. You can use that directory as a separate QA project and record the application's location in the environment reference. Alternatively, merge the package into the application's repository root.

@@ -9,6 +9,7 @@ import './chrome-devtools.test.js';
 import './chrome-fixture-browser.test.js';
 import './board.test.js';
 import './attention.test.js';
+import './task-source.test.js';
 import './documents.test.js';
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync, renameSync, existsSync } from 'node:fs';

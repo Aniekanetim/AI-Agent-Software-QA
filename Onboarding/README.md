@@ -25,7 +25,7 @@ The commands support the agent's conversation; they do not conduct a standalone 
 4. Discover email integrations and select verification mailboxes.
 5. Establish application access.
 6. Build and review initial project/product understanding.
-7. Configure check-ins, PR triggers and reporting.
+7. Choose the task source and configure check-ins, PR triggers and reporting.
 8. Verify scoped readiness and explain how work begins.
 
 The sequence follows dependencies. A staging-only project does not need an application checkout. A project without GitHub access can still use discovery and the local board. Email can be deferred when no current journey needs it. Every context domain must still have a source, justified non-applicability or a question with an owner.

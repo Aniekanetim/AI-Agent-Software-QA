@@ -8,9 +8,15 @@ Read AGENTS.md, unified_project_context.md, Project Context/README.md,
 Product Discovery/Project Context/README.md, QA Process Context/README.md,
 Application Flow Map/README.md,
 QA task management Board/README.md and QA/Quality assurance/qa-workflow.md.
-Inspect Ready for QA and Retest under QA task management Board.
-Read all seven status folders for IDs/deduplication. Deferred/Canceled work,
-including claimed or approval-waiting items, is not executable. Recheck canonical
+Run npm run qa -- task-source check-in from the actual QA root. If local, follow
+QA task management Board/README.md and inspect Ready for QA and Retest. Read all
+seven local status folders for IDs and deduplication. If live, follow
+automation/task-source/README.md and work from the native tickets, claims and
+queue mappings. Pause that pickup if live access fails. Apply the remaining
+folder-specific operations in this template only to local mode. In live mode use
+native tickets, linked evidence and the live publication controls for QA handoffs.
+
+Deferred/Canceled work, including claimed or approval-waiting items, is not executable. Recheck canonical
 status/generation before starts/dispatches and after waits. Inspect due Deferred
 reviews and prior notices; brief once and acknowledge only the actual message.
 Dates, new PR commits and late replies do not override an inactive decision.
@@ -50,7 +56,7 @@ For missing or conflicting information, comment on the existing ticket for the
 developer, index its unanswered question in the board README, and wait only on
 dependent work. Read actual responses before resuming; retain the conversation
 and link responsible-owner clarifications or canonical source updates.
-If blocker notifications are actually configured, read automation/attention/README.md.
+In local mode, if blocker notifications are actually configured, read automation/attention/README.md.
 Retain supported blocker facts and original question references on existing tickets.
 Use actual recorded times; stale imports cannot replace newer blocker states.
 Preserve original history and source evidence instead of restamping old updates.

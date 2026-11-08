@@ -4,6 +4,8 @@ import { commitReply, queueQuestions, journalPath, type Reply } from '../onboard
 import { readState, writeState, type Stage } from '../onboarding/state.js';
 import * as attention from '../attention/preferences.js';
 
+import { activeSource, sourcePath } from '../task-source/config.js';
+
 export const areas = [
   { id: 'project', label: 'Project and environments', files: ['.local/project.json'], stage: 'project' },
   { id: 'context', label: 'Project context and discovery', files: ['.local/context-settings.json'], stage: 'understanding' },
@@ -15,6 +17,7 @@ export const areas = [
   { id: 'schedule', label: 'Check-in schedule', files: ['.local/operation-preferences.json'], stage: 'operation' },
   { id: 'reporting', label: 'Reporting and evidence preferences', files: ['.local/reporting-settings.json', attention.preferencesPath], stage: 'operation' },
   { id: 'postman', label: 'API tools and Postman', files: ['.local/postman-settings.json'], stage: 'tools' },
+  { id: 'taskSource', label: 'Task source', files: [sourcePath], stage: 'operation' },
 ] as const;
 interface NotificationRecovery { questionId: string; preferencesPath: string; preferencesRevision: string | null; recordedAt: string; action: 'leftWithoutUpdatingNotificationEdit' }
 interface Menu { schemaVersion: 1; open: boolean; area: string | null; questionId: string | null; source: string | null; questionKind?: 'attention'; notificationRecoveryHistory?: NotificationRecovery[] }
@@ -38,6 +41,10 @@ function retainNotificationRecovery(root: string, menu: Menu) {
 export function showMenu(root: string) {
   const menu = menuState(root).value, area = areas.find(a => a.id === menu.area);
   const current = area ? area.files.map(file => {
+    if (file === sourcePath) {
+      try { return { path: file, value: activeSource(root).value }; }
+      catch { return { path: file, value: 'Task source settings need reconciliation. Other settings remain available.' }; }
+    }
     if (file === attention.preferencesPath) { try { const value = attention.settings(root).value ?? 'Not configured'; assertNonsecret(value); return { path: file, value }; } catch { return { path: file, value: 'Notification preferences need reconciliation; other settings remain available.' }; } }
     return { path: file, value: existsSync(contained(root, file)) ? JSON.parse(readFileSync(contained(root, file), 'utf8')) : 'Not configured' };
   }) : [];
@@ -69,6 +76,7 @@ export function startEdit(root: string, input: { id: string; prompt: string; fil
   const current = menuState(root), area = areas.find(a => a.id === current.value.area);
   if (!current.value.open || !area || current.value.questionId || !(area.files as readonly string[]).includes(input.file)) throw new Error('Bind the edit to the selected area and its canonical destination.');
   requireText(input.source);
+  if (area.id === 'taskSource') throw new Error('Use task-source inspect, preview and save for this area.');
   if (area.id === 'email') throw new Error('Use email account discovery and the guarded mailbox-selection procedure; do not overwrite connection JSON.');
   if (input.file === attention.preferencesPath) {
     if (input.pointer) throw new Error('Save the merged notification preferences through their isolated optional-settings path.');

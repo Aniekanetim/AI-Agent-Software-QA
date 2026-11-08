@@ -19,6 +19,7 @@ function read(root: string) {
   if (r.value.schemaVersion !== 1 || !Array.isArray(r.value.deliveries) || !Array.isArray(r.value.controls) || r.value.deliveries.some(d => !['reserved', 'presenting', 'presented', 'delivered', 'notSent', 'uncertain'].includes(d.state) || !Array.isArray(d.members)) || r.value.controls.some(c => !['acknowledge', 'snooze'].includes(c.kind) || !Array.isArray(c.members)) || new Set(r.value.deliveries.map(d => d.id)).size !== r.value.deliveries.length || new Set(r.value.controls.map(c => c.id)).size !== r.value.controls.length) throw new Error('Preserve notification delivery history and reconcile it; unreadable state must not restart delivery.');
   return r;
 }
+export function pendingPresentation(root: string) { return read(root).value.deliveries.some(delivery => ['presenting', 'uncertain'].includes(delivery.state)); }
 export function status(root: string) { return { preferences: settings(root), unresolved: read(root).value.deliveries.filter(d => ['reserved', 'presenting', 'uncertain'].includes(d.state)), activation: 'Preferences do not create a schedule or establish actual message delivery.' }; }
 const member = (i: Item): Member => ({ key: i.key, fingerprint: i.fingerprint, ticketId: i.ticketId, generation: i.generation });
 const matches = (a: Member, b: Member) => a.key === b.key && a.fingerprint === b.fingerprint && a.generation === b.generation && a.ticketId === b.ticketId;
