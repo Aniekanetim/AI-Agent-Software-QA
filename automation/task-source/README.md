@@ -8,9 +8,9 @@ The four API adapters have simulated provider tests. Confirm account, board and 
 
 | App | Information to select | Credential available to the QA process |
 | --- | --- | --- |
-| Jira Cloud | Site hostname, account email and Jira Software board ID. Map the status IDs under the board's columns. | `QA_JIRA_API_TOKEN` |
-| ClickUp | Workspace ID and List ID. Map the List's task status IDs. | `QA_CLICKUP_API_TOKEN` |
-| Linear | Team ID and, if needed, an exact project ID. Map the team's workflow state IDs. | `QA_LINEAR_API_KEY` |
+| Jira Cloud | Site hostname, account email and Jira Software board ID. Include the Cloud ID for a scoped token. Map the status IDs under the board's columns. | `QA_JIRA_API_TOKEN` |
+| ClickUp | Workspace ID and List ID. Map the List's task status IDs. The inspector supplies a name-derived ID when ClickUp provides only a name; re-preview after renaming such a status. | `QA_CLICKUP_API_TOKEN` |
+| Linear | Team ID and, if needed, an exact project ID. Map the team's workflow state IDs. | `QA_LINEAR_API_KEY` or `QA_LINEAR_ACCESS_TOKEN` |
 | Asana | Project GID. Map its sections or the enum values of a specified status custom field. | `QA_ASANA_ACCESS_TOKEN` |
 
 Use an authorized test/service account and supply its credential through the runtime environment. Keep credentials out of commands, request files and task evidence. Scheduled runs need access in their own execution environment.
@@ -40,9 +40,29 @@ Use `npm run qa --` before the abbreviated commands on this page. Input JSON bel
 }
 ```
 
-Use `site` and `jiraEmail` for Jira Cloud, optional `linearProjectId` for Linear, or optional `asanaFieldId` for Asana. Jira defect creation additionally needs the original issue's project to allow the selected `jiraDefect: { issueTypeId, transitionId }` and the board filter to include the resulting issue. `ready` and `retest` are required. Use a single mapped destination for each move or defect routing action. Choose an empty `actions` array to use the board for intake with human-managed updates.
+Use `site` and `jiraEmail` for Jira Cloud and add `jiraCloudId` for a scoped token. For Linear, use optional `linearProjectId` and set `linearAuth` to `oauth` if the environment supplies an OAuth access token. Use optional `asanaFieldId` for an Asana single-select custom field. Jira defect creation additionally needs the original issue's project to allow the selected `jiraDefect: { issueTypeId, transitionId }` and the board filter to include the resulting issue. `ready` and `retest` are required. Use a single mapped destination for each move or defect routing action. Choose an empty `actions` array to use the board for intake with human-managed updates.
 
 To choose the local task manager, preview and save `{ "kind": "local" }` through the same commands. Reconcile active claims, operations and uncertain publications before switching. A disconnect pauses the live queues. Resume with the same authorized account and scope.
+
+## Provider setup and verification
+
+### Jira Cloud
+
+Use a scoped service-account API token through the Atlassian API gateway where the organization has provisioned one. Use the Jira site and its actual Cloud ID. The inspector checks their pairing before sending credentials to the gateway. The direct site URL supports an authorized personal API token for a local sandbox. Match the board's columns to issue status IDs and verify the board filter includes the intended issues. Exercise the destination's actual workflow transition and the chosen defect type in the sandbox. [Service-account tokens](https://support.atlassian.com/user-management/docs/manage-api-tokens-for-service-accounts/) · [Jira board API](https://developer.atlassian.com/cloud/jira/software/rest/api-group-board/) · [Jira issue API](https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/)
+
+### ClickUp
+
+Use an authorized test token or a token provisioned through the organization's OAuth app. Verify the List belongs to the selected Workspace. Select its task statuses from the inspection output. Tasks in multiple Lists can be visible, and moves apply the home List's workflow. Test pickup against the intended mapping and verify comments and defects in the actual List. [Authentication](https://developer.clickup.com/docs/authentication) · [List tasks](https://developer.clickup.com/reference/gettasks) · [Update task](https://developer.clickup.com/reference/updatetask)
+
+### Linear
+
+Use a personal API key for a sandbox or an externally provisioned OAuth access token for the chosen account. For OAuth, request read access and only the needed write scopes for comments and issue updates or creation. Use the Team's workflow states and verify that an optional Project filter excludes unrelated issues. A GraphQL response can contain errors alongside successful HTTP status, so only complete results establish the required capability. [GraphQL API](https://linear.app/developers/graphql) · [OAuth scopes and renewal](https://linear.app/developers/oauth-2-0-authentication) · [Published schema](https://github.com/linear/linear/blob/master/packages/sdk/src/schema.graphql)
+
+### Asana
+
+Use an authorized PAT for a single QA installation or an externally provisioned OAuth token. For OAuth, include the read scopes needed to identify the user, project, sections and tasks. A multi-project task can sit in a different section in each project. Verify the selected project's direct membership and use its section or configured enum field to route the task. A section move changes the selected project's section. A custom field update writes the task's actual field value. Verify the destination and side effects with the team. [Authentication](https://developers.asana.com/docs/authentication) · [Project tasks](https://developers.asana.com/reference/gettasksforproject) · [Task fields](https://developers.asana.com/reference/tasks) · [Section moves](https://developers.asana.com/reference/addtaskforsection)
+
+For each sandbox, verify inspection and preview, initial QA pickup, retest pickup, reassignment and cancellation while work is open, then each allowed write and its readback. Confirm a revoked credential or rate limit pauses the affected work. The portable package reads credentials supplied by the runtime. OAuth registration, consent and renewal are handled by the adopting organization's credential setup.
 
 ## Pick up a live task
 

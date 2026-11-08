@@ -12,6 +12,7 @@ export const tokenVariables = {
   jira: 'QA_JIRA_API_TOKEN', clickup: 'QA_CLICKUP_API_TOKEN',
   linear: 'QA_LINEAR_API_KEY', asana: 'QA_ASANA_ACCESS_TOKEN',
 };
+export const linearOAuthVariable = 'QA_LINEAR_ACCESS_TOKEN';
 
 // Provider response shape is verified at the normalization boundary.
 type Payload = Record<string, any>;
@@ -74,7 +75,7 @@ function sender(base: string, token: string, transport: typeof fetch): Send {
     try {
       response = await transport(url, {
         method: method ?? (body === undefined ? 'GET' : 'POST'), redirect: 'error',
-        headers: { Authorization: token, Accept: 'application/json', 'Content-Type': 'application/json' },
+        headers: { ...(token ? { Authorization: token } : {}), Accept: 'application/json', 'Content-Type': 'application/json' },
         body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(15_000),
       });
     } catch { throw new Error('The task provider connection failed or timed out.'); }
@@ -116,9 +117,14 @@ function clickup(board: BoardSelection, send: Send) {
     const workspace = board.clickupWorkspaceId!;
     const [identity, selected, locations] = await Promise.all([send('user'), send(`list/${listId}`), send(`team/${part(workspace)}/space?archived=false`)]);
     scope(selected.id, board.scopeId);
+    if (selected.archived === true) throw new Error('The ClickUp List is archived.');
     const space = list(locations.spaces).find(row => key(row.id) === key(object(selected.space).id));
     if (!space) throw new Error('The List is outside the selected ClickUp Workspace or is inaccessible.');
-    const states = list(selected.statuses ?? space.statuses).map(state => ({ id: key(state.id), name: label(state.status) }));
+    const states = list(selected.statuses ?? space.statuses).map(state => {
+      const name = label(state.status);
+      const native = state.id == null ? null : key(state.id);
+      return { id: native ?? 'name-' + digest(name), name, native };
+    });
     const rows: Ticket[] = [], descriptions: Record<string, unknown> = Object.create(null);
     for (let index = 0; index < 100; index++) {
       const page = await send(`list/${listId}/task?include_closed=true&include_timl=true&page=${index}`);
@@ -126,15 +132,18 @@ function clickup(board: BoardSelection, send: Send) {
       for (const raw of tasks) {
         const status = object(raw.status);
         descriptions[key(raw.id)] = raw.description ?? null;
-        const matches = status.id ? states.filter(state => state.id === key(status.id)) : states.filter(state => state.name === status.status);
+        const homeListId = key(object(raw.list).id);
+        const native = status.id == null ? null : key(status.id);
+        const matches = states.filter(state => state.native !== null && state.native === native ||
+          homeListId === board.scopeId && (native === null || state.native === null) && state.name === status.status);
         rows.push(ticket({
           id: key(raw.id), title: label(raw.name), url: `https://app.clickup.com/t/${part(raw.id)}`,
           state: matches.length === 1 ? matches[0]!.id : null, assignees: list(raw.assignees).map(user => key(user.id)),
-          createdAt: iso(raw.date_created), closed: status.type === 'closed', priority: Number(raw.priority?.id) || 99, homeListId: key(object(raw.list).id),
+          createdAt: iso(raw.date_created), closed: status.type === 'closed', priority: Number(raw.priority?.id) || 99, homeListId,
         }, { description: raw.description, status: status.status, homeList: raw.list?.id }, raw.date_updated));
       }
       if (page.last_page === true || page.last_page === undefined && tasks.length < 100) {
-        return collect({ accountId: key(object(identity.user).id), workspaceId: workspace, scopeId: board.scopeId, scopeName: label(selected.name) }, states, rows, descriptions);
+        return collect({ accountId: key(object(identity.user).id), workspaceId: workspace, scopeId: board.scopeId, scopeName: label(selected.name) }, states.map(({ id, name }) => ({ id, name })), rows, descriptions);
       }
     }
     throw new Error('ClickUp did not complete pagination.');
@@ -156,14 +165,19 @@ function linear(board: BoardSelection, send: Send) {
     }
   }
   return async () => {
-    const result = await query('query($team: String!) { viewer { id } organization { id } team(id: $team) { id name } }', { team: board.scopeId });
+    const result = await query('query($team: String!) { viewer { id } organization { id } team(id: $team) { id name archivedAt } }', { team: board.scopeId });
     scope(object(result.team).id, board.scopeId);
+    if (result.team.archivedAt !== null) throw new Error('The Linear team is archived or could not be verified.');
     const states = (await pages('query($team: String!, $after: String) { team(id: $team) { states(first: 50, after: $after) { nodes { id name } pageInfo { hasNextPage endCursor } } } }', { team: board.scopeId }, data => object(data.team).states)).map(state => ({ id: key(state.id), name: label(state.name) }));
     const projectId = board.linearProjectId;
-    const project = projectId ? object((await query('query($project: String!) { project(id: $project) { id name } }', { project: projectId })).project) : null;
-    if (project && projectId) scope(project.id, projectId);
-    const issues = await pages('query($team: String!, $after: String, $filter: IssueFilter) { team(id: $team) { issues(first: 50, after: $after, filter: $filter) { nodes { id title url description priority createdAt updatedAt archivedAt state { id type } assignee { id } project { id } } pageInfo { hasNextPage endCursor } } } }', { team: board.scopeId, filter: projectId ? { project: { id: { eq: projectId } } } : null }, data => object(data.team).issues);
+    const project = projectId ? object((await query('query($project: String!) { project(id: $project) { id name archivedAt } }', { project: projectId })).project) : null;
+    if (project && projectId) {
+      scope(project.id, projectId);
+      if (project.archivedAt !== null) throw new Error('The Linear project is archived or could not be verified.');
+    }
+    const issues = await pages('query($team: String!, $after: String, $filter: IssueFilter) { team(id: $team) { issues(first: 50, after: $after, filter: $filter, includeSubTeams: false) { nodes { id title url description priority createdAt updatedAt archivedAt team { id } state { id type } assignee { id } project { id } } pageInfo { hasNextPage endCursor } } } }', { team: board.scopeId, filter: projectId ? { project: { id: { eq: projectId } } } : null }, data => object(data.team).issues);
     const rows = issues.map(raw => {
+      scope(object(raw.team).id, board.scopeId);
       if (projectId) scope(object(raw.project).id, projectId);
       return ticket({
         id: key(raw.id), title: label(raw.title), url: label(raw.url), state: key(object(raw.state).id),
@@ -198,8 +212,9 @@ function asana(board: BoardSelection, send: Send) {
     const selectedField = field ? sources.find(item => item.custom_field?.gid === field)?.custom_field : null;
     const states = (field ? list(object(selectedField).enum_options).filter(option => option.enabled === true) : sources).map(state => ({ id: key(state.gid), name: label(state.name) }));
     const tasks = await pages(`projects/${project}/tasks`, 'gid,name,notes,completed,assignee.gid,created_at,modified_at,permalink_url,memberships.project.gid,memberships.section.gid,custom_fields.gid,custom_fields.enum_value.gid');
-    const rows = tasks.map(raw => {
+    const rows = tasks.flatMap(raw => {
       const members = list(raw.memberships).filter(member => member.project?.gid === board.scopeId);
+      if (members.length === 0) return [];
       if (members.length !== 1 || typeof raw.completed !== 'boolean') throw new Error('The Asana task membership or completion state changed.');
       const state = field ? list(raw.custom_fields).find(value => value.gid === field)?.enum_value?.gid : members[0]!.section?.gid;
       return ticket({
@@ -213,18 +228,24 @@ function asana(board: BoardSelection, send: Send) {
 
 function boardSender(board: BoardSelection, transport: typeof fetch, env: NodeJS.ProcessEnv) {
   validateBoard(board);
-  const variable = tokenVariables[board.provider], token = env[variable];
+  const linearOAuth = board.provider === 'linear' && board.linearAuth === 'oauth';
+  const variable = linearOAuth ? linearOAuthVariable : tokenVariables[board.provider], token = env[variable];
   requireText(token, `Credential in ${variable}`);
   const api = {
-    jira: [`https://${board.site}/`, 'Basic ' + Buffer.from(`${board.jiraEmail}:${token}`).toString('base64')],
+    jira: [board.jiraCloudId ? `https://api.atlassian.com/ex/jira/${part(board.jiraCloudId)}/` : `https://${board.site}/`, 'Basic ' + Buffer.from(`${board.jiraEmail}:${token}`).toString('base64')],
     clickup: ['https://api.clickup.com/api/v2/', token],
-    linear: ['https://api.linear.app/', token],
+    linear: ['https://api.linear.app/', linearOAuth ? `Bearer ${token}` : token],
     asana: ['https://app.asana.com/api/1.0/', `Bearer ${token}`],
   }[board.provider];
   return sender(api[0]!, api[1]!, transport);
 }
 export async function readBoard(board: BoardSelection, transport: typeof fetch = fetch, env = process.env): Promise<Connection> {
-  return { jira, clickup, linear, asana }[board.provider](board, boardSender(board, transport, env))();
+  const send = boardSender(board, transport, env);
+  if (board.provider === 'jira' && board.jiraCloudId) {
+    const tenant = await sender(`https://${board.site}/`, '', transport)('_edge/tenant_info');
+    scope(tenant.cloudId, board.jiraCloudId);
+  }
+  return { jira, clickup, linear, asana }[board.provider](board, send)();
 }
 
 

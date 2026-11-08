@@ -217,6 +217,7 @@ function publicationMutation(request: Proposal, claim: Claim, choice: LiveChoice
   const mapped = choice.queues[queue];
   if (mapped?.length !== 1) throw new Error('Select one unambiguous destination for the board write.');
   const destination = connection.states.find(s => s.id === mapped[0])!;
+  if (choice.board.provider === 'clickup' && connection.states.filter(state => state.name === destination.name).length !== 1) throw new Error('ClickUp requires an unambiguous destination status name for this write.');
   const mutation: Mutation = request.action === 'move' ? { action: request.action, destination } : {
     action: request.action, destination, title: request.title,
     body: `${request.body}\n\nOriginating QA ticket: ${claim.ticket.url}`,
@@ -235,7 +236,7 @@ function approvedPublication(root: string, request: PublicationRequest, claim: C
   const gate = mutation.action === 'move' && request.action === 'move' && request.to === 'testedOk' ? 'G5' : 'G3';
   const decision = approvedGate(root, claim, request.decision, gate);
   const reviewed = proposalDigest(claim, mutation);
-  if (decision.publicationDigest !== reviewed && !decision.publicationDigests?.includes(reviewed)) throw new Error('The actual review must cover this exact board publication.');
+  if (decision.publicationDigest !== reviewed && !(Array.isArray(decision.publicationDigests) && decision.publicationDigests.includes(reviewed))) throw new Error('The actual review must cover this exact board publication.');
   return mutation;
 }
 export async function publish(root: string, request: PublicationRequest, reader: BoardReader = readBoard, writer: BoardWriter = prepareWrite) {

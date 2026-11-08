@@ -16,7 +16,7 @@ import { installGh } from './github/install.js';
 import * as board from './board/board.js';
 import * as taskSource from './task-source/work.js';
 import { activeSource, providers as taskProviders, requireLocalSource } from './task-source/config.js';
-import { tokenVariables } from './task-source/provider.js';
+import { linearOAuthVariable, tokenVariables } from './task-source/provider.js';
 import * as attentionPreferences from './attention/preferences.js';
 import * as blockers from './attention/blockers.js';
 import * as attention from './attention/notifications.js';
@@ -94,7 +94,7 @@ async function main() {
   }
   if (area === 'task-source') {
     if (action === 'status') output(activeSource(root));
-    else if (action === 'providers') output(taskProviders.map(provider => ({ provider, credentialVariable: tokenVariables[provider], credentialPresent: !!process.env[tokenVariables[provider]], readiness: 'Verify the actual account and board with inspect.' })));
+    else if (action === 'providers') output(taskProviders.map(provider => ({ provider, credentials: (provider === 'linear' ? [tokenVariables.linear, linearOAuthVariable] : [tokenVariables[provider]]).map(variable => ({ variable, present: !!process.env[variable] })), readiness: 'Verify the actual account and board with inspect.' })));
     else if (action === 'inspect') output(await taskSource.inspect(input()));
     else if (action === 'preview') output(await taskSource.preview(root, input()));
     else if (action === 'save') output(await taskSource.configure(root, input()));

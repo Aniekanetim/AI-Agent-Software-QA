@@ -65,11 +65,11 @@ test('Linear verifies organization, team and project, and rejects mismatched or 
   let project = '22';
   const transport = mock((_url, init) => {
     const { query, variables } = JSON.parse(String(init.body));
-    if (query.includes('viewer')) return { data: { viewer: { id: 'account' }, organization: { id: 'org' }, team: { id: '11', name: 'Team' } } };
+    if (query.includes('viewer')) return { data: { viewer: { id: 'account' }, organization: { id: 'org' }, team: { id: '11', name: 'Team', archivedAt: null } } };
     if (query.includes('states')) return { data: { team: { states: { nodes: [{ id: 'qa', name: 'QA' }], pageInfo: { hasNextPage: false } } } } };
-    if (query.includes('project(id:')) return { data: { project: { id: '22', name: 'Project' } } };
+    if (query.includes('project(id:')) return { data: { project: { id: '22', name: 'Project', archivedAt: null } } };
     assert.equal(variables.filter.project.id.eq, '22');
-    const issue = { id: 'task', title: 'Test me', url: 'https://linear.app/example/issue/QA-1', archivedAt: null, project: { id: project }, assignee: { id: 'account' }, state: { id: 'qa' }, createdAt: time, updatedAt: time };
+    const issue = { id: 'task', title: 'Test me', url: 'https://linear.app/example/issue/QA-1', archivedAt: null, team: { id: '11' }, project: { id: project }, assignee: { id: 'account' }, state: { id: 'qa' }, createdAt: time, updatedAt: time };
     return { data: { team: { issues: { nodes: [issue], pageInfo: { hasNextPage: false } } } } };
   });
   assert.equal((await readBoard(linear, transport, env)).tickets.length, 1);
@@ -221,4 +221,55 @@ test('A live source switch preserves claimed local work and in-flight reminders'
   f.put('.local/attention/delivery-state.json', { schemaVersion: 1, deliveries: [{ id: 'original', state: 'presenting', members: [] }], controls: [] });
   await assert.rejects(f.select(), /local blocker reminder/);
   assert.equal(activeSource(f.root).value.choice.kind, 'local');
+});
+
+
+test('ClickUp resolves a home-List status when the catalogue omits native status IDs', async () => {
+  const task = { id: 'one', name: 'QA task', status: { status: 'QA', id: 'qa', type: 'custom' }, assignees: [], list: { id: '11' }, date_created: epoch, date_updated: epoch };
+  const transport = mock(url => {
+    if (url.pathname.endsWith('/user')) return { user: { id: 7 } };
+    if (url.pathname.endsWith('/team/workspace/space')) return { spaces: [{ id: 'space' }] };
+    if (url.pathname.endsWith('/list/11')) return { id: '11', name: 'QA List', space: { id: 'space' }, statuses: [{ status: 'QA', orderindex: 0, type: 'open' }] };
+    if (url.pathname.endsWith('/list/11/task')) return { tasks: [task, { ...task, id: 'two', list: { id: 'other' } }], last_page: true };
+    return unexpected(url);
+  });
+  const observed = await readBoard(clickup, transport, env);
+  assert.deepEqual(observed.states[0], { name: 'QA', id: 'name-' + digest('QA') });
+  assert.equal(observed.tickets[0]?.state, observed.states[0]?.id);
+  assert.equal(observed.tickets[1]?.state, null);
+});
+
+
+test('Scoped Jira tokens go only to the verified Cloud ID gateway', async () => {
+  const board = { ...jira, jiraCloudId: 'tenant' };
+  let tenant = 'tenant', gatewayCalls = 0;
+  const transport = mock((url, init) => {
+    const headers = new Headers(init.headers);
+    if (url.hostname === 'fixture.atlassian.net') {
+      assert.equal(url.pathname, '/_edge/tenant_info');
+      assert.equal(headers.has('authorization'), false);
+      return { cloudId: tenant };
+    }
+    gatewayCalls++;
+    assert.equal(url.hostname, 'api.atlassian.com');
+    assert.match(url.pathname, /^\/ex\/jira\/tenant\//);
+    assert.match(headers.get('authorization') ?? '', /^Basic /);
+    if (url.pathname.endsWith('/myself')) return { accountId: 'qa', active: true };
+    if (url.pathname.endsWith('/configuration')) return { id: 11, name: 'QA', columnConfig: { columns: [] } };
+    if (url.pathname.endsWith('/issue')) return { issues: [], isLast: true };
+    return unexpected(url);
+  });
+  assert.equal((await readBoard(board, transport, env)).identity.workspaceId, 'fixture.atlassian.net');
+  assert.equal(gatewayCalls, 3);
+  tenant = 'different';
+  await assert.rejects(readBoard(board, transport, env), /different/);
+  assert.equal(gatewayCalls, 3);
+});
+
+test('Linear accepts an OAuth access token using the documented Bearer header', async () => {
+  const transport = mock((_url, init) => {
+    assert.equal(new Headers(init.headers).get('authorization'), 'Bearer fixture-oauth');
+    return Response.json({ errors: [{ message: 'Synthetic denied permission' }] });
+  });
+  await assert.rejects(readBoard({ ...linear, linearAuth: 'oauth' }, transport, { QA_LINEAR_ACCESS_TOKEN: 'fixture-oauth' }), /could not verify/);
 });

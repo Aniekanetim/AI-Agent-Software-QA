@@ -12,9 +12,11 @@ export interface BoardSelection {
   scopeId: string;
   site?: string;
   jiraEmail?: string;
+  jiraCloudId?: string;
   jiraDefect?: { issueTypeId: string; transitionId: string };
   clickupWorkspaceId?: string;
   linearProjectId?: string;
+  linearAuth?: 'apiKey' | 'oauth';
   asanaFieldId?: string;
 }
 export interface LiveChoice {
@@ -39,13 +41,15 @@ export function id(value: unknown): string {
 }
 export function validateBoard(board: BoardSelection) {
   if (!board || !providers.includes(board.provider)) throw new Error('Choose a supported task app.');
-  const extra = { jira: ['site', 'jiraEmail', 'jiraDefect'], clickup: ['clickupWorkspaceId'], linear: ['linearProjectId'], asana: ['asanaFieldId'] }[board.provider];
+  const extra = { jira: ['site', 'jiraEmail', 'jiraCloudId', 'jiraDefect'], clickup: ['clickupWorkspaceId'], linear: ['linearProjectId', 'linearAuth'], asana: ['asanaFieldId'] }[board.provider];
   if (Object.keys(board).some(key => !['provider', 'scopeId', ...extra].includes(key))) throw new Error('Use the fields supported by the selected task app.');
   id(board.scopeId);
   if (board.provider === 'jira') {
     if (!board.site || !/^[a-z0-9-]+\.atlassian\.net$/.test(board.site)) throw new Error('Use the Jira Cloud site hostname.');
     if (!board.jiraEmail || !/^[^\s:@]+@[^\s:@]+$/.test(board.jiraEmail)) throw new Error('Supply the Jira account email for API-token authentication.');
   }
+  if (board.jiraCloudId !== undefined) id(board.jiraCloudId);
+  if (board.linearAuth !== undefined && !['apiKey', 'oauth'].includes(board.linearAuth)) throw new Error('Choose the Linear credential type.');
   if (board.jiraDefect !== undefined) {
     id(board.jiraDefect?.issueTypeId); id(board.jiraDefect?.transitionId);
     if (Object.keys(board.jiraDefect).length !== 2) throw new Error('Use the reviewed Jira issue type and create transition IDs.');
