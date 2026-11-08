@@ -273,3 +273,76 @@ test('Linear accepts an OAuth access token using the documented Bearer header', 
   });
   await assert.rejects(readBoard({ ...linear, linearAuth: 'oauth' }, transport, { QA_LINEAR_ACCESS_TOKEN: 'fixture-oauth' }), /could not verify/);
 });
+
+test('a returned Retest ticket gets a new claim and can move to Rework again', async () => {
+  const f = fixture();
+  f.choice.queues.rework = ['rework'];
+  const states = [...f.board.states, { id: 'rework', name: 'Rework' }];
+  let state = 'retest', updated = Date.parse(time);
+  const transport = mock(url => {
+    if (url.pathname.endsWith('/user')) return { user: { id: 'qa-agent' } };
+    if (url.pathname.endsWith('/team/workspace/space')) return { spaces: [{ id: 'space' }] };
+    if (url.pathname.endsWith('/list/11')) return { id: '11', name: 'Sandbox', space: { id: 'space' }, statuses: states.map(s => ({ id: s.id, status: s.name })) };
+    if (url.pathname.endsWith('/list/11/task')) return { last_page: true, tasks: [{
+      id: 'task', name: 'Synthetic defect', description: 'Original reproduction',
+      status: { id: state, status: state, type: 'custom' }, assignees: [{ id: 'qa-agent' }],
+      list: { id: '11' }, date_created: epoch, date_updated: String(updated),
+    }] };
+    return unexpected(url);
+  });
+  const reader = (selection: BoardSelection) => readBoard(selection, transport, env);
+  const preview = await live.preview(f.root, f.choice, reader);
+  await live.configure(f.root, { choice: f.choice, previewDigest: preview.digest, source: 'Synthetic selection' }, reader);
+  const original = (await reader(clickup)).tickets[0]!;
+  const pickup = () => live.claim(f.root, { ticketId: 'task', ticketRevision: original.revision, source: 'Synthetic retest intake' }, reader);
+  const packet = f.put('.local/retest-packet.json', { outcome: 'Synthetic failed retest' });
+
+  const first = await pickup();
+  updated += 1000;
+  assert.equal((await live.recheck(f.root, first.id, reader)).claim.id, first.id);
+  const failRetest = async (claimId: string, id: string) => {
+    const proposal = { id, claimId, action: 'move' as const, to: 'rework' as const };
+    const { publicationDigest } = await live.publicationPreview(f.root, proposal, reader);
+    const decision = f.put('.local/' + id + '.json', { claimId, ticketRevision: original.revision, gate: 'G3', decision: 'Approved', reviewer: 'Synthetic QA', source: 'Synthetic disposition', packet, publicationDigest });
+    return live.publish(f.root, { ...proposal, decision, source: 'Synthetic reviewed publication' }, reader, async () => async () => {
+      state = 'rework';
+      return { remoteId: 'task' };
+    });
+  };
+  await failRetest(first.id, 'first-rework');
+  state = 'retest';
+  await assert.rejects(live.recheck(f.root, first.id, reader), /handoff already completed/);
+  assert.deepEqual((await live.checkIn(f.root, reader)).candidates, []);
+  live.closeClaim(f.root, { claimId: first.id, source: 'Synthetic handoff completed', evidence: [packet] });
+
+  const queue = await live.checkIn(f.root, reader);
+  assert.equal(queue.candidates?.[0]?.ticket.revision, original.revision);
+  const second = await pickup();
+  assert.notEqual(second.id, first.id);
+  await assert.rejects(pickup(), /already exists/);
+  assert.equal((await failRetest(second.id, 'second-rework')).state, 'confirmed');
+});
+
+test('settings keeps the existing numeric close shortcut and offers Task source at 12', () => {
+  const f = fixture();
+  const shown = menu.openMenu(f.root, 'Synthetic settings request');
+  assert.deepEqual(shown.choices.slice(10), [{ id: 'close', label: 'Close settings' }, { id: 'taskSource', label: 'Task source' }]);
+  assert.equal(menu.chooseArea(f.root, '11').action, 'closed');
+  menu.openMenu(f.root, 'Synthetic settings request');
+  assert.equal(menu.chooseArea(f.root, '12').area, 'Task source');
+});
+
+test('a newer native update reopens a manually handed off Retest without duplicating the old observation', async () => {
+  const f = fixture(), ticket = f.board.tickets[0]!;
+  ticket.state = 'retest'; ticket.updatedAt = time;
+  await f.select();
+  const first = await f.claim();
+  live.closeClaim(f.root, { claimId: first.id, source: 'Synthetic manual retest disposition', evidence: [f.put('.local/manual-handoff.json', { state: 'Rework' })] });
+  assert.deepEqual((await live.checkIn(f.root, f.reader)).candidates, []);
+  ticket.updatedAt = '2026-01-01T00:01:00Z';
+  assert.equal((await live.checkIn(f.root, f.reader)).candidates?.[0]?.ticket.id, ticket.id);
+  const second = await f.claim();
+  assert.notEqual(second.id, first.id);
+  live.closeClaim(f.root, { claimId: second.id, source: 'Synthetic second disposition', evidence: [f.put('.local/second-handoff.json', { state: 'Tested-Ok' })] });
+  assert.deepEqual((await live.checkIn(f.root, f.reader)).candidates, []);
+});

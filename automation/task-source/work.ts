@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { assertNonsecret, digest, load, requireText, save, verifyEvidence, withLock, type Evidence } from '../shared/store.js';
+import { pendingCommentPublications } from '../github/github.js';
 import { pendingPresentation } from '../attention/notifications.js';
 import { pendingTransitions, pendingOperations, tickets as localTickets } from '../board/board.js';
 import { activeSource, sourcePath, validateBoard, validateChoice, id, type Active, type BoardSelection, type Choice, type Identity, type LiveChoice, type Queue } from './config.js';
@@ -77,6 +78,7 @@ export async function configure(root: string, request: { choice: Choice; preview
     if (journal(root).value.claims.some(c => c.state === 'open')) throw new Error('Reconcile active live claims before changing the task source.');
     if (current.value.choice.kind === 'local' && request.choice.kind === 'live') {
       if (pendingTransitions(root).length || pendingOperations(root).length) throw new Error('Reconcile pending local board operations before changing the task source.');
+      if (pendingCommentPublications(root).length) throw new Error('Reconcile pending GitHub comments before changing the task source.');
       const claimed = localTickets(root).some(ticket => {
         const owner = ticket.text.match(/^\|\s*Owner\s*\/\s*claimed at\s*\|([^|\r\n]+)\|/im)?.[1]?.trim();
         return ['Ready for QA', 'Retest', 'Dev Todo', 'Rework'].includes(ticket.status) && owner && owner.toLowerCase() !== 'unassigned';
@@ -100,6 +102,23 @@ export async function liveBoard(root: string, reader: BoardReader) {
   mappings(choice, connection);
   return { choice, revision: active.revision, connection };
 }
+function alreadyClaimed(work: Journal, key: string, ticket: Ticket, queue: Queue | null) {
+  return work.claims.some(claim => {
+    if (claim.sourceKey !== key || claim.ticket.id !== ticket.id) return false;
+    if (claim.state === 'open') return true;
+    if (claim.ticket.revision !== ticket.revision) return false;
+    if (queue !== 'retest') return true;
+
+    const confirmed = work.publications.filter(publication => publication.claimId === claim.id && publication.state === 'confirmed');
+    // Some providers do not change their update time when moving between sections.
+    if (confirmed.some(publication => publication.action === 'move')) return false;
+
+    // A report posted during the old claim should not itself count as a new retest.
+    const posted = confirmed.some(publication => publication.action === 'comment');
+    const previous = (posted ? claim.terminal?.at : claim.ticket.updatedAt) ?? claim.terminal?.at;
+    return !(previous && ticket.updatedAt && Date.parse(ticket.updatedAt) > Date.parse(previous));
+  });
+}
 export async function checkIn(root: string, reader: BoardReader = readBoard) {
   const active = activeSource(root);
   if (active.value.choice.kind === 'local') return { kind: 'local', instruction: 'Use the existing local board check-in procedure.' };
@@ -108,9 +127,9 @@ export async function checkIn(root: string, reader: BoardReader = readBoard) {
   const rows = ranked(choice, connection).filter(row => row.eligible), key = sourceKey(choice, connection.identity);
   const resume = claims.map(c => ({
     claim: c,
-    eligible: c.sourceRevision === revision && !work.publications.some(p => p.claimId === c.id && p.state === 'pending') && !work.executions.some(run => run.claimId === c.id && !run.terminal) && rows.some(row => row.ticket.id === c.ticket.id && row.ticket.revision === c.ticket.revision),
+    eligible: c.sourceRevision === revision && !work.publications.some(p => p.claimId === c.id && (p.state === 'pending' || p.action === 'move' && p.state === 'confirmed')) && !work.executions.some(run => run.claimId === c.id && !run.terminal) && rows.some(row => row.ticket.id === c.ticket.id && row.ticket.revision === c.ticket.revision),
   }));
-  return { kind: 'live', identity: connection.identity, resume, candidates: rows.filter(row => !work.claims.some(c => c.ticket.id === row.ticket.id && (c.state === 'open' || c.sourceKey === key && c.ticket.revision === row.ticket.revision))), authorization: 'Review through G1–G5.' };
+  return { kind: 'live', identity: connection.identity, resume, candidates: rows.filter(row => !alreadyClaimed(work, key, row.ticket, row.queue)), authorization: 'Review through G1–G5.' };
 }
 export async function details(root: string, ticketId: string, reader: BoardReader = readBoard) {
   const { connection } = await liveBoard(root, reader);
@@ -129,7 +148,7 @@ export async function claim(root: string, request: { ticketId: string; ticketRev
   return withLock(root, 'qa-board', () => {
     if (activeSource(root).revision !== revision) throw new Error('The active task source changed.');
     const current = journal(root);
-    if (current.value.claims.some(c => c.ticket.id === ticket.id && (c.state === 'open' || c.sourceKey === key && c.ticket.revision === ticket.revision))) throw new Error('A claim already exists for this ticket or revision. Inspect its history before taking more work.');
+    if (alreadyClaimed(current.value, key, ticket, queue)) throw new Error('A claim already exists for this ticket or revision. Inspect its history before taking more work.');
     const record: Claim = { id: randomUUID(), sourceKey: key, sourceRevision: revision, identity: connection.identity, ticket, queue, source: request.source, state: 'open', startedAt: new Date().toISOString() };
     current.value.claims.push(record);
     save(root, journalPath, current.value, current.revision);
@@ -149,7 +168,9 @@ export async function recheck(root: string, claimId: string, reader: BoardReader
     throw new Error('The ticket, ownership, queue or source changed. Preserve evidence and reconcile before resuming.');
   }
   openClaim(root, claimId);
-  if (journal(root).value.publications.some(p => p.claimId === claimId && p.state === 'pending')) throw new Error('Reconcile the pending board write before resuming.');
+  const publications = journal(root).value.publications.filter(p => p.claimId === claimId);
+  if (publications.some(p => p.state === 'pending')) throw new Error('Reconcile the pending board write before resuming.');
+  if (publications.some(p => p.action === 'move' && p.state === 'confirmed')) throw new Error('The board handoff already completed. Close this claim before taking the next retest.');
   return { claim, choice, connection };
 }
 export interface Gate {
@@ -243,7 +264,7 @@ export async function publish(root: string, request: PublicationRequest, reader:
   assertNonsecret(request); id(request.id); requireText(request.source, 'Actual authorization for this board publication');
   const { claim, choice, connection } = await recheck(root, request.claimId, reader);
   const mutation = approvedPublication(root, request, claim, choice, connection);
-  const fingerprint = digest(JSON.stringify({ source: claim.sourceKey, ticket: claim.ticket.id, mutation }));
+  const fingerprint = digest(JSON.stringify({ source: claim.sourceKey, ticket: claim.ticket.id, mutation, ...(mutation.action === 'move' ? { claimId: claim.id } : {}) }));
   const write = await writer(choice.board, claim.ticket, mutation.action === 'move' ? mutation : { ...mutation, body: `${mutation.body}\n\nQA operation: ${request.id}` });
   const fresh = await recheck(root, claim.id, reader);
   if (JSON.stringify(approvedPublication(root, request, fresh.claim, fresh.choice, fresh.connection)) !== JSON.stringify(mutation)) throw new Error('The reviewed publication changed before submission.');
@@ -268,7 +289,8 @@ export async function publish(root: string, request: PublicationRequest, reader:
     const record = updatePublication(root, pending.id, item => { item.remoteId = remoteId; });
     if (mutation.action !== 'comment') {
       const observed = await liveBoard(root, reader);
-      if (mutation.action === 'move' && remoteId !== claim.ticket.id || !observed.connection.tickets.some(t => t.id === remoteId && t.state === mutation.destination.id)) {
+      const atDestination = observed.connection.tickets.find(t => t.id === remoteId && t.state === mutation.destination.id);
+      if (!atDestination || mutation.action === 'move' && remoteId !== claim.ticket.id) {
         throw new Error('The provider did not verify the requested ticket at its destination.');
       }
     }

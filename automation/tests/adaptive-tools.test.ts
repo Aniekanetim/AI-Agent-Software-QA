@@ -121,3 +121,18 @@ test('task assessment is read-only and preserves earlier onboarding and source b
   const input = f.put('.local/task-tools.json', f.plan); const one = assessTaskTools(f.root, f.plan); assert.deepEqual(assessTaskTools(f.root, f.plan), one);
   assert.deepEqual(readFileSync(resolve(f.root, '.local/onboarding-state.json')), before); assert.equal(evidence(f.root, input.path).sha256, input.sha256);
 });
+
+test('standalone tool assessment stays available with a live task source', () => {
+  const f = fixture(); f.browser();
+  f.put('.local/task-source.json', {
+    schemaVersion: 1, source: 'Synthetic task source selection',
+    choice: { kind: 'live', board: { provider: 'clickup', scopeId: 'list', clickupWorkspaceId: 'workspace' }, queues: { ready: ['qa'], retest: ['retest'] }, actions: [] },
+    identity: { accountId: 'qa', workspaceId: 'workspace', scopeId: 'list', scopeName: 'Synthetic board' },
+  });
+  assert.equal(assessTaskTools(f.root, f.plan).status, 'capabilitiesVerified');
+  f.plan.liveClaim = { id: 'synthetic-claim', ticketRevision: '1' };
+  assert.match(assessTaskTools(f.root, f.plan).globalIssues.join(' '), /live claim/);
+  delete f.plan.liveClaim;
+  f.plan.task = f.put('QA task management Board/Ready for QA/QA-001.md', '# QA-001: Synthetic local ticket');
+  assert.match(assessTaskTools(f.root, f.plan).globalIssues.join(' '), /board task/);
+});

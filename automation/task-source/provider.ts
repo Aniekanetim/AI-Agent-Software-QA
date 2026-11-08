@@ -4,7 +4,7 @@ import { id, validateBoard, type BoardSelection, type Identity, type Action } fr
 export interface State { id: string; name: string }
 export interface Ticket {
   id: string; title: string; url: string; state: string | null; assignees: string[];
-  closed: boolean; createdAt: string; priority: number; revision: string; projectId?: string; homeListId?: string;
+  closed: boolean; createdAt: string; updatedAt?: string; priority: number; revision: string; projectId?: string; homeListId?: string;
 }
 export interface Connection { identity: Identity; states: State[]; tickets: Ticket[]; descriptions?: Record<string, unknown> }
 export type BoardReader = (board: BoardSelection) => Promise<Connection>;
@@ -34,13 +34,12 @@ function iso(value: unknown) {
   return new Date(time).toISOString();
 }
 function assignee(value: unknown, field: string): string[] { return value === null ? [] : [key(object(value)[field])]; }
-function ticket(value: Omit<Ticket, 'revision'>, detail: unknown, updatedAt: unknown): Ticket {
+function ticket(value: Omit<Ticket, 'revision' | 'updatedAt'>, detail: unknown, updatedAt: unknown): Ticket {
   const url = new URL(value.url);
   if (url.protocol !== 'https:' || url.username || url.password || !(url.hostname.endsWith('.atlassian.net') || ['app.clickup.com', 'linear.app', 'app.asana.com'].includes(url.hostname))) throw new Error('Use a safe native ticket URL.');
   const { assignees } = value;
   const stable = { ...value, assignees: [...new Set(assignees)].sort() };
-  iso(updatedAt);
-  return { ...stable, revision: digest(JSON.stringify({ ...stable, detail })) };
+  return { ...stable, updatedAt: iso(updatedAt), revision: digest(JSON.stringify({ ...stable, detail })) };
 }
 const byId = (items: State[], expected: string) => {
   const found = items.filter(item => item.id === expected);
@@ -59,7 +58,7 @@ function collect(identity: Identity, states: State[], tickets: Ticket[], descrip
   const unique = new Map<string, Ticket>();
   for (const row of tickets) {
     const current = unique.get(row.id);
-    if (current && current.revision !== row.revision) throw new Error('A ticket changed during pagination. Refresh the board.');
+    if (current && (current.revision !== row.revision || current.updatedAt !== row.updatedAt)) throw new Error('A ticket changed during pagination. Refresh the board.');
     unique.set(row.id, row);
   }
   return { identity, states, tickets: [...unique.values()], descriptions };

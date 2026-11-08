@@ -68,7 +68,7 @@ const help = {
   settings: 'open --source | show | choose --area | edit --input | present | save --input | attention-shown --source | save-attention --input | cancel | back | close',
   browser: 'versions | install | mcp-config | check --provider library/cli/mcpServer [--headless] [--context interactive/scheduled/ci] | import-report --input | fixture',
   email: 'policy | account --input | accounts | options --input | discover --provider gmailApi/agentmail --source | create-inbox --input | select --input | verify --input | begin --input | outcome --input',
-  github: 'reconcile-legacy --input --repository --number --policy --target --source | install --source | check --repository | check-in --source | event --repository --number --source | policy-digest --policy | run/dispatch --policy --target --repository --number --source | comment --policy --target --repository --number --body --source',
+  github: 'pending-comments | reconcile-comment --input | reconcile-legacy --input --repository --number --policy --target --source | install --source | check --repository | check-in --source | event --repository --number --source | policy-digest --policy | run/dispatch --policy --target --repository --number --source | comment --policy --target --repository --number --body --source',
   evidence: '--path [--pointer] : calculate an evidence reference; no product verdict is inferred',
   note: 'Use project-private JSON under .local/ for inputs. The agent presents questions and performs authorized host connections. CLI output is a model, not an actual human conversation or approval. See Onboarding/README.md.',
 };
@@ -291,6 +291,8 @@ async function main() {
       output(access); return;
     }
     if (action === 'policy-digest') { output({ policyDigest: github.policyDigest(fromFile(option('policy'))) }); return; }
+    if (action === 'pending-comments') { output(github.pendingCommentPublications(root)); return; }
+    if (action === 'reconcile-comment') { output(github.reconcileCommentPublication(root, input())); return; }
     requireLocalSource(root);
     const configuration = fromFile<github.GithubSettings>('.local/github-settings.json'); github.validateSettings(configuration);
     const source = option('source');

@@ -12,8 +12,8 @@ Say **Open settings** at any point. The agent shows current values and these are
 8. Check-in schedule
 9. Reporting and evidence preferences
 10. API tools and Postman
-11. Task source
-12. Close settings
+11. Close settings
+12. Task source
 
 Direct requests such as “Keep browser sessions visible,” “Use Postman for this collection” or “Check every hour” also work. Distinguish a task-specific instruction from a project constraint; ask only when its scope is materially unclear. Reuse the clear instruction, show the affected current value and consequence, and ask only for a genuinely missing decision. A request to change cadence authorizes its relevant scheduler change; retain any existing required concrete briefing and inspect the actual saved schedule afterwards.
 

@@ -9,7 +9,6 @@ import { assessInventory, type Target } from '../chrome-devtools/webmcp.js';
 import { readSettings as chromeSettings } from '../chrome-devtools/config.js';
 import { requireDocumentBinding } from '../chrome-devtools/document-context.js';
 import { boardRoot, tickets, assertExecutable } from '../board/board.js';
-import { activeSource } from '../task-source/config.js';
 import { recheck } from '../task-source/work.js';
 import { type BoardReader } from '../task-source/provider.js';
 
@@ -19,17 +18,19 @@ export interface TaskToolPlan {
   requirements: { id: string; browser: boolean; operations: string[]; requiredTool: ToolId | null; basis: Evidence[]; webmcp?: { inventory: Evidence; target: Target; toolNames?: string[] } }[];
   selections: { requirementId: string; tool: ToolId; rationale: string; limitations: string[] }[];
 }
+const canonicalTaskPath = (path: string) => path.replaceAll('\\', '/').replace(/^(\.\/)+/, '');
+const isLocalTask = (path: string) => canonicalTaskPath(path).toLowerCase().startsWith(boardRoot.toLowerCase() + '/');
 const providers: Partial<Record<ToolId, BrowserReport['provider']>> = { inAppBrowser: 'inApp', harnessMcp: 'harnessMcp', playwrightCli: 'cli', playwrightLibrary: 'library' };
 
 /** Assess the agent's explicit selection; never select a fallback, execute work or grant approval. */
 export function assessTaskTools(root: string, plan: TaskToolPlan) {
-  const issues = plan?.liveClaim || activeSource(root).value.choice.kind === 'live'
+  const issues = plan?.liveClaim
     ? ['Use the active live claim for a fresh task eligibility check.'] : [];
   return assessSelection(root, plan, issues);
 }
 export async function assessLiveTaskTools(root: string, plan: TaskToolPlan, claimId: string, reader?: BoardReader) {
   const { claim } = await recheck(root, claimId, reader);
-  if (plan.liveClaim?.id !== claim.id || plan.liveClaim.ticketRevision !== claim.ticket.revision || plan.task.path.startsWith(boardRoot + '/')) throw new Error('Bind the tool plan to the live claim and its current revision.');
+  if (plan.liveClaim?.id !== claim.id || plan.liveClaim.ticketRevision !== claim.ticket.revision || isLocalTask(plan.task.path)) throw new Error('Bind the tool plan to the live claim and its current revision.');
   return assessSelection(root, plan, []);
 }
 function assessSelection(root: string, plan: TaskToolPlan, globalIssues: string[]) {
@@ -41,9 +42,10 @@ function assessSelection(root: string, plan: TaskToolPlan, globalIssues: string[
   const ids = plan.requirements.map(r => r.id); uniqueTexts(ids, 'Requirement IDs');
   uniqueTexts(plan.selections.map(s => s.requirementId), 'Selection bindings');
   if (plan.selections.some(s => !ids.includes(s.requirementId))) throw new Error('Selection points to an unknown requirement.');
-  if (plan.task.path.startsWith(boardRoot + '/')) {
+  if (isLocalTask(plan.task.path)) {
     try {
-      const all = tickets(root), exact = all.find(t => t.path === plan.task.path), moved = all.filter(t => t.path.split('/').at(-1) === plan.task.path.split('/').at(-1));
+      const path = canonicalTaskPath(plan.task.path);
+      const all = tickets(root), exact = all.find(t => t.path === path), moved = all.filter(t => t.path.split('/').at(-1) === path.split('/').at(-1));
       const ticket = exact ?? (moved.length === 1 ? moved[0] : undefined);
       if (!ticket) throw new Error('Ticket missing');
       assertExecutable(root, ticket.id);
