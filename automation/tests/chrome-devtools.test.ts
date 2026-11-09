@@ -60,6 +60,18 @@ test('compatibility and explicit configuration retain feature flags, privacy and
   assert.throws(() => validateSettings(f.root, { ...f.settings, connection: { mode: 'existing', browserUrl: 'http://external.example:9222' } }));
   assert.throws(() => validateSettings(f.root, { ...f.settings, connection: { mode: 'existing', browserUrl: 'http://user:pass@127.0.0.1:9222' } }));
 });
+test('new dedicated launches default to Standard and preserve task-level WebMCP origin checks', async () => {
+  const f = fixture();
+  const settings: ChromeSettings = { ...f.settings, schemaVersion: 2 };
+  assert.equal(configurationObject(f.root, settings).allowedUrlPattern, undefined);
+  assert.deepEqual(configurationObject(f.root, f.settings).allowedUrlPattern, ['http://127.0.0.1:30123/*']);
+  const dependencies = [...settings.allowedOrigins, 'https://sign-in.example.test'];
+  assert.deepEqual(configurationObject(f.root, { ...settings, networkMode: 'strict', networkOrigins: dependencies }).allowedUrlPattern, dependencies.map(origin => origin + '/*'));
+  assert.equal(configurationObject(f.root, { ...settings, networkOrigins: dependencies }).allowedUrlPattern, undefined);
+  assert.throws(() => configurationObject(f.root, { ...settings, networkMode: 'standard', connection: { mode: 'existing', browserUrl: 'http://127.0.0.1:9222' } }), /dedicated QA browser/);
+  await assert.rejects(captureInventory(f.root, { ...f.bridge, configurationHash: settingsHash(settings) }, settings, { ...f.target, url: 'https://sign-in.example.test/' }, 'Synthetic observation'), /outside the authorized connection scope/);
+  assert.equal(f.calls.length, 0);
+});
 test('version evidence cannot become a native harness connection', async () => {
   const f = fixture(); await installation(f);
   assert(registry.status(f.root, 'chromeDevtoolsCli', ['version']).reusable);

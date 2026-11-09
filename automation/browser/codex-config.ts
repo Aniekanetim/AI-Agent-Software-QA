@@ -63,16 +63,22 @@ export async function readNativeQaConfig(request: Request, root: string) {
   return { file, version, revision: digest(JSON.stringify([resolve(file), version])), config: layer.config, effective, args: server.args as string[] };
 }
 
-export function nativeRuleAddition(args: string[], rule: string) {
+export function nativeRuleAddition(args: string[], rule: string, enableStrict = false): { networkMode: 'standard' | 'strict'; present: boolean; rules: string[]; args: string[] } {
   const flag = '--allowedUrlPattern';
   const start = args.indexOf(flag);
-  if (start === -1 || args.lastIndexOf(flag) !== start || args.slice(0, start).includes('--') || args.some(arg => arg.startsWith(flag + '='))) throw new Error('Use the owner handoff for this qa-webmcp allowlist format.');
+  if (args.lastIndexOf(flag) !== start || args.slice(0, start).includes('--') || args.some(arg => arg.startsWith(flag + '=') || /^--(?:no-)?allowed-url-pattern(?:=|$)/.test(arg))) throw new Error('Use the owner handoff for this qa-webmcp allowlist format.');
+  if (start === -1) {
+    if (enableStrict && args.some(arg => /^--(?:blockedUrlPattern|blocked-url-pattern)(?:=|$)/.test(arg))) throw new Error('Reconcile the existing qa-webmcp blocklist with its owner before enabling Strict networking.');
+    const delimiter = args.indexOf('--');
+    const end = delimiter === -1 ? args.length : delimiter;
+    return { networkMode: 'standard', present: false, rules: [], args: enableStrict ? [...args.slice(0, end), flag, rule, ...args.slice(end)] : args };
+  }
   const next = args.findIndex((arg, index) => index > start && arg.startsWith('-'));
   const end = next === -1 ? args.length : next;
   const rules = args.slice(start + 1, end);
   if (!rules.length) throw new Error('Confirm the existing qa-webmcp allowlist before editing it.');
   const present = rules.includes(rule);
-  return { present, rules, args: present ? args : [...args.slice(0, end), rule, ...args.slice(end)] };
+  return { networkMode: 'strict', present, rules, args: present ? args : [...args.slice(0, end), rule, ...args.slice(end)] };
 }
 
 export async function writeNativeQaConfig(request: Request, root: string, before: Awaited<ReturnType<typeof readNativeQaConfig>>, args: string[]) {

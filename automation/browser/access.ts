@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { webOrigin, settingsHash, settingsPath, validateSettings, type ChromeSettings } from '../chrome-devtools/config.js';
+import { chromeNetworkOrigins, webOrigin, settingsHash, settingsPath, validateSettings, type ChromeSettings, type NetworkMode } from '../chrome-devtools/config.js';
 import { assertNonsecret, atPointer, contained, digest, load, requireText, revision, save, verifyEvidence, withLock, type Evidence } from '../shared/store.js';
 import { assertToolId, type ToolId } from '../tools/registry.js';
 import { readToolPolicy } from '../tools/policy.js';
@@ -17,15 +17,16 @@ export interface AccessTarget {
 export type OriginScope =
   | { kind: 'projectChrome'; activeSettingsHash: string | null }
   | { kind: 'observedAllowlist'; activeOrigins: string[] | null; savedOrigins: string[] | null }
-  | { kind: 'noAllowlist' | 'unknown' };
+  | { kind: 'noAllowlist'; pendingStrict?: true }
+  | { kind: 'unknown' };
 export interface AccessPreparation {
   schemaVersion: 1; target: AccessTarget; scope: OriginScope; observedAt: string; source: string; evidence: Evidence[];
 }
 interface Prepared extends AccessPreparation {
   harness: string; environmentRevision: string; origin: string; observation?: Evidence;
 }
-type Outcome = 'rendered' | 'originDenied' | 'networkFailed' | 'httpError' | 'redirectBlocked' | 'scopeUnverified';
-const outcomes: readonly Outcome[] = ['rendered', 'originDenied', 'networkFailed', 'httpError', 'redirectBlocked', 'scopeUnverified'];
+type Outcome = 'rendered' | 'signInReached' | 'originDenied' | 'networkFailed' | 'httpError' | 'redirectBlocked' | 'scopeUnverified';
+const outcomes: readonly Outcome[] = ['rendered', 'signInReached', 'originDenied', 'networkFailed', 'httpError', 'redirectBlocked', 'scopeUnverified'];
 export interface AccessObservation {
   target: AccessTarget; approval: Evidence; observedAt: string; evidence: Evidence[];
   outcome: Outcome; requestedUrl: string; finalUrl?: string; httpStatus?: number; scopeEnforced?: boolean;
@@ -37,7 +38,7 @@ interface Receipt {
 type Status = 'needsConnectionCheck' | 'missingOrigin' | 'reloadRequired' | 'scopeUnverified' | 'needsProbe' | 'verified' | Exclude<Outcome, 'rendered'>;
 interface AccessReport {
   target: AccessTarget; origin: string; status: Status; next: string;
-  additionalOrigin?: string; settingsRevision?: string; observation?: Evidence;
+  networkMode?: NetworkMode; additionalOrigin?: string; settingsRevision?: string; observation?: Evidence;
 }
 
 function environments(root: string): { name?: unknown; url?: unknown }[] {
@@ -120,14 +121,21 @@ function projectChromeSettings(root: string) {
 }
 function configuration(root: string, plan: Prepared): { report: AccessReport; settingsRevision: string | null } {
   const { target, origin, scope } = plan;
-  const base = { target, origin };
+  const base: Pick<AccessReport, 'target' | 'origin' | 'networkMode'> = { target, origin };
   let configRevision: string | null = null;
   if (scope.kind === 'projectChrome') {
     const current = projectChromeSettings(root), config = current.config;
+    const networkOrigins = chromeNetworkOrigins(config);
+    base.networkMode = networkOrigins ? 'strict' : 'standard';
     configRevision = current.revision;
-    if (!config.allowedOrigins.includes(origin)) return { settingsRevision: configRevision, report: { ...base, status: 'missingOrigin', additionalOrigin: origin, settingsRevision: configRevision, next: 'Review the exact origin addition and reuse existing authorization or obtain the missing decision during setup.' } };
+    if (networkOrigins && !networkOrigins.includes(origin)) return { settingsRevision: configRevision, report: { ...base, status: 'missingOrigin', additionalOrigin: origin, settingsRevision: configRevision, next: 'Review the exact origin addition and reuse existing authorization or obtain the missing decision during setup.' } };
     if (scope.activeSettingsHash !== settingsHash(config)) return { settingsRevision: configRevision, report: { ...base, status: 'reloadRequired', next: 'Start or reload the selected connection with the saved project settings, then verify the actual target.' } };
   }
+  if (scope.kind === 'noAllowlist') {
+    base.networkMode = 'standard';
+    if (scope.pendingStrict) return { settingsRevision: null, report: { ...base, status: 'reloadRequired', next: 'Strict networking is saved. Reload this connection and inspect its active rules before continuing.' } };
+  }
+  if (scope.kind === 'observedAllowlist') base.networkMode = 'strict';
   if (scope.kind === 'observedAllowlist' && scope.activeOrigins !== null && !scope.activeOrigins.includes(origin)) {
     return { settingsRevision: null, report: scope.savedOrigins?.includes(origin)
       ? { ...base, status: 'reloadRequired', next: 'The saved rule differs from the running connection. Reload the selected connection, then verify actual access.' }
@@ -141,14 +149,16 @@ function configuration(root: string, plan: Prepared): { report: AccessReport; se
   const unknown = scope.kind === 'unknown' || scope.kind === 'observedAllowlist' && scope.activeOrigins === null;
   return { settingsRevision: configRevision, report: unknown
     ? { ...base, status: 'scopeUnverified', next: 'Inspect the actual connection scope or verify the approved target through a bounded browser probe.' }
-    : { ...base, status: 'needsProbe', next: 'Verify the saved public entry page through the selected browser within the approved origin.' } };
+    : { ...base, status: 'needsProbe', next: base.networkMode === 'standard'
+      ? 'Open the saved entry page. Record the rendered target or its sign-in destination before using credentials.'
+      : 'Verify the saved public entry page through the selected browser within the approved origin.' } };
 }
 function binding(plan: Prepared, settingsRevision: string | null) {
   return digest(JSON.stringify([plan.target.environment, plan.target.tool, plan.target.connection, plan.target.generation, plan.harness, plan.environmentRevision, plan.scope, settingsRevision]));
 }
 
 /** A recorded decision supports only the exact origin, environment and connection it names. */
-function authorization(root: string, ref: Evidence, target: AccessTarget, origin: string, action: 'addOrigin' | 'navigate') {
+function authorization(root: string, ref: Evidence, target: AccessTarget, origin: string, action: 'addOrigin' | 'enableStrict' | 'navigate') {
   if (ref?.path?.replaceAll('\\', '/') === settingsPath) throw new Error('Use an independent authorization record, not the settings being changed.');
   verifyRefs(root, [ref]);
   const value = JSON.parse(readFileSync(contained(root, ref.path), 'utf8'));
@@ -170,8 +180,14 @@ export function assessBrowserAccess(root: string, target: AccessTarget, now = Da
     if (!receipt || receipt.schemaVersion !== 1 || !outcomes.includes(receipt.outcome) || receipt.binding !== binding(plan, settingsRevision) || !fresh(receipt.observedAt, now)) return report;
     authorization(root, receipt.approval, target, current.origin, 'navigate'); verifyRefs(root, receipt.evidence);
     if (receipt.outcome === 'rendered') {
-      if (receipt.scopeEnforced !== true || receipt.finalOrigin !== current.origin || (report.status === 'scopeUnverified' && plan.scope.kind === 'observedAllowlist' && plan.scope.activeOrigins !== null)) return report;
+      if ((report.networkMode !== 'standard' && receipt.scopeEnforced !== true) || receipt.finalOrigin !== current.origin || (report.status === 'scopeUnverified' && plan.scope.kind === 'observedAllowlist' && plan.scope.activeOrigins !== null)) return report;
       return { ...report, status: 'verified', observation: plan.observation, next: 'Target page access verified for this connection. Application authentication and task authorization remain separate.' };
+    }
+    if (receipt.outcome === 'signInReached') {
+      if (!report.networkMode || !receipt.finalOrigin?.startsWith('https://') || receipt.finalOrigin === current.origin || (report.networkMode === 'strict' && receipt.scopeEnforced !== true)) return report;
+      return {
+        ...report, status: 'signInReached', observation: plan.observation, next: `The entry route reached sign-in at ${receipt.finalOrigin}. Verify the identity provider before using credentials, then verify application access.`,
+      };
     }
     return { ...report, status: receipt.outcome, observation: plan.observation, next: 'Resolve the recorded browser access outcome for this target before dependent work. Reuse other verified preparation.' };
   } catch { return report; }
@@ -185,7 +201,8 @@ export function prepareBrowserAccess(root: string, input: AccessPreparation, now
   return withLock(root, 'browser-access', () => {
     const { current, path, stored, plan } = currentPrepared(root, input.target, now);
     if (stored.value && Date.parse(stored.value.observedAt) > Date.parse(input.observedAt)) throw new Error('A newer browser preparation exists. Preserve it and inspect current access.');
-    const prepared: Prepared = { schemaVersion: 1, target: input.target, scope: input.scope, source: input.source, evidence: input.evidence, observedAt: input.observedAt, harness: harnessKey(currentHarness(root)), origin: current.origin, environmentRevision: current.revision };
+    const scope = input.scope.kind === 'noAllowlist' && plan?.scope.kind === 'noAllowlist' && plan.scope.pendingStrict ? plan.scope : input.scope;
+    const prepared: Prepared = { schemaVersion: 1, target: input.target, scope, source: input.source, evidence: input.evidence, observedAt: input.observedAt, harness: harnessKey(currentHarness(root)), origin: current.origin, environmentRevision: current.revision };
     const { settingsRevision } = configuration(root, prepared);
     if (plan?.observation && binding(plan, settingsRevision) === binding(prepared, settingsRevision)) prepared.observation = plan.observation;
     save(root, path, prepared, stored.revision);
@@ -198,11 +215,14 @@ export function applyBrowserOrigin(root: string, input: { target: AccessTarget; 
     const { current, plan } = currentPrepared(root, input.target, now);
     if (plan?.scope.kind !== 'projectChrome') throw new Error('This helper only updates existing project Chrome settings. Prepare a supported host setup handoff for native connections.');
     checkPolicy(root, input.target.tool);
-    authorization(root, input.approval, input.target, current.origin, 'addOrigin');
     const saved = projectChromeSettings(root), config = saved.config;
-    if (config.allowedOrigins.includes(current.origin)) return { changed: false, access: assessBrowserAccess(root, input.target, now) };
+    const networkOrigins = chromeNetworkOrigins(config);
+    if (!networkOrigins) return { changed: false, access: assessBrowserAccess(root, input.target, now) };
+    authorization(root, input.approval, input.target, current.origin, 'addOrigin');
+    if (networkOrigins.includes(current.origin)) return { changed: false, access: assessBrowserAccess(root, input.target, now) };
     if (!hashPattern.test(input.expectedSettingsRevision) || input.expectedSettingsRevision !== saved.revision) throw new Error('Browser settings changed. Review the exact addition again without overwriting current settings.');
-    const updated = { ...config, allowedOrigins: [...config.allowedOrigins, current.origin], evidence: [...config.evidence, input.approval] };
+    const origins = [...networkOrigins, current.origin];
+    const updated = { ...config, ...(config.schemaVersion === 1 ? { allowedOrigins: origins } : { networkOrigins: origins }), evidence: [...config.evidence, input.approval] };
     validateSettings(root, updated);
     const delta = { schemaVersion: 1, environment: input.target.environment, origin: current.origin, before: saved.revision, proposed: digest(JSON.stringify(updated, null, 2) + '\n'), approval: input.approval, effect: 'Proposed exact rule addition. Compare against actual settings revision to establish whether it was applied.' };
     const deltaPath = `.local/browser-access/changes/${digest(JSON.stringify(delta))}.json`;
@@ -215,53 +235,61 @@ export function applyBrowserOrigin(root: string, input: { target: AccessTarget; 
 function nativePreparation(root: string, target: AccessTarget, now: number) {
   currentHarness(root, 'interactive');
   const prepared = currentPrepared(root, target, now);
-  if (target.tool !== 'chromeDevtoolsHost' || target.connection !== nativeQaConnection || prepared.plan?.scope.kind !== 'observedAllowlist') {
-    throw new Error('Prepare the actual qa-webmcp host connection and its observed allowlist first.');
+  if (target.tool !== 'chromeDevtoolsHost' || target.connection !== nativeQaConnection || !prepared.plan || (prepared.plan.scope.kind !== 'observedAllowlist' && prepared.plan.scope.kind !== 'noAllowlist')) {
+    throw new Error('Prepare the actual qa-webmcp host connection and its observed network mode first.');
   }
   checkPolicy(root, target.tool);
   return { ...prepared, plan: prepared.plan, scope: prepared.plan.scope };
 }
 
 export async function planNativeBrowserOrigin(root: string, target: AccessTarget, executable?: string) {
-  const { current } = nativePreparation(root, target, Date.now());
+  const { current, scope } = nativePreparation(root, target, Date.now());
   return withCodexConfig(async request => {
     const config = await readNativeQaConfig(request, root);
     const rule = current.origin + '/*';
     const addition = nativeRuleAddition(config.args, rule);
-    return { target, rule, expectedSettingsRevision: config.revision, status: addition.present ? 'alreadySaved' : 'missingOrigin', existingRuleCount: addition.rules.length };
+    const plan = { target, origin: current.origin, expectedSettingsRevision: config.revision, networkMode: addition.networkMode };
+    if (addition.networkMode === 'standard') return { ...plan, status: scope.kind === 'observedAllowlist' ? 'reloadRequired' : 'standard' };
+    return { ...plan, rule, status: addition.present ? 'alreadySaved' : 'missingOrigin', existingRuleCount: addition.rules.length };
   }, executable);
 }
 
-export async function applyNativeBrowserOrigin(root: string, input: { target: AccessTarget; expectedSettingsRevision: string; approval?: Evidence }, executable?: string) {
+export async function applyNativeBrowserOrigin(root: string, input: { target: AccessTarget; expectedSettingsRevision: string; approval?: Evidence; enableStrict?: boolean }, executable?: string) {
   assertNonsecret(input);
   const { target, approval } = input;
   const original = nativePreparation(root, target, Date.now());
   const rule = original.current.origin + '/*';
   return withCodexConfig(async request => {
     const before = await readNativeQaConfig(request, root);
-    const addition = nativeRuleAddition(before.args, rule);
+    const addition = nativeRuleAddition(before.args, rule, input.enableStrict === true);
     const unchangedPreparation = () => {
       const actual = nativePreparation(root, target, Date.now());
       if (actual.stored.revision !== original.stored.revision || actual.current.revision !== original.current.revision) throw new Error('The browser or environment preparation changed. Recheck the current target.');
       return actual;
     };
     unchangedPreparation();
+    const enabling = addition.networkMode === 'standard';
+    if (enabling && input.enableStrict !== true) return { changed: false, networkMode: 'standard', access: assessBrowserAccess(root, target) };
     if (!addition.present) {
       if (before.revision !== input.expectedSettingsRevision) throw new Error('Codex settings changed. Inspect the exact addition again before applying it.');
-      if (!approval) throw new Error('Link the actual authorization for adding this exact qa-webmcp rule.');
-      authorization(root, approval, target, original.current.origin, 'addOrigin');
+      if (!approval) throw new Error(enabling ? 'Link the decision to enable Strict and use this exact initial origin.' : 'Link the actual authorization for adding this exact qa-webmcp rule.');
+      authorization(root, approval, target, original.current.origin, enabling ? 'enableStrict' : 'addOrigin');
     }
     const after = addition.present ? before : await writeNativeQaConfig(request, root, before, addition.args);
     return withLock(root, 'browser-access', () => {
       const { path, stored, plan, scope } = unchangedPreparation();
-      const change = { schemaVersion: 1, target, rule, before: before.revision, after: after.revision, previousRulesPreserved: true, ...(addition.present ? {} : { approval }) };
+      const change = { schemaVersion: 1, target, rule, before: before.revision, after: after.revision, previousRulesPreserved: true, ...(enabling ? { enabledStrict: true } : {}), ...(addition.present ? {} : { approval }) };
       const deltaPath = `.local/browser-access/changes/${digest(JSON.stringify(change))}.json`;
       if (revision(root, deltaPath) === null) save(root, deltaPath, change, null);
       const savedRules = nativeRuleAddition(after.args, rule).rules;
-      const savedOrigins = [...new Set([...(scope.activeOrigins ?? []), ...(scope.savedOrigins ?? []), original.current.origin])].filter(origin => savedRules.includes(origin + '/*'));
-      if (!scope.savedOrigins || scope.savedOrigins.length !== savedOrigins.length || savedOrigins.some(origin => !scope.savedOrigins?.includes(origin))) {
-        const { observation: _old, ...prepared } = plan;
-        save(root, path, { ...prepared, scope: { ...scope, savedOrigins } }, stored.revision);
+      const { observation: _old, ...prepared } = plan;
+      if (scope.kind === 'noAllowlist') {
+        if (!scope.pendingStrict) save(root, path, { ...prepared, scope: { ...scope, pendingStrict: true } }, stored.revision);
+      } else {
+        const savedOrigins = [...new Set([...(scope.activeOrigins ?? []), ...(scope.savedOrigins ?? []), original.current.origin])].filter(origin => savedRules.includes(origin + '/*'));
+        if (!scope.savedOrigins || scope.savedOrigins.length !== savedOrigins.length || savedOrigins.some(origin => !scope.savedOrigins?.includes(origin))) {
+          save(root, path, { ...prepared, scope: { ...scope, savedOrigins } }, stored.revision);
+        }
       }
       return {
         changed: !addition.present, previousRulesPreserved: true,
@@ -284,12 +312,15 @@ export function recordBrowserAccess(root: string, input: AccessObservation, now 
     const { report, settingsRevision } = configuration(root, plan);
     const finalOrigin = input.finalUrl ? webOrigin(input.finalUrl) : undefined;
     if (input.httpStatus !== undefined && (!Number.isInteger(input.httpStatus) || input.httpStatus < 100 || input.httpStatus > 599)) throw new Error('Use the observed HTTP status or omit it.');
-    if (input.outcome === 'rendered' && (input.scopeEnforced !== true || finalOrigin !== current.origin || (input.httpStatus !== undefined && (input.httpStatus < 200 || input.httpStatus >= 300)) || ['missingOrigin', 'reloadRequired'].includes(report.status) || (report.status === 'scopeUnverified' && plan.scope.kind === 'observedAllowlist' && plan.scope.activeOrigins !== null))) throw new Error('Access requires a rendered target inside the approved origin through the active, bounded browser connection.');
+    const unsuccessful = input.httpStatus !== undefined && (input.httpStatus < 200 || input.httpStatus >= 300);
+    const missingScope = report.networkMode !== 'standard' && input.scopeEnforced !== true;
+    if (input.outcome === 'rendered' && (missingScope || finalOrigin !== current.origin || unsuccessful || ['missingOrigin', 'reloadRequired'].includes(report.status) || (report.status === 'scopeUnverified' && plan.scope.kind === 'observedAllowlist' && plan.scope.activeOrigins !== null))) throw new Error('Access requires a rendered target inside the approved origin through the active, bounded browser connection.');
+    if (input.outcome === 'signInReached' && (!report.networkMode || missingScope || report.status !== 'needsProbe' || !finalOrigin?.startsWith('https://') || finalOrigin === current.origin || unsuccessful)) throw new Error('Record a rendered HTTPS sign-in destination observed from the entry route through the active browser.');
     if (plan.observation) {
       const prior = load<Receipt | null>(root, plan.observation.path, () => null).value;
       if (prior && Date.parse(prior.observedAt) > Date.parse(input.observedAt)) throw new Error('Keep the newer browser observation. Do not replace it with an older result.');
     }
-    const receipt: Receipt = { schemaVersion: 1, binding: binding(plan, settingsRevision), outcome: input.outcome, observedAt: input.observedAt, approval: input.approval, evidence: input.evidence, ...(finalOrigin ? { finalOrigin } : {}), ...(input.httpStatus !== undefined ? { httpStatus: input.httpStatus } : {}), ...(input.outcome === 'rendered' ? { scopeEnforced: true } : {}) };
+    const receipt: Receipt = { schemaVersion: 1, binding: binding(plan, settingsRevision), outcome: input.outcome, observedAt: input.observedAt, approval: input.approval, evidence: input.evidence, ...(finalOrigin ? { finalOrigin } : {}), ...(input.httpStatus !== undefined ? { httpStatus: input.httpStatus } : {}), ...(input.scopeEnforced === true ? { scopeEnforced: true } : {}) };
     const receiptPath = `.local/browser-access/observations/${digest(JSON.stringify(receipt))}.json`;
     if (revision(root, receiptPath) === null) save(root, receiptPath, receipt, null);
     const observation = { path: receiptPath, sha256: digest(JSON.stringify(receipt, null, 2) + '\n') };

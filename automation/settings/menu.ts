@@ -4,6 +4,7 @@ import { commitReply, queueQuestions, journalPath, type Reply } from '../onboard
 import { readState, writeState, type Stage } from '../onboarding/state.js';
 import * as attention from '../attention/preferences.js';
 import { browserAccessStatus } from '../browser/access.js';
+import { chromeNetworkMode, settingsPath, type ChromeSettings } from '../chrome-devtools/config.js';
 
 import { activeSource, sourcePath } from '../task-source/config.js';
 
@@ -14,7 +15,7 @@ const existingAreas = [
   { id: 'review', label: 'Review responsibilities and execution policies', files: ['.local/review-settings.json'], stage: 'operation' },
   { id: 'email', label: 'Email providers, accounts and mailboxes', files: ['.local/email-connections.json'], stage: 'email' },
   { id: 'verification', label: 'OTP and verification preferences', files: ['.local/verification-settings.json'], stage: 'email' },
-  { id: 'browser', label: 'Tool constraints, browser visibility and Chrome DevTools', files: ['.local/tool-policy.json', '.local/browser-preferences.json', '.local/chrome-devtools-settings.json'], stage: 'tools' },
+  { id: 'browser', label: 'Tool constraints, browser visibility and Chrome DevTools', files: ['.local/tool-policy.json', '.local/browser-preferences.json', settingsPath], stage: 'tools' },
   { id: 'schedule', label: 'Check-in schedule', files: ['.local/operation-preferences.json'], stage: 'operation' },
   { id: 'reporting', label: 'Reporting and evidence preferences', files: ['.local/reporting-settings.json', attention.preferencesPath], stage: 'operation' },
   { id: 'postman', label: 'API tools and Postman', files: ['.local/postman-settings.json'], stage: 'tools' },
@@ -52,11 +53,19 @@ export function showMenu(root: string) {
     return { path: file, value: existsSync(contained(root, file)) ? JSON.parse(readFileSync(contained(root, file), 'utf8')) : 'Not configured' };
   }) : [];
   assertNonsecret(current);
+  const chrome = current.find(item => item.path === settingsPath)?.value as ChromeSettings | undefined;
   const notification = menu.questionId && menu.questionKind === 'attention' ? notificationQuestion(root, menu.questionId) : null;
   return { action: menu.open ? (area ? 'editArea' : 'chooseArea') : 'closed', area: area?.label ?? null,
     choices: area ? ['Back', 'Cancel this edit', 'Close settings'] : menuChoices.map(({ id, label }) => ({ id, label })),
     current,
-    ...(menu.open && area?.id === 'browser' ? { browserAccess: browserAccessStatus(root) } : {}),
+    ...(menu.open && area?.id === 'browser' ? {
+      browserAccess: browserAccessStatus(root),
+      browserNetworking: {
+        newLaunchDefault: 'standard',
+        configuredMode: chrome?.connection && chrome.connection.mode !== 'host' ? chromeNetworkMode(chrome) : null,
+        instruction: 'Keep Standard to allow sign-in redirects. Select Strict to restrict browser traffic to approved origins. Reload the connection after changing the mode.',
+      },
+    } : {}),
     question: menu.questionId ? notification ? notification.question : readState(root).value.questions.find(q => q.id === menu.questionId) : null,
     questionIssue: notification?.issue ?? null,
     notificationRecoveryHistory: menu.notificationRecoveryHistory ?? [],

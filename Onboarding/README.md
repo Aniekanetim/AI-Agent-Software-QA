@@ -45,7 +45,7 @@ Start with [shared tool discovery](../automation/tools/README.md). The agent ins
 
 Dependencies and adapters are distributed with the package; browsers, host connections and credentials are established on the adopting machine. Neither package installation nor a configuration file proves operational readiness.
 
-Start with the target environment and reuse its URL if it was already supplied. For planned browser work, [verify target access during setup](../automation/browser/target-access.md). The supported Codex `qa-webmcp` path adds the exact authorized origin and reads the allowlist back to confirm that existing entries were preserved. Verify navigation through the running browser before dependent work.
+Start with the target environment and reuse its URL if it was already supplied. New dedicated QA browsers use Standard networking so ordinary sign-in redirects and page resources can load. [Verify target access](../automation/browser/target-access.md) through the running browser. If the user opts in to Strict, configure the approved origins before the probe.
 
 ## Preserve information and resume
 
