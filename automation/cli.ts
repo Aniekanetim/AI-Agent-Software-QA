@@ -319,6 +319,7 @@ async function main() {
   throw new Error('Unknown command. Run npm run qa -- help.');
 }
 main().catch(error => {
+  if (error instanceof taskSource.LiveCheckInError) output(error.guidance);
   const message = error instanceof Error ? error.message : 'Operation failed; inspect retained state.';
   try { store.assertNonsecret(message); process.stderr.write(message + '\n'); } catch { process.stderr.write('Operation failed; sensitive details suppressed.\n'); }
   process.exitCode = 1;
