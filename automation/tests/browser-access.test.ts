@@ -3,7 +3,7 @@ import test from 'node:test';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { applyBrowserOrigin, assessBrowserAccess, browserAccessStatus, browserTargets, prepareBrowserAccess, recordBrowserAccess, type AccessTarget, type OriginScope } from '../browser/access.js';
+import { applyBrowserOrigin, assessBrowserAccess, browserAccessStatus, browserTargets, ensureStandardChrome, prepareBrowserAccess, recordBrowserAccess, type AccessTarget, type OriginScope } from '../browser/access.js';
 import { nativeRuleAddition, readNativeQaConfig, writeNativeQaConfig } from '../browser/codex-config.js';
 import { settingsHash, settingsPath, type ChromeSettings } from '../chrome-devtools/config.js';
 import { integrationStatus } from '../onboarding/integrations.js';
@@ -136,7 +136,7 @@ test('a saved native rule needs reload and a successful bounded probe in the ref
 
 test('project origin apply preserves existing settings and requires a current exact authorized addition', () => {
   const f = fixture(), target = { ...f.target, tool: 'chromeDevtoolsCli' as const };
-  const original: ChromeSettings = { schemaVersion: 1, source: 'Synthetic fixture', evidence: [f.source], visibility: 'headed', connection: { mode: 'launch', executablePath: process.execPath, profile: 'isolated' }, allowedOrigins: [fixtureOrigin], debuggingTools: false, javascriptEvaluation: true, usageStatistics: false, performanceCrux: false };
+  const original: ChromeSettings = { schemaVersion: 2, networkMode: 'strict', source: 'Synthetic fixture', evidence: [f.source], visibility: 'headed', connection: { mode: 'launch', executablePath: process.execPath, profile: 'isolated' }, allowedOrigins: [fixtureOrigin], debuggingTools: false, javascriptEvaluation: true, usageStatistics: false, performanceCrux: false };
   f.put(settingsPath, original);
   const planned = f.prepare({ kind: 'projectChrome', activeSettingsHash: settingsHash(original) }, target);
   assert.equal(planned.status, 'missingOrigin');
@@ -152,13 +152,64 @@ test('project origin apply preserves existing settings and requires a current ex
   const applied = applyBrowserOrigin(f.root, { ...request, expectedSettingsRevision: concurrent.sha256 });
   assert.equal(applied.access.status, 'reloadRequired'); assert.equal(applied.changed, true);
   verifyEvidence(f.root, applied.delta!);
-  const updated = { ...edited, allowedOrigins: [fixtureOrigin, origin], evidence: [f.source, request.approval] };
+  const updated = { ...edited, networkOrigins: [fixtureOrigin, origin], evidence: [f.source, request.approval] };
   assert.deepEqual(JSON.parse(f.read(settingsPath)), updated);
   const after = f.read(settingsPath);
   assert.equal(applyBrowserOrigin(f.root, request).changed, false); assert.equal(f.read(settingsPath), after);
   const reloaded = { ...target, generation: 'new-settings' };
   assert.equal(f.prepare({ kind: 'projectChrome', activeSettingsHash: settingsHash(updated) }, reloaded).status, 'needsProbe');
   assert.equal(recordBrowserAccess(f.root, f.probe(reloaded, request.approval)).status, 'verified');
+});
+
+test('legacy owned launch upgrades once, retaining target scope, previous rules, and rollback settings', () => {
+  const f = fixture(), target = { ...f.target, tool: 'chromeDevtoolsCli' as const };
+  const original: ChromeSettings = { schemaVersion: 1, source: 'Synthetic legacy settings', evidence: [f.source], visibility: 'headed', connection: { mode: 'launch', executablePath: process.execPath, profile: 'isolated' }, allowedOrigins: [origin, fixtureOrigin], debuggingTools: false, javascriptEvaluation: true, usageStatistics: false, performanceCrux: false };
+  const before = f.put(settingsPath, original);
+  const scope = { kind: 'projectChrome', activeSettingsHash: settingsHash(original) } as const;
+  assert.equal(f.prepare(scope, target).status, 'needsStandardSetup');
+  assert.equal(applyBrowserOrigin(f.root, { target, expectedSettingsRevision: before.sha256, approval: f.decision(target) }).changed, false);
+  const input = { environment: 'staging', tool: target.tool, source: 'Synthetic Standard reconciliation', evidence: [f.source] };
+  const updated = ensureStandardChrome(f.root, input);
+  assert.equal(updated.status, 'reloadRequired');
+  assert.deepEqual(JSON.parse(f.read(`.local/browser-access/legacy-chrome/${before.sha256}.json`)), original);
+  const standard = { ...original, schemaVersion: 2, networkMode: 'standard', networkOrigins: original.allowedOrigins };
+  assert.deepEqual(JSON.parse(f.read(settingsPath)), standard);
+  assert.equal(ensureStandardChrome(f.root, input).changed, false);
+  assert.equal(f.prepare({ ...scope, activeSettingsHash: updated.settingsHash! }, { ...target, generation: 'refreshed-standard' }).status, 'needsProbe');
+  const explicit = f.put(settingsPath, { ...standard, networkMode: 'strict' });
+  assert.equal(ensureStandardChrome(f.root, input).status, 'explicitStrict');
+  assert.equal(revision(f.root, settingsPath), explicit.sha256);
+});
+
+test('old native rules alone select a dedicated Standard connection and a recorded Strict choice is reused', () => {
+  const f = fixture(), target = { ...f.target, connection: 'qa-webmcp' };
+  const scope: OriginScope = { kind: 'observedAllowlist', activeOrigins: [fixtureOrigin], savedOrigins: [fixtureOrigin] };
+  const legacy = { target, rule: origin + '/*', approval: f.decision(target, ['addOrigin']) };
+  const path = '.local/browser-access/changes/' + '1'.repeat(64) + '.json';
+  f.put(path, legacy);
+  assert.equal(f.prepare(scope, target).status, 'needsStandardSetup');
+  const settings = ensureStandardChrome(f.root, { environment: 'staging', tool: 'chromeDevtoolsCli', executablePath: process.execPath, source: 'Synthetic dedicated setup', evidence: [f.source] });
+  assert.equal(settings.status, 'launchRequired');
+  assert.equal(JSON.parse(f.read(settingsPath)).networkMode, 'standard');
+  f.put(path, { ...legacy, enabledStrict: true });
+  assert.equal(assessBrowserAccess(f.root, target).status, 'needsStandardSetup');
+  f.put(path, { ...legacy, enabledStrict: true, approval: f.decision(target, ['enableStrict']) });
+  assert.equal(assessBrowserAccess(f.root, target).status, 'missingOrigin');
+});
+
+test('a saved shared connection is backed up while a separate dedicated launcher is selected', () => {
+  const f = fixture();
+  const shared: ChromeSettings = { schemaVersion: 1, source: 'Synthetic host settings', evidence: [f.source], visibility: 'headless', connection: { mode: 'host', connectionReference: 'qa-webmcp' }, allowedOrigins: [fixtureOrigin], debuggingTools: true, javascriptEvaluation: true, usageStatistics: false, performanceCrux: false };
+  const before = f.put(settingsPath, shared);
+  const result = ensureStandardChrome(f.root, { environment: 'staging', tool: 'chromeDevtoolsCli', executablePath: process.execPath, source: 'Synthetic dedicated setup', evidence: [f.source] });
+  assert.equal(result.status, 'launchRequired');
+  const saved = JSON.parse(f.read(settingsPath));
+  assert.equal(saved.networkMode, 'standard');
+  assert.equal(saved.connection.profile, 'isolated');
+  assert.equal(saved.visibility, 'headless');
+  assert.equal(saved.debuggingTools, false);
+  assert.deepEqual(saved.allowedOrigins, [origin]);
+  assert.deepEqual(JSON.parse(f.read(`.local/browser-access/legacy-chrome/${before.sha256}.json`)), shared);
 });
 
 test('onboarding skips origin edits in Standard and adds network-only rules in opted-in Strict', () => {

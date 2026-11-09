@@ -99,7 +99,7 @@ export function next(root: string, repeatOnRequest?: string): Record<string, unk
     const preparingBrowser = stage === 'tools' || stage === 'access';
     const browserAccess = preparingBrowser ? browserAccessStatus(root).filter(item => item.status !== 'verified') : [];
     return { action: 'work', stage, label: labels[stage], next: blocker?.next ?? 'Prepare and verify the onboarding handoff.', issues: status.issues, ...(preparingBrowser ? {
-      browserNetworking: 'Use Standard for a new dedicated QA browser. Reuse the actual mode of an existing connection. Configure an allowlist only for Strict.',
+      browserNetworking: 'Use Standard unless this project selected Strict. If legacy settings need reconciliation, prepare the project-owned launcher. Configure an allowlist only for Strict.',
       ...(browserAccess.length ? { browserAccess } : {}),
     } : {}) };
   });

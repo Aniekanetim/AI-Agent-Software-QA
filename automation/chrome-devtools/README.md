@@ -53,7 +53,7 @@ The agent saves project-specific settings through the existing [onboarding conve
 
 Calculate actual references with `npm run qa -- evidence --path <actual-file>`. The `allowedOrigins` field scopes the agent's WebMCP actions. Use exact HTTPS or loopback HTTP origins, with a nondefault port where applicable.
 
-New dedicated launches use **Standard** networking. To opt in to the browser network allowlist, set `"networkMode": "strict"` and provide the authorized app and dependency origins in `networkOrigins`. If omitted in Strict, `networkOrigins` uses the WebMCP target origins. Existing schema 1 settings use Strict. With explicit direction, migrate a dedicated schema 1 launch to schema 2 and set `"networkMode": "standard"` to use ordinary browser networking. Check the active mode after restarting the connection.
+Dedicated launches use **Standard** networking. To opt in to the network allowlist, set `"networkMode": "strict"` and provide the authorized app and dependency origins in `networkOrigins`. If omitted in Strict, `networkOrigins` uses the WebMCP target origins. Schema 1 reflects the earlier launcher format. Use [the Standard setup command](../browser/target-access.md#prepare-the-dedicated-standard-launcher) to migrate a project-owned schema 1 launch, back up its settings, and retain the old rules for reuse. Refresh the connection and verify the active mode.
 
 Connection alternatives:
 

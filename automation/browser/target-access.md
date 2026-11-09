@@ -1,6 +1,6 @@
 # Verify browser access to a saved environment
 
-Establish access to the target during onboarding. **Standard** is the default for a new dedicated QA browser. It lets browser redirects and page resources load normally while the agent's actions stay within the authorized task. **Strict** is an opt-in network allowlist. Reuse the actual mode of an existing connection.
+Establish access to the target during onboarding. **Standard** is the default for a dedicated QA browser. It lets redirects and page resources load while the agent stays within the authorized task. **Strict** is a recorded project choice. Legacy rules describe a connection's configuration, which can differ from the project's choice.
 
 ## Onboarding and Settings
 
@@ -25,14 +25,20 @@ In a browser without an applicable allowlist, skip rule setup and still verify n
 
 To apply a rule to existing **project Chrome settings**, use `npm run qa -- browser-access apply --input .local/browser-origin-addition.json`. The input is `{ target, expectedSettingsRevision, approval }`. Copy the revision shown with `missingOrigin` and reference the actual authorization. The helper adds one origin, preserves the other settings and records the proposed change. An already present origin needs no edit. If settings changed, inspect the new diff before retrying.
 
+### Prepare the dedicated Standard launcher
+
+When target preparation reports `needsStandardSetup`, run `npm run qa -- browser-access ensure-standard --input .local/standard-browser.json` with `{ environment, tool, executablePath?, visibility?, source, evidence }`. Use `chromeDevtoolsCli` or `chromeDevtoolsMcp` for `tool`. For a fresh launcher, select an existing compatible Chrome executable and reuse the user's visibility preference. The command scopes WebMCP actions to the saved target and creates an isolated launch.
+
+For a legacy project-owned launch, the command backs up the old settings and saves Standard with the previous network rules available for Strict. An existing Standard setup is reused. A saved explicit Strict choice is retained. For a shared or attached connection, the helper backs up its project selection and creates a dedicated launcher without editing the host configuration. Respect any required host restrictions. Launch or reload the dedicated connection and verify actual operation.
+
 ### Add an authorized origin to Codex qa-webmcp
 
 1. Prepare the actual native connection with `tool: "chromeDevtoolsHost"`, `connection: "qa-webmcp"` and the observed network mode.
-2. Run `npm run qa -- browser-access native-plan --input .local/qa-webmcp-target.json` with the `target` object. If the saved mode is Standard, skip allowlist setup. If it is Strict, the helper reports the proposed exact rule, current revision and whether the rule is already saved.
-3. In Strict, use `npm run qa -- browser-access native-apply --input .local/qa-webmcp-addition.json` with `{ target, expectedSettingsRevision, approval }`. If the user opts in to Strict from Standard, include `enableStrict: true` and an `enableStrict` approval for the initial exact origin. This is separate from approval to add a rule to a running Strict setup. The helper reads the configuration back to verify preservation and records a private receipt.
+2. Run `npm run qa -- browser-access native-plan --input .local/qa-webmcp-target.json` with the `target` object. For Standard, skip allowlist setup. With existing native rules and no project Strict choice, use the dedicated Standard launcher. With a recorded Strict choice, the helper reports the exact rule and saved revision.
+3. In Strict, use `npm run qa -- browser-access native-apply --input .local/qa-webmcp-addition.json` with `{ target, expectedSettingsRevision, approval }`. To record a new Strict choice, include `enableStrict: true` and an `enableStrict` approval. This records the choice even when the first rule is already present. Subsequent exact additions use `addOrigin`. The helper verifies the saved configuration and records a private receipt.
 4. If needed, reload the selected connection using its supported host controls. Prepare the refreshed generation and verify the target in that active browser. When the running scope is unknown, inspect it or perform the authorized bounded probe. A saved rule alone leaves browser access unverified.
 
-The helper supports a local, unshadowed Codex user configuration. It uses the Codex executable on PATH, or an absolute path provided with `--codex-executable`. To switch an existing native Strict connection to Standard, have its owner remove the specific `--allowedUrlPattern` argument group through the supported host configuration, retain the previous rules for reuse, and refresh the connection. Hand off managed or unsupported settings to their owner.
+The native helper supports a local, unshadowed Codex user configuration. It uses the Codex executable on PATH or an absolute path provided with `--codex-executable`. Managed and unsupported settings follow the host owner's procedure.
 
 `approval` is an evidence reference to a retained actual decision (or its JSON pointer), with this shape:
 

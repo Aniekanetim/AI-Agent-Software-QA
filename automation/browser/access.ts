@@ -35,10 +35,10 @@ interface Receipt {
   schemaVersion: 1; binding: string; outcome: Outcome; observedAt: string; approval: Evidence; evidence: Evidence[];
   finalOrigin?: string; httpStatus?: number; scopeEnforced?: boolean;
 }
-type Status = 'needsConnectionCheck' | 'missingOrigin' | 'reloadRequired' | 'scopeUnverified' | 'needsProbe' | 'verified' | Exclude<Outcome, 'rendered'>;
+type Status = 'needsConnectionCheck' | 'needsStandardSetup' | 'missingOrigin' | 'reloadRequired' | 'scopeUnverified' | 'needsProbe' | 'verified' | Exclude<Outcome, 'rendered'>;
 interface AccessReport {
   target: AccessTarget; origin: string; status: Status; next: string;
-  networkMode?: NetworkMode; additionalOrigin?: string; settingsRevision?: string; observation?: Evidence;
+  networkMode?: NetworkMode; preferredMode?: NetworkMode; additionalOrigin?: string; settingsRevision?: string; observation?: Evidence;
 }
 
 function environments(root: string): { name?: unknown; url?: unknown }[] {
@@ -62,6 +62,41 @@ export function browserTargets(root: string) {
   return [...names].map(name => {
     try { return { environment: name, origin: environment(root, name).origin }; }
     catch { return { environment: name, issue: 'The saved browser URL is missing, invalid or ambiguous. Clarify only this target.' }; }
+  });
+}
+
+/** Reconcile the project's own launcher. Native and attached browsers have a separate owner. */
+export function ensureStandardChrome(root: string, input: { environment: string; tool: 'chromeDevtoolsCli' | 'chromeDevtoolsMcp'; executablePath?: string; visibility?: ChromeSettings['visibility']; source: string; evidence: Evidence[] }) {
+  assertNonsecret(input);
+  if (!['chromeDevtoolsCli', 'chromeDevtoolsMcp'].includes(input.tool)) throw new Error('Select the dedicated project Chrome launcher.');
+  checkPolicy(root, input.tool);
+  requireText(input.source, 'Standard browser setup source');
+  verifyRefs(root, input.evidence);
+  return withLock(root, 'browser-access', () => {
+    const { origin } = environment(root, input.environment);
+    const stored = load<ChromeSettings | null>(root, settingsPath, () => null);
+    const previous = stored.value;
+    if (previous) validateSettings(root, previous);
+    if (previous?.networkMode === 'strict') return { changed: false, status: 'explicitStrict', mode: 'strict' };
+    const owned = previous?.connection.mode === 'launch' ? previous : null;
+    if (owned) {
+      if (!owned.allowedOrigins.includes(origin)) throw new Error('Confirm the saved WebMCP target scope for this environment before using the project launcher.');
+      if (owned.schemaVersion === 2) return { changed: false, status: 'configured', mode: 'standard', settingsHash: settingsHash(owned) };
+    }
+    const standard: ChromeSettings = owned
+      ? { ...owned, schemaVersion: 2, networkMode: 'standard', networkOrigins: owned.allowedOrigins }
+      : {
+        schemaVersion: 2, networkMode: 'standard', source: input.source, evidence: input.evidence,
+        visibility: input.visibility ?? previous?.visibility ?? 'headed', connection: { mode: 'launch', profile: 'isolated', executablePath: input.executablePath ?? '' },
+        allowedOrigins: [origin], debuggingTools: false, javascriptEvaluation: false, usageStatistics: false, performanceCrux: false,
+      };
+    validateSettings(root, standard);
+    if (previous) {
+      const path = `.local/browser-access/legacy-chrome/${stored.revision}.json`;
+      if (revision(root, path) === null) save(root, path, previous, null);
+    }
+    save(root, settingsPath, standard, stored.revision);
+    return { changed: true, status: owned ? 'reloadRequired' : 'launchRequired', mode: 'standard', settingsHash: settingsHash(standard) };
   });
 }
 function validateTarget(target: AccessTarget) {
@@ -128,14 +163,18 @@ function configuration(root: string, plan: Prepared): { report: AccessReport; se
     const networkOrigins = chromeNetworkOrigins(config);
     base.networkMode = networkOrigins ? 'strict' : 'standard';
     configRevision = current.revision;
+    if (config.schemaVersion === 1 && config.connection.mode === 'launch') return { settingsRevision: configRevision, report: { ...base, preferredMode: 'standard', status: 'needsStandardSetup', next: 'Prepare Standard for the project-owned launcher and refresh its running connection.' } };
     if (networkOrigins && !networkOrigins.includes(origin)) return { settingsRevision: configRevision, report: { ...base, status: 'missingOrigin', additionalOrigin: origin, settingsRevision: configRevision, next: 'Review the exact origin addition and reuse existing authorization or obtain the missing decision during setup.' } };
     if (scope.activeSettingsHash !== settingsHash(config)) return { settingsRevision: configRevision, report: { ...base, status: 'reloadRequired', next: 'Start or reload the selected connection with the saved project settings, then verify the actual target.' } };
   }
   if (scope.kind === 'noAllowlist') {
     base.networkMode = 'standard';
-    if (scope.pendingStrict) return { settingsRevision: null, report: { ...base, status: 'reloadRequired', next: 'Strict networking is saved. Reload this connection and inspect its active rules before continuing.' } };
+    if (scope.pendingStrict || (isNativeQa(target) && nativeStrictChoice(root, target))) return { settingsRevision: null, report: { ...base, preferredMode: 'strict', status: 'reloadRequired', next: 'Strict was selected for this connection. Check its saved rules and refresh the active connection before continuing.' } };
   }
-  if (scope.kind === 'observedAllowlist') base.networkMode = 'strict';
+  if (scope.kind === 'observedAllowlist') {
+    base.networkMode = 'strict';
+    if (isNativeQa(target) && !nativeStrictChoice(root, target)) return { settingsRevision: null, report: { ...base, preferredMode: 'standard', status: 'needsStandardSetup', next: 'Prepare a dedicated Standard connection for this project. The existing qa-webmcp rules are separate from a Strict choice.' } };
+  }
   if (scope.kind === 'observedAllowlist' && scope.activeOrigins !== null && !scope.activeOrigins.includes(origin)) {
     return { settingsRevision: null, report: scope.savedOrigins?.includes(origin)
       ? { ...base, status: 'reloadRequired', next: 'The saved rule differs from the running connection. Reload the selected connection, then verify actual access.' }
@@ -168,12 +207,35 @@ function authorization(root: string, ref: Evidence, target: AccessTarget, origin
   requireText(decision.source, 'Actual human authorization source');
 }
 
+const isNativeQa = (target: AccessTarget) => target.tool === 'chromeDevtoolsHost' && target.connection === nativeQaConnection;
+function nativeChoicePath(root: string, target: AccessTarget) {
+  const { id, profile } = currentHarness(root);
+  return `.local/browser-access/network-choices/${digest(JSON.stringify([target.tool, target.connection, id, profile]))}.json`;
+}
+function nativeStrictChoice(root: string, target: AccessTarget) {
+  type Choice = { target: AccessTarget; rule: string; approval?: Evidence; enabledStrict?: true };
+  const check = (value: Choice | null) => {
+    if (!value?.enabledStrict || value.target.tool !== target.tool || value.target.connection !== target.connection || !value.approval || !value.rule.endsWith('/*')) return false;
+    authorization(root, value.approval, value.target, webOrigin(value.rule.slice(0, -2)), 'enableStrict');
+    return true;
+  };
+  const saved = load<Choice | null>(root, nativeChoicePath(root, target), () => null).value;
+  if (saved) return check(saved);
+  const directory = '.local/browser-access/changes';
+  if (!existsSync(contained(root, directory))) return false;
+  return readdirSync(contained(root, directory), { withFileTypes: true }).some(item => {
+    if (!item.isFile() || !/^[a-f0-9]{64}\.json$/.test(item.name)) return false;
+    try { return check(load<Choice | null>(root, `${directory}/${item.name}`, () => null).value); }
+    catch { return false; }
+  });
+}
+
 export function assessBrowserAccess(root: string, target: AccessTarget, now = Date.now()): AccessReport {
   const { current, plan } = currentPrepared(root, target, now);
   if (!plan) return { target, origin: current.origin, status: 'needsConnectionCheck', next: 'Inspect the selected browser and refresh only this target/connection preparation.' };
   checkPolicy(root, target.tool);
   const { report, settingsRevision } = configuration(root, plan);
-  if (report.status === 'missingOrigin' || report.status === 'reloadRequired' || !plan.observation) return report;
+  if (['needsStandardSetup', 'missingOrigin', 'reloadRequired'].includes(report.status) || !plan.observation) return report;
   try {
     verifyRefs(root, [plan.observation]);
     const receipt = load<Receipt | null>(root, plan.observation.path, () => null).value;
@@ -217,7 +279,7 @@ export function applyBrowserOrigin(root: string, input: { target: AccessTarget; 
     checkPolicy(root, input.target.tool);
     const saved = projectChromeSettings(root), config = saved.config;
     const networkOrigins = chromeNetworkOrigins(config);
-    if (!networkOrigins) return { changed: false, access: assessBrowserAccess(root, input.target, now) };
+    if (!networkOrigins || (config.schemaVersion === 1 && config.connection.mode === 'launch')) return { changed: false, access: assessBrowserAccess(root, input.target, now) };
     authorization(root, input.approval, input.target, current.origin, 'addOrigin');
     if (networkOrigins.includes(current.origin)) return { changed: false, access: assessBrowserAccess(root, input.target, now) };
     if (!hashPattern.test(input.expectedSettingsRevision) || input.expectedSettingsRevision !== saved.revision) throw new Error('Browser settings changed. Review the exact addition again without overwriting current settings.');
@@ -235,7 +297,7 @@ export function applyBrowserOrigin(root: string, input: { target: AccessTarget; 
 function nativePreparation(root: string, target: AccessTarget, now: number) {
   currentHarness(root, 'interactive');
   const prepared = currentPrepared(root, target, now);
-  if (target.tool !== 'chromeDevtoolsHost' || target.connection !== nativeQaConnection || !prepared.plan || (prepared.plan.scope.kind !== 'observedAllowlist' && prepared.plan.scope.kind !== 'noAllowlist')) {
+  if (!isNativeQa(target) || !prepared.plan || (prepared.plan.scope.kind !== 'observedAllowlist' && prepared.plan.scope.kind !== 'noAllowlist')) {
     throw new Error('Prepare the actual qa-webmcp host connection and its observed network mode first.');
   }
   checkPolicy(root, target.tool);
@@ -250,6 +312,7 @@ export async function planNativeBrowserOrigin(root: string, target: AccessTarget
     const addition = nativeRuleAddition(config.args, rule);
     const plan = { target, origin: current.origin, expectedSettingsRevision: config.revision, networkMode: addition.networkMode };
     if (addition.networkMode === 'standard') return { ...plan, status: scope.kind === 'observedAllowlist' ? 'reloadRequired' : 'standard' };
+    if (!nativeStrictChoice(root, target)) return { ...plan, preferredMode: 'standard', status: 'needsStandardSetup' };
     return { ...plan, rule, status: addition.present ? 'alreadySaved' : 'missingOrigin', existingRuleCount: addition.rules.length };
   }, executable);
 }
@@ -268,19 +331,23 @@ export async function applyNativeBrowserOrigin(root: string, input: { target: Ac
       return actual;
     };
     unchangedPreparation();
-    const enabling = addition.networkMode === 'standard';
-    if (enabling && input.enableStrict !== true) return { changed: false, networkMode: 'standard', access: assessBrowserAccess(root, target) };
-    if (!addition.present) {
+    const optingIn = input.enableStrict === true;
+    if (!optingIn && (addition.networkMode === 'standard' || !nativeStrictChoice(root, target))) return { changed: false, networkMode: addition.networkMode, access: assessBrowserAccess(root, target) };
+    if (optingIn || !addition.present) {
       if (before.revision !== input.expectedSettingsRevision) throw new Error('Codex settings changed. Inspect the exact addition again before applying it.');
-      if (!approval) throw new Error(enabling ? 'Link the decision to enable Strict and use this exact initial origin.' : 'Link the actual authorization for adding this exact qa-webmcp rule.');
-      authorization(root, approval, target, original.current.origin, enabling ? 'enableStrict' : 'addOrigin');
+      if (!approval) throw new Error(optingIn ? 'Link the decision to enable Strict and use this exact initial origin.' : 'Link the actual authorization for adding this exact qa-webmcp rule.');
+      authorization(root, approval, target, original.current.origin, optingIn ? 'enableStrict' : 'addOrigin');
     }
     const after = addition.present ? before : await writeNativeQaConfig(request, root, before, addition.args);
     return withLock(root, 'browser-access', () => {
       const { path, stored, plan, scope } = unchangedPreparation();
-      const change = { schemaVersion: 1, target, rule, before: before.revision, after: after.revision, previousRulesPreserved: true, ...(enabling ? { enabledStrict: true } : {}), ...(addition.present ? {} : { approval }) };
+      const change = { schemaVersion: 1, target, rule, before: before.revision, after: after.revision, previousRulesPreserved: true, ...(optingIn ? { enabledStrict: true } : {}), ...(!addition.present || optingIn ? { approval } : {}) };
       const deltaPath = `.local/browser-access/changes/${digest(JSON.stringify(change))}.json`;
       if (revision(root, deltaPath) === null) save(root, deltaPath, change, null);
+      if (optingIn) {
+        const path = nativeChoicePath(root, target);
+        save(root, path, change, revision(root, path));
+      }
       const savedRules = nativeRuleAddition(after.args, rule).rules;
       const { observation: _old, ...prepared } = plan;
       if (scope.kind === 'noAllowlist') {
@@ -314,7 +381,7 @@ export function recordBrowserAccess(root: string, input: AccessObservation, now 
     if (input.httpStatus !== undefined && (!Number.isInteger(input.httpStatus) || input.httpStatus < 100 || input.httpStatus > 599)) throw new Error('Use the observed HTTP status or omit it.');
     const unsuccessful = input.httpStatus !== undefined && (input.httpStatus < 200 || input.httpStatus >= 300);
     const missingScope = report.networkMode !== 'standard' && input.scopeEnforced !== true;
-    if (input.outcome === 'rendered' && (missingScope || finalOrigin !== current.origin || unsuccessful || ['missingOrigin', 'reloadRequired'].includes(report.status) || (report.status === 'scopeUnverified' && plan.scope.kind === 'observedAllowlist' && plan.scope.activeOrigins !== null))) throw new Error('Access requires a rendered target inside the approved origin through the active, bounded browser connection.');
+    if (input.outcome === 'rendered' && (missingScope || finalOrigin !== current.origin || unsuccessful || ['needsStandardSetup', 'missingOrigin', 'reloadRequired'].includes(report.status) || (report.status === 'scopeUnverified' && plan.scope.kind === 'observedAllowlist' && plan.scope.activeOrigins !== null))) throw new Error('Access requires a rendered target inside the approved origin through the active, bounded browser connection.');
     if (input.outcome === 'signInReached' && (!report.networkMode || missingScope || report.status !== 'needsProbe' || !finalOrigin?.startsWith('https://') || finalOrigin === current.origin || unsuccessful)) throw new Error('Record a rendered HTTPS sign-in destination observed from the entry route through the active browser.');
     if (plan.observation) {
       const prior = load<Receipt | null>(root, plan.observation.path, () => null).value;

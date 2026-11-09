@@ -45,7 +45,7 @@ Start with [shared tool discovery](../automation/tools/README.md). The agent ins
 
 Dependencies and adapters are distributed with the package; browsers, host connections and credentials are established on the adopting machine. Neither package installation nor a configuration file proves operational readiness.
 
-Start with the target environment and reuse its URL if it was already supplied. New dedicated QA browsers use Standard networking so ordinary sign-in redirects and page resources can load. [Verify target access](../automation/browser/target-access.md) through the running browser. If the user opts in to Strict, configure the approved origins before the probe.
+Start with the target environment and reuse its URL if it was already supplied. Standard networking lets sign-in redirects and page resources load normally. [Reconcile legacy browser setup and verify target access](../automation/browser/target-access.md) through the running browser. Configure the approved network origins when the user opts in to Strict.
 
 ## Preserve information and resume
 

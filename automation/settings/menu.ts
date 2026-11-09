@@ -63,6 +63,7 @@ export function showMenu(root: string) {
       browserNetworking: {
         newLaunchDefault: 'standard',
         configuredMode: chrome?.connection && chrome.connection.mode !== 'host' ? chromeNetworkMode(chrome) : null,
+        preferredMode: chrome?.connection?.mode === 'launch' && chrome.networkMode === 'strict' ? 'strict' : 'standard',
         instruction: 'Keep Standard to allow sign-in redirects. Select Strict to restrict browser traffic to approved origins. Reload the connection after changing the mode.',
       },
     } : {}),
