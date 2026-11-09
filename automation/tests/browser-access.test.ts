@@ -197,6 +197,21 @@ test('old native rules alone select a dedicated Standard connection and a record
   assert.equal(assessBrowserAccess(f.root, target).status, 'missingOrigin');
 });
 
+test('a saved shared connection is backed up while a separate dedicated launcher is selected', () => {
+  const f = fixture();
+  const shared: ChromeSettings = { schemaVersion: 1, source: 'Synthetic host settings', evidence: [f.source], visibility: 'headless', connection: { mode: 'host', connectionReference: 'qa-webmcp' }, allowedOrigins: [fixtureOrigin], debuggingTools: true, javascriptEvaluation: true, usageStatistics: false, performanceCrux: false };
+  const before = f.put(settingsPath, shared);
+  const result = ensureStandardChrome(f.root, { environment: 'staging', tool: 'chromeDevtoolsCli', executablePath: process.execPath, source: 'Synthetic dedicated setup', evidence: [f.source] });
+  assert.equal(result.status, 'launchRequired');
+  const saved = JSON.parse(f.read(settingsPath));
+  assert.equal(saved.networkMode, 'standard');
+  assert.equal(saved.connection.profile, 'isolated');
+  assert.equal(saved.visibility, 'headless');
+  assert.equal(saved.debuggingTools, false);
+  assert.deepEqual(saved.allowedOrigins, [origin]);
+  assert.deepEqual(JSON.parse(f.read(`.local/browser-access/legacy-chrome/${before.sha256}.json`)), shared);
+});
+
 test('onboarding skips origin edits in Standard and adds network-only rules in opted-in Strict', () => {
   const f = fixture(), target = { ...f.target, tool: 'chromeDevtoolsCli' as const };
   const config: ChromeSettings = { schemaVersion: 2, source: 'Synthetic fixture', evidence: [f.source], visibility: 'headed', connection: { mode: 'launch', executablePath: process.execPath, profile: 'isolated' }, allowedOrigins: [fixtureOrigin], debuggingTools: false, javascriptEvaluation: true, usageStatistics: false, performanceCrux: false };

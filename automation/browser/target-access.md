@@ -29,7 +29,7 @@ To apply a rule to existing **project Chrome settings**, use `npm run qa -- brow
 
 When target preparation reports `needsStandardSetup`, run `npm run qa -- browser-access ensure-standard --input .local/standard-browser.json` with `{ environment, tool, executablePath?, visibility?, source, evidence }`. Use `chromeDevtoolsCli` or `chromeDevtoolsMcp` for `tool`. For a fresh launcher, select an existing compatible Chrome executable and reuse the user's visibility preference. The command scopes WebMCP actions to the saved target and creates an isolated launch.
 
-For a legacy project-owned launch, the command backs up the old settings and saves Standard with the previous network rules available for Strict. An existing Standard setup is reused. A saved explicit Strict choice is retained. A shared native connection with legacy rules stays under its owner's control. Prepare a separate launcher for the project and respect any required host restrictions. Launch or reload the dedicated connection and verify actual operation.
+For a legacy project-owned launch, the command backs up the old settings and saves Standard with the previous network rules available for Strict. An existing Standard setup is reused. A saved explicit Strict choice is retained. For a shared or attached connection, the helper backs up its project selection and creates a dedicated launcher without editing the host configuration. Respect any required host restrictions. Launch or reload the dedicated connection and verify actual operation.
 
 ### Add an authorized origin to Codex qa-webmcp
 

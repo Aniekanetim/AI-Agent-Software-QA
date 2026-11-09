@@ -76,18 +76,18 @@ export function ensureStandardChrome(root: string, input: { environment: string;
     const { origin } = environment(root, input.environment);
     const stored = load<ChromeSettings | null>(root, settingsPath, () => null);
     const previous = stored.value;
-    if (previous) {
-      validateSettings(root, previous);
-      if (previous.connection.mode !== 'launch') throw new Error('Prepare a separate project-owned launcher. The saved browser belongs to an attached or native connection.');
-      if (previous.networkMode === 'strict') return { changed: false, status: 'explicitStrict', mode: 'strict' };
-      if (!previous.allowedOrigins.includes(origin)) throw new Error('Confirm the saved WebMCP target scope for this environment before using the project launcher.');
-      if (previous.schemaVersion === 2) return { changed: false, status: 'configured', mode: 'standard', settingsHash: settingsHash(previous) };
+    if (previous) validateSettings(root, previous);
+    if (previous?.networkMode === 'strict') return { changed: false, status: 'explicitStrict', mode: 'strict' };
+    const owned = previous?.connection.mode === 'launch' ? previous : null;
+    if (owned) {
+      if (!owned.allowedOrigins.includes(origin)) throw new Error('Confirm the saved WebMCP target scope for this environment before using the project launcher.');
+      if (owned.schemaVersion === 2) return { changed: false, status: 'configured', mode: 'standard', settingsHash: settingsHash(owned) };
     }
-    const standard: ChromeSettings = previous
-      ? { ...previous, schemaVersion: 2, networkMode: 'standard', networkOrigins: previous.allowedOrigins }
+    const standard: ChromeSettings = owned
+      ? { ...owned, schemaVersion: 2, networkMode: 'standard', networkOrigins: owned.allowedOrigins }
       : {
         schemaVersion: 2, networkMode: 'standard', source: input.source, evidence: input.evidence,
-        visibility: input.visibility ?? 'headed', connection: { mode: 'launch', profile: 'isolated', executablePath: input.executablePath ?? '' },
+        visibility: input.visibility ?? previous?.visibility ?? 'headed', connection: { mode: 'launch', profile: 'isolated', executablePath: input.executablePath ?? '' },
         allowedOrigins: [origin], debuggingTools: false, javascriptEvaluation: false, usageStatistics: false, performanceCrux: false,
       };
     validateSettings(root, standard);
@@ -96,7 +96,7 @@ export function ensureStandardChrome(root: string, input: { environment: string;
       if (revision(root, path) === null) save(root, path, previous, null);
     }
     save(root, settingsPath, standard, stored.revision);
-    return { changed: true, status: previous ? 'reloadRequired' : 'launchRequired', mode: 'standard', settingsHash: settingsHash(standard) };
+    return { changed: true, status: owned ? 'reloadRequired' : 'launchRequired', mode: 'standard', settingsHash: settingsHash(standard) };
   });
 }
 function validateTarget(target: AccessTarget) {
