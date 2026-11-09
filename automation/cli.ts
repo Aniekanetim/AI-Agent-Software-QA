@@ -6,6 +6,7 @@ import * as conversation from './onboarding/conversation.js';
 import { readState, writeState, readiness, labels } from './onboarding/state.js';
 import * as settings from './settings/menu.js';
 import * as browser from './browser/tools.js';
+import * as browserAccess from './browser/access.js';
 import { startFixture } from './browser/fixture.js';
 import * as email from './email/email.js';
 import { mailboxPolicy } from './email/policy.js';
@@ -67,6 +68,7 @@ const help = {
   onboarding: 'start | roadmap-shown --source | status | next | queue --input | shown/not-shown --id --source | reply --input | recover | reconcile --input | retire-tool-questions --input | pause/resume --source | clarify/defer --input | check/domains --input | finish --input',
   settings: 'open --source | show | choose --area | edit --input | present | save --input | attention-shown --source | save-attention --input | cancel | back | close',
   browser: 'versions | install | mcp-config | check --provider library/cli/mcpServer [--headless] [--context interactive/scheduled/ci] | import-report --input | fixture',
+  'browser-access': 'targets | status | prepare --input | apply --input | record --input : exact environment access through the selected browser; never launches a browser or edits a native host',
   email: 'policy | account --input | accounts | options --input | discover --provider gmailApi/agentmail --source | create-inbox --input | select --input | verify --input | begin --input | outcome --input',
   github: 'pending-comments | reconcile-comment --input | reconcile-legacy --input --repository --number --policy --target --source | install --source | check --repository | check-in --source | event --repository --number --source | policy-digest --policy | run/dispatch --policy --target --repository --number --source | comment --policy --target --repository --number --body --source',
   evidence: '--path [--pointer] : calculate an evidence reference; no product verdict is inferred',
@@ -207,8 +209,8 @@ async function main() {
     return;
   }
   if (area === 'onboarding') {
-    if (action === 'start') { output({ roadmap: labels, progress: readState(root).value, harness: readHarness(root), next: 'Inspect existing records. Bind the actual calling harness and discover/reuse tools before asking setup questions. Present the roadmap and register only missing decisions.' }); return; }
-    if (action === 'status') { const state = readState(root).value; output({ state, readiness: readiness(root, state) }); return; }
+    if (action === 'start') { output({ roadmap: labels, progress: readState(root).value, harness: readHarness(root), next: 'Inspect existing records. Bind the actual calling harness and discover/reuse tools before asking setup questions. Present the roadmap and register only missing decisions. For planned browser work, use browser-access targets and prepare as soon as the environment and selected connection are known.' }); return; }
+    if (action === 'status') { const state = readState(root).value; output({ state, readiness: readiness(root, state), browserAccess: browserAccess.browserAccessStatus(root) }); return; }
     if (action === 'next') { output(conversation.next(root, options.get('repeat-source'))); return; }
     if (action === 'queue') conversation.queueQuestions(root, input());
     else if (action === 'shown' || action === 'not-shown') conversation.acknowledge(root, option('id'), option('source'), action === 'shown');
@@ -240,6 +242,15 @@ async function main() {
     else if (action === 'close') { settings.closeMenu(root); value = settings.showMenu(root); }
     else throw new Error('Unknown settings command.');
     output(value); return;
+  }
+  if (area === 'browser-access') {
+    if (action === 'targets') output(browserAccess.browserTargets(root));
+    else if (action === 'status') output(browserAccess.browserAccessStatus(root));
+    else if (action === 'prepare') output(browserAccess.prepareBrowserAccess(root, input()));
+    else if (action === 'apply') output(browserAccess.applyBrowserOrigin(root, input()));
+    else if (action === 'record') output(browserAccess.recordBrowserAccess(root, input()));
+    else throw new Error('Unknown browser access command. Run help.');
+    return;
   }
   if (area === 'browser') {
     const browserContext = (): ExecutionContext => { const value = options.get('context') ?? currentHarness(root).executionContext; if (!['interactive', 'scheduled', 'ci'].includes(value)) throw new Error('Use interactive, scheduled or ci context.'); return value as ExecutionContext; };

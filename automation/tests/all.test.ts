@@ -4,6 +4,7 @@ import './email-aliases.test.js';
 import './coverage.test.js';
 import './flow-map.test.js';
 import './adaptive-tools.test.js';
+import './browser-access.test.js';
 import './data-preparation.test.js';
 import './chrome-devtools.test.js';
 import './chrome-fixture-browser.test.js';

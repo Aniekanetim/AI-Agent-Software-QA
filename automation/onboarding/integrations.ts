@@ -9,6 +9,7 @@ import { readHarness, currentHarness, type ExecutionContext } from '../tools/run
 import { readRecord, readinessIssues } from '../tools/registry.js';
 import { settings as postmanSettings, capabilityIssues as postmanCapabilityIssues } from '../postman/postman.js';
 import { readSettings as chromeSettings } from '../chrome-devtools/config.js';
+import { browserAccessStatus } from '../browser/access.js';
 import type { Stage } from './state.js';
 
 /** Project preparation and optional capability gaps remain separate; neither authorizes task execution. */
@@ -118,6 +119,9 @@ export function integrationStatus(root: string) {
     }
     if (chrome.configured && !chrome.methods.some(m => !m.issues.length)) issues.push('Chrome DevTools: verify the relevant selected access route; installation/settings alone are insufficient. Independent work can continue.');
   });
+  for (const access of browserAccessStatus(root)) if (access.status !== 'verified') {
+    issues.push(`Browser target${'target' in access ? ' ' + access.target.environment + ' (' + access.origin + ')' : ''}: ${access.next}`);
+  }
   return { issues: stageIssues.map(issue => issue.message), stageIssues, capabilityIssues: issues, chrome, taskReadiness: 'Assess the selected operations for each task; onboarding completion is not task execution authorization.' };
 }
 

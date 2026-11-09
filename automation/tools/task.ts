@@ -4,9 +4,10 @@ import { currentHarness, type ExecutionContext } from './runtime.js';
 import { readRecord, readinessIssues, assertToolId, type ToolId } from './registry.js';
 import { readToolPolicy, toolVisibility, uniqueTexts, type ToolPolicy } from './policy.js';
 import { validateReport, type BrowserReport } from '../browser/tools.js';
+import { assessBrowserAccess, type AccessTarget } from '../browser/access.js';
 import { status as postmanStatus } from '../postman/postman.js';
 import { assessInventory, type Target } from '../chrome-devtools/webmcp.js';
-import { readSettings as chromeSettings } from '../chrome-devtools/config.js';
+import { readSettings as chromeSettings, webOrigin } from '../chrome-devtools/config.js';
 import { requireDocumentBinding } from '../chrome-devtools/document-context.js';
 import { boardRoot, tickets, assertExecutable } from '../board/board.js';
 import { recheck } from '../task-source/work.js';
@@ -15,7 +16,7 @@ import { type BoardReader } from '../task-source/provider.js';
 export interface TaskToolPlan {
   schemaVersion: 1; id: string; revision: string; task: Evidence; objective: string; executionContext: ExecutionContext;
   liveClaim?: { id: string; ticketRevision: string };
-  requirements: { id: string; browser: boolean; operations: string[]; requiredTool: ToolId | null; basis: Evidence[]; webmcp?: { inventory: Evidence; target: Target; toolNames?: string[] } }[];
+  requirements: { id: string; browser: boolean; operations: string[]; requiredTool: ToolId | null; basis: Evidence[]; browserAccess?: Omit<AccessTarget, 'tool'>; webmcp?: { inventory: Evidence; target: Target; toolNames?: string[] } }[];
   selections: { requirementId: string; tool: ToolId; rationale: string; limitations: string[] }[];
 }
 const canonicalTaskPath = (path: string) => path.replaceAll('\\', '/').replace(/^(\.\/)+/, '');
@@ -60,6 +61,7 @@ function assessSelection(root: string, plan: TaskToolPlan, globalIssues: string[
     if (typeof requirement.browser !== 'boolean' || !requirement.operations.length || !Array.isArray(requirement.basis) || !requirement.basis.length) throw new Error('Each requirement needs its browser/other target, actual operations and source basis.');
     if (requirement.requiredTool !== null) assertToolId(requirement.requiredTool);
     const issues: string[] = [];
+    if (!requirement.browser && requirement.browserAccess !== undefined) issues.push('Bind browser target access only to the browser requirement it serves.');
     for (const ref of requirement.basis) { try { verifyEvidence(root, ref); } catch { issues.push('Requirement basis is missing or changed.'); } }
     const selection = plan.selections.find(s => s.requirementId === requirement.id);
     if (!selection) issues.push('Agent must choose a suitable tool and explain its fit.');
@@ -67,6 +69,13 @@ function assessSelection(root: string, plan: TaskToolPlan, globalIssues: string[
       assertToolId(selection.tool); requireText(selection.rationale, 'Selection rationale'); uniqueTexts(selection.limitations, 'Selection limitations');
       if (requirement.requiredTool && selection.tool !== requirement.requiredTool) issues.push(`This task explicitly requires ${requirement.requiredTool}; do not silently substitute another tool.`);
       if (policy?.prohibitedTools.includes(selection.tool) || policy?.allowedTools && !policy.allowedTools.includes(selection.tool)) issues.push('Selected tool conflicts with actual project constraints.');
+      if (requirement.browser && requirement.browserAccess !== undefined) {
+        try {
+          const access = assessBrowserAccess(root, { ...requirement.browserAccess, tool: selection.tool });
+          if (access.status !== 'verified') issues.push(`Browser access to ${access.origin}: ${access.next}`);
+          if (requirement.webmcp && webOrigin(requirement.webmcp.target.url) !== access.origin) issues.push('The browser environment and WebMCP inventory name different origins.');
+        } catch { issues.push('Verify the saved environment and selected browser connection before this target-specific requirement.'); }
+      }
       try {
         const report = readRecord(root, selection.tool);
         if (report && report.tool !== selection.tool) issues.push('Capability record identifies a different tool.');

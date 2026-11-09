@@ -45,6 +45,8 @@ Start with [shared tool discovery](../automation/tools/README.md). The agent ins
 
 Dependencies and adapters are distributed with the package; browsers, host connections and credentials are established on the adopting machine. Neither package installation nor a configuration file proves operational readiness.
 
+For planned browser work, [verify target access during setup](../automation/browser/target-access.md). Reuse the saved environment, check the selected browser's scope, resolve any missing exact origin and verify actual navigation before the first dependent task.
+
 ## Preserve information and resume
 
 Canonical context stays in the two [context stores](context-interview.md). Private nonsecret preferences, progress, bindings and recovery journals live under ignored `.local/`; credentials and browser authentication state stay outside committed records. Do not commit `.local/` merely to transfer a setup.

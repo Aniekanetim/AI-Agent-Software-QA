@@ -54,3 +54,5 @@ Maintain preparation limits and responsibilities in the canonical [data policy/p
 ## Chrome DevTools settings
 
 The browser/tool-constraints area also accepts `.local/chrome-devtools-settings.json`. [The integration guide](../automation/chrome-devtools/README.md) defines explicit connection, visibility, origin and privacy settings. Show current values, preserve unrelated settings and prior replies, and reverify only affected tools/access/operation checkpoints. Saving this file neither connects the harness nor changes an existing browser server. Native-host mode reuses a separately verified connection.
+
+Use [target access status](../automation/browser/target-access.md) in the browser area after changing an environment or connection. Show the exact origin, actual running scope and remaining setup; do not re-ask for a saved URL or mark access ready from an edited allowlist. The targeted helper updates only existing project Chrome settings with an actual scoped decision. For a native host, handle the supported change/reload and confirm navigation separately.

@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, unlinkSync } from 'node:fs';
 import { contained, privatePath, load, save, replace, revision, digest, evidence, verifyEvidence, requireText, assertNonsecret, withLock, atPointer, type Evidence } from '../shared/store.js';
 import { readState, writeState, stages, labels, statePath, readiness, assessReadiness, type Question, type Stage, type SetupState, type Check, type ContextDomain } from './state.js';
+import { browserAccessStatus } from '../browser/access.js';
 
 export const journalPath = '.local/pending-response.json';
 export interface ProposedWrite { path: string; expectedSha256: string | null; content: string; origin: 'human' | 'agent' }
@@ -76,7 +77,8 @@ export function next(root: string, repeatOnRequest?: string): Record<string, unk
     const { status, blocker } = assessReadiness(root, state);
     if (state.completed && status.ready) return { action: 'complete', next: 'Use the existing task board and applicable scoped authorizations.' };
     const stage = blocker?.stage ?? 'handoff';
-    return { action: 'work', stage, label: labels[stage], next: blocker?.next ?? 'Prepare and verify the onboarding handoff.', issues: status.issues };
+    const browserAccess = ['tools', 'access'].includes(stage) ? browserAccessStatus(root).filter(item => item.status !== 'verified') : [];
+    return { action: 'work', stage, label: labels[stage], next: blocker?.next ?? 'Prepare and verify the onboarding handoff.', issues: status.issues, ...(browserAccess.length ? { browserAccess } : {}) };
   });
 }
 export function acknowledge(root: string, id: string, source: string, shown = true): void {
