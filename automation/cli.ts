@@ -59,7 +59,7 @@ const help = {
   tools: 'bind --input | scan --source [--tool] | select --input | status --tool [--requires operation,operation] | import-host --input | assess-task --input : read-only assessment of agent-selected capabilities',
   data: 'assess --input : read-only preparation/state assessment; no generation, application mutations or approval',
   chrome: 'check --source | mcp-config | rehearse --provider cli/mcpServer [--headless] [--executable path] | session-start --input | page --input | inventory --input | import-host-inventory --input | execute --input | confirm --input | session-stop --id : explicit scoped WebMCP operations; no implicit product authorization',
-  postman: 'check --source | login-instructions | run --input : detects/reuses the CLI; local runs need no login; cloud operations need selected account/reporting scope',
+  postman: 'check --source | login-instructions | run --input | run-status --id : detects/reuses the CLI; local runs need no login; cloud operations need selected account/reporting scope',
   onboarding: 'start | roadmap-shown --source | status | next | queue --input | shown/not-shown --id --source | reply --input | recover | reconcile --input | retire-tool-questions --input | pause/resume --source | clarify/defer --input | check/domains --input | finish --input',
   settings: 'open --source | show | choose --area | edit --input | present | save --input | attention-shown --source | save-attention --input | cancel | back | close',
   browser: 'versions | install | mcp-config | check --provider library/cli/mcpServer [--headless] [--context interactive/scheduled/ci] | import-report --input | fixture',
@@ -171,6 +171,7 @@ async function main() {
   if (area === 'postman') {
     if (action === 'check') output(await postman.inspect(root, option('source')));
     else if (action === 'login-instructions') output(postman.loginInstructions(root));
+    else if (action === 'run-status') output(postman.runStatus(root, option('id')));
     else if (action === 'run') { const result = await postman.runCollection(root, input()); output(result); if (result.outcome !== 'passed') process.exitCode = 1; }
     else throw new Error('Unknown Postman command.');
     return;

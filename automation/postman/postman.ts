@@ -161,9 +161,47 @@ export interface RunResult {
   reportFormat?: 'json' | 'cli-summary' | 'unavailable';
   assertions?: { total: number; failed: number }; requests?: { total: number; failed: number }; reason?: string;
 }
+function runRecordPath(id: unknown) {
+  if (typeof id !== 'string' || !/^[A-Za-z0-9_-]{1,80}$/.test(id)) throw new Error('Use a unique, simple execution ID.');
+  return `.local/postman/runs/${id}.json`;
+}
+export function runStatus(root: string, id: string) {
+  const path = runRecordPath(id);
+  const { value: record, revision: saved } = load<RunResult | null>(root, path, () => null);
+  if (!saved) throw new Error('No retained Postman run was found for this execution ID.');
+  const invalid = 'The retained Postman run record is invalid. Preserve it for reconciliation.';
+  if (!record || record.schemaVersion !== 1 || record.id !== id ||
+      !['running', 'completed'].includes(record.state) ||
+      !['passed', 'failed', 'executionError', 'incomplete'].includes(record.outcome) ||
+      typeof record.startedAt !== 'string' || !Number.isFinite(Date.parse(record.startedAt)) ||
+      (record.state === 'completed' && (typeof record.completedAt !== 'string' || !Number.isFinite(Date.parse(record.completedAt)))) ||
+      !record.target || typeof record.target.environment !== 'string' || !record.target.environment.trim() ||
+      typeof record.target.build !== 'string' || !record.target.build.trim() ||
+      (record.reason !== undefined && typeof record.reason !== 'string')) throw new Error(invalid);
+
+  const counts = (value: RunResult['assertions']) => {
+    if (value === undefined) return undefined;
+    if (!value || !Number.isInteger(value.total) || !Number.isInteger(value.failed) ||
+        value.failed < 0 || value.failed > value.total) throw new Error(invalid);
+    return { total: value.total, failed: value.failed };
+  };
+  const interrupted = record.state === 'running';
+  const result = {
+    id, recordedState: record.state, outcome: interrupted ? 'unconfirmed' as const : record.outcome,
+    target: { environment: record.target.environment, build: record.target.build },
+    startedAt: record.startedAt, completedAt: interrupted ? undefined : record.completedAt,
+    assertions: counts(record.assertions), requests: counts(record.requests), reason: record.reason,
+    evidence: { path, sha256: saved },
+    nextAction: interrupted
+      ? 'Inspect the original attempt and target outcomes before authorizing a new execution.'
+      : 'Review the retained result against the approved checks and investigate any gaps.',
+  };
+  assertNonsecret(result);
+  return result;
+}
 export function validateRun(root: string, request: RunRequest): void {
   assertNonsecret(request);
-  if (!request || !/^[A-Za-z0-9_-]{1,80}$/.test(request.id)) throw new Error('Use a unique, simple execution ID.');
+  runRecordPath(request?.id);
   requireText(request.source); requireText(request.authorizationReference, 'Actual scoped execution authorization');
   requireText(request.target?.environment); requireText(request.target?.build); requireText(request.target?.source);
   const target = new URL(request.target.baseUrl); if (!['http:', 'https:'].includes(target.protocol) || target.username || target.password || target.search || target.hash) throw new Error('Record a nonsecret target base URL without credentials/query/fragment.');
@@ -203,7 +241,7 @@ export function cliSummary(text: string): unknown {
 }
 export async function runCollection(root: string, request: RunRequest, runner: Runner = runProcess): Promise<RunResult> {
   validateRun(root, request); const identity = currentHarness(root), requestDigest = digest(JSON.stringify(request));
-  const path = `.local/postman/runs/${request.id}.json`, previous = load<RunResult | null>(root, path, () => null);
+  const path = runRecordPath(request.id), previous = load<RunResult | null>(root, path, () => null);
   if (previous.value) {
     if (previous.value.requestDigest !== requestDigest || harnessKey(previous.value.harness) !== harnessKey(identity)) throw new Error('This execution ID already belongs to different inputs or a different harness.');
     if (previous.value.state === 'running') throw new Error('This run is unfinished or uncertain. Inspect it before explicitly authorizing a new execution ID.');

@@ -9,34 +9,61 @@ import { readHarness, currentHarness, type ExecutionContext } from '../tools/run
 import { readRecord, readinessIssues } from '../tools/registry.js';
 import { settings as postmanSettings, capabilityIssues as postmanCapabilityIssues } from '../postman/postman.js';
 import { readSettings as chromeSettings } from '../chrome-devtools/config.js';
+import type { Stage } from './state.js';
 
 /** Project preparation and optional capability gaps remain separate; neither authorizes task execution. */
 export function integrationStatus(root: string) {
-  const issues: string[] = [];
+  const stageIssues: { stage: Stage; message: string }[] = [];
   const read = (path: string) => JSON.parse(readFileSync(contained(root, path), 'utf8'));
   const present = (path: string) => existsSync(contained(root, path));
-  let executionContext: ExecutionContext = readHarness(root)?.executionContext ?? 'interactive';
-  try { currentHarness(root); } catch { issues.push('Identify this calling harness; preserve existing onboarding and verify only affected tools.'); }
-  if (!present('.local/project.json')) issues.push('Identify the project, environments and responsible people in the canonical project record.');
-  else { const project = read('.local/project.json'); if (!project.name || !project.source || !Array.isArray(project.environments) || !project.environments.length || !Array.isArray(project.owners) || !project.owners.length) issues.push('The project record needs environments, owners and its source.'); }
-  if (!present('.local/context-settings.json')) issues.push('Record the context-establishment route.');
-  else { const context = read('.local/context-settings.json'); if (!['provide', 'discover', 'combined'].includes(context.route) || !context.source) issues.push('Choose provide, discover or combined with an actual source.'); }
-  if (!present('.local/operation-preferences.json')) issues.push('Record on-demand, scheduled, events or combined operation; a preference alone activates nothing.');
-  if (present('.local/operation-preferences.json')) {
+  let executionContext: ExecutionContext = 'interactive';
+  const check = (stage: Stage, invalid: string, assess: (report: (message: string) => void) => void) => {
+    const report = (message: string) => { stageIssues.push({ stage, message }); };
+    try { assess(report); } catch { report(invalid); }
+  };
+  check('tools', 'Identify this calling harness; preserve existing onboarding and verify only affected tools.', () => {
+    executionContext = readHarness(root)?.executionContext ?? 'interactive';
+    currentHarness(root);
+  });
+  check('project', 'The project record is unreadable or invalid. Inspect and reconcile it.', report => {
+    if (!present('.local/project.json')) {
+      report('Identify the project, environments and responsible people in the canonical project record.');
+      return;
+    }
+    const project = read('.local/project.json');
+    if (!project.name || !project.source || !Array.isArray(project.environments) || !project.environments.length || !Array.isArray(project.owners) || !project.owners.length) report('The project record needs environments, owners and its source.');
+  });
+  check('contextRoute', 'The context route is unreadable or invalid. Inspect and reconcile it.', report => {
+    if (!present('.local/context-settings.json')) {
+      report('Record the context-establishment route.');
+      return;
+    }
+    const context = read('.local/context-settings.json');
+    if (!['provide', 'discover', 'combined'].includes(context.route) || !context.source) report('Choose provide, discover or combined with an actual source.');
+  });
+  check('operation', 'The operating preferences or scheduler record is unreadable or invalid. Inspect and reconcile it.', report => {
+    if (!present('.local/operation-preferences.json')) {
+      report('Record on-demand, scheduled, events or combined operation; a preference alone activates nothing.');
+      return;
+    }
     const operation = read('.local/operation-preferences.json');
-    if (!['onDemand', 'scheduled', 'events', 'combined'].includes(operation.mode) || !operation.source) issues.push('Record an actual operating-mode choice.');
+    if (!['onDemand', 'scheduled', 'events', 'combined'].includes(operation.mode) || !operation.source) report('Record an actual operating-mode choice.');
     if (['scheduled', 'combined'].includes(operation.mode)) {
       executionContext = 'scheduled';
-      if (!present('.local/schedule-record.json')) issues.push('The schedule preference has no actual scheduler record.');
-      else { const schedule = read('.local/schedule-record.json'); if (!schedule.id || schedule.state !== 'ACTIVE' || schedule.root !== realpathSync(root) || !schedule.source || !schedule.evidence?.length) issues.push('The actual schedule is not verified for this project.'); else for (const ref of schedule.evidence) { try { verifyEvidence(root, ref); } catch { issues.push('Schedule evidence changed.'); } } }
+      if (!present('.local/schedule-record.json')) report('The schedule preference has no actual scheduler record.');
+      else {
+        const schedule = read('.local/schedule-record.json');
+        if (!schedule.id || schedule.state !== 'ACTIVE' || schedule.root !== realpathSync(root) || !schedule.source || !schedule.evidence?.length) report('The actual schedule is not verified for this project.');
+        else for (const ref of schedule.evidence) { try { verifyEvidence(root, ref); } catch { report('Schedule evidence changed.'); } }
+      }
     }
     if (['events', 'combined'].includes(operation.mode)) {
-      if (!operation.triggerReference || !operation.triggerEvidence?.length) issues.push('An event preference needs its actual configured trigger reference and evidence.');
-      for (const ref of operation.triggerEvidence ?? []) { try { verifyEvidence(root, ref); } catch { issues.push('Event trigger evidence changed.'); } }
+      if (!operation.triggerReference || !operation.triggerEvidence?.length) report('An event preference needs its actual configured trigger reference and evidence.');
+      for (const ref of operation.triggerEvidence ?? []) { try { verifyEvidence(root, ref); } catch { report('Event trigger evidence changed.'); } }
     }
-  }
-  try { readToolPolicy(root); } catch { issues.push('Tool policy or its source is invalid; resolve the actual constraints.'); }
-  const projectIssues = [...issues]; issues.length = 0;
+  });
+  check('tools', 'Tool policy or its source is invalid; resolve the actual constraints.', () => { readToolPolicy(root); });
+  const issues: string[] = [];
   const inspect = (name: string, action: () => void) => { try { action(); } catch { issues.push(`${name}: configuration/evidence is invalid; preserve it and recheck affected work.`); } };
   inspect('Legacy browser preference', () => {
     if (present('.local/browser-preferences.json')) {
@@ -91,7 +118,7 @@ export function integrationStatus(root: string) {
     }
     if (chrome.configured && !chrome.methods.some(m => !m.issues.length)) issues.push('Chrome DevTools: verify the relevant selected access route; installation/settings alone are insufficient. Independent work can continue.');
   });
-  return { issues: projectIssues, capabilityIssues: issues, chrome, taskReadiness: 'Assess the selected operations for each task; onboarding completion is not task execution authorization.' };
+  return { issues: stageIssues.map(issue => issue.message), stageIssues, capabilityIssues: issues, chrome, taskReadiness: 'Assess the selected operations for each task; onboarding completion is not task execution authorization.' };
 }
 
 /** Backwards-compatible full diagnostic list, not the onboarding blocking decision. */

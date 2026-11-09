@@ -106,9 +106,23 @@ test('scoped onboarding completion revalidates actual sources and does not survi
   put(r, '.local/project.json', { name: 'Fixture', environments: ['Synthetic'], owners: ['Fixture owner'], source: 'Synthetic actual reply reference' });
   put(r, '.local/context-settings.json', { route: 'provide', source: 'Synthetic choice' }); put(r, '.local/operation-preferences.json', { mode: 'onDemand', source: 'Synthetic choice' });
   for (const stage of stages.filter(s => s !== 'handoff')) c.recordCheck(r, stage, { status: 'verified', checkedAt: new Date().toISOString(), evidence: [ref], reason: null, nextAction: null });
-  c.recordDomains(r, ['business', 'product', 'technical', 'design', 'decisions'].map(domain => ({ domain: domain as any, state: 'documented' as const, owner: 'Fixture owner', sources: [ref] })));
+  const domainSource = put(r, '.local/domain.md', '# Synthetic domain basis');
+  c.recordDomains(r, ['business', 'product', 'technical', 'design', 'decisions'].map(domain => ({ domain: domain as any, state: 'documented' as const, owner: 'Fixture owner', sources: [domainSource] })));
   c.finish(r, ref); assert.equal(c.next(r).action, 'complete');
-  put(r, ref.path, '# Changed synthetic source'); assert.equal(readiness(r, readState(r).value).ready, false);
+  const stateRevision = s.revision(r, '.local/onboarding-state.json');
+
+  put(r, '.local/operation-preferences.json', { mode: 'scheduled', source: 'Synthetic mode change' });
+  assert.equal(c.next(r).stage, 'operation');
+  assert.match(String(c.next(r).next), /actual scheduler record/);
+  put(r, domainSource.path, '# Changed domain basis');
+  assert.equal(c.next(r).stage, 'understanding');
+  assert.match(String(c.next(r).next), /domain\.md/);
+  put(r, ref.path, '# Changed synthetic source');
+  assert.equal(readiness(r, readState(r).value).ready, false);
+  const next = c.next(r);
+  assert.equal(next.stage, 'project');
+  assert.match(String(next.next), /source\.md/);
+  assert.equal(s.revision(r, '.local/onboarding-state.json'), stateRevision);
 });
 const account: mail.Account = { provider: 'gmail', accountId: 'qa@example.test', mailboxId: 'qa@example.test', address: 'qa@example.test', connectionReference: 'host:test-connection', authentication: 'connected' };
 const inventory = (): mail.Inventory => ({ schemaVersion: 1, harness: 'Synthetic fixture', executionContext: 'interactive', source: 'Synthetic metadata observation', providers: [{ id: 'gmail', name: 'Gmail', available: true }], accounts: [account, { ...account, accountId: 'other@example.test', mailboxId: 'other@example.test', address: 'other@example.test' }] });

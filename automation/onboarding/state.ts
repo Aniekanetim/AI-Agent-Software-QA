@@ -45,30 +45,55 @@ export function readState(root: string) { const result = load(root, statePath, e
 export function writeState(root: string, state: SetupState, expected: string | null) {
   validateState(state); state.updatedAt = new Date().toISOString(); return save(root, statePath, state, expected);
 }
-export function readiness(root: string, state: SetupState, includeHandoff = true): { ready: boolean; issues: string[]; capabilityIssues: string[] } {
-  validateState(state); const issues: string[] = [];
+export function assessReadiness(root: string, state: SetupState, includeHandoff = true) {
+  validateState(state);
+  const findings: { stage: Stage; message: string; next: string }[] = [];
+  const report = (stage: Stage, message: string, next = message) => { findings.push({ stage, message, next }); };
   for (const stage of stages.filter(s => includeHandoff || s !== 'handoff')) {
     const check = state.checks[stage];
-    if (['project', 'contextRoute', 'understanding', 'operation', 'handoff'].includes(stage) && check.status === 'notApplicable') issues.push(`${stage}: this checkpoint is mandatory; record scoped knowledge and gaps instead`);
-    if (!['verified', 'notApplicable'].includes(check.status)) issues.push(`${stage}: ${check.nextAction ?? check.reason ?? check.status}`);
-    if (check.status === 'notApplicable' && !check.reason) issues.push(`${stage}: a non-applicability reason is required`);
-    if (check.status === 'verified' && (!check.evidence.length || !check.checkedAt)) issues.push(`${stage}: observed evidence is required`);
-    for (const ref of check.evidence) { try { verifyEvidence(root, ref); } catch { issues.push(`${stage}: evidence changed or is unavailable`); } }
+    if (['project', 'contextRoute', 'understanding', 'operation', 'handoff'].includes(stage) && check.status === 'notApplicable') report(stage, `${stage}: this checkpoint is mandatory; record scoped knowledge and gaps instead`);
+    if (!['verified', 'notApplicable'].includes(check.status)) report(stage, `${stage}: ${check.nextAction ?? check.reason ?? check.status}`,
+      check.nextAction ?? check.reason ?? 'Inspect existing sources and prepare the missing evidence for this checkpoint.');
+    if (check.status === 'notApplicable' && !check.reason) report(stage, `${stage}: a non-applicability reason is required`);
+    if (check.status === 'verified' && (!check.evidence.length || !check.checkedAt)) report(stage, `${stage}: observed evidence is required`);
+    for (const ref of check.evidence) {
+      try { verifyEvidence(root, ref); }
+      catch {
+        const location = ref?.path ? ` at ${ref.path}` : '';
+        report(stage, `${stage}: evidence changed or is unavailable`, `Revalidate the changed or unavailable evidence${location} before continuing.`);
+      }
+    }
   }
   for (const name of ['business', 'product', 'technical', 'design', 'decisions']) {
     const domain = state.domains.find(d => d.domain === name);
-    if (!domain || !domain.owner?.trim()) issues.push(`${name}: record knowledge, an owner question or justified non-applicability`);
+    if (!domain || !domain.owner?.trim()) report('understanding', `${name}: record knowledge, an owner question or justified non-applicability`);
     else {
-      if (!['documented', 'gap', 'notApplicable'].includes(domain.state)) issues.push(`${name}: invalid context state`);
-      if (domain.state === 'documented' && !domain.sources.length) issues.push(`${name}: source evidence is missing`);
-      if (domain.state === 'gap' && !domain.questionReference) issues.push(`${name}: link the original owner question`);
-      if (domain.state === 'notApplicable' && !domain.reason) issues.push(`${name}: explain non-applicability`);
-      for (const ref of domain.sources) { try { verifyEvidence(root, ref); } catch { issues.push(`${name}: source evidence changed`); } }
+      if (!['documented', 'gap', 'notApplicable'].includes(domain.state)) report('understanding', `${name}: invalid context state`);
+      if (domain.state === 'documented' && !domain.sources.length) report('understanding', `${name}: source evidence is missing`);
+      if (domain.state === 'gap' && !domain.questionReference) report('understanding', `${name}: link the original owner question`);
+      if (domain.state === 'notApplicable' && !domain.reason) report('understanding', `${name}: explain non-applicability`);
+      for (const ref of domain.sources) {
+        try { verifyEvidence(root, ref); }
+        catch {
+          const location = ref?.path ? ` at ${ref.path}` : '';
+          report('understanding', `${name}: source evidence changed`, `Revalidate the ${name} source${location} before continuing.`);
+        }
+      }
     }
   }
-  for (const q of state.questions) if (q.required && q.status !== 'answered') issues.push(`question ${q.id}: ${q.status}`);
+  for (const q of state.questions) if (q.required && q.status !== 'answered') report(q.stage, `question ${q.id}: ${q.status}`);
   let capabilityIssues: string[] = [];
-  try { const integrations = integrationStatus(root); issues.push(...integrations.issues); capabilityIssues = integrations.capabilityIssues; } catch { issues.push('Project integration state is invalid; preserve and reconcile it.'); }
+  try {
+    const integrations = integrationStatus(root);
+    for (const { stage, message } of integrations.stageIssues) report(stage, message);
+    capabilityIssues = integrations.capabilityIssues;
+  } catch { report('operation', 'Project integration state is invalid; preserve and reconcile it.'); }
+  const issues = findings.map(finding => finding.message);
   if (state.paused) issues.push('Onboarding is paused.');
-  return { ready: !issues.length, issues, capabilityIssues };
+  const stage = stages.find(stage => findings.some(finding => finding.stage === stage));
+  const blocker = findings.find(finding => finding.stage === stage);
+  return { status: { ready: !issues.length, issues, capabilityIssues }, blocker };
+}
+export function readiness(root: string, state: SetupState, includeHandoff = true) {
+  return assessReadiness(root, state, includeHandoff).status;
 }
