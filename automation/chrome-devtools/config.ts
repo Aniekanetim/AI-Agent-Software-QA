@@ -5,12 +5,23 @@ import { selectedCommand } from '../tools/registry.js';
 import { toolVisibility, readToolPolicy } from '../tools/policy.js';
 
 export const settingsPath = '.local/chrome-devtools-settings.json';
+export type NetworkMode = 'standard' | 'strict';
 export interface ChromeSettings {
-  schemaVersion: 1; source: string; evidence: Evidence[];
+  schemaVersion: 1 | 2; source: string; evidence: Evidence[];
   visibility: 'headed' | 'headless';
   connection: { mode: 'launch'; executablePath: string; profile: 'isolated' | 'project' } | { mode: 'existing'; browserUrl: string } | { mode: 'host'; connectionReference: string };
   allowedOrigins: string[]; debuggingTools: boolean; javascriptEvaluation: boolean;
+  networkMode?: NetworkMode; networkOrigins?: string[];
   usageStatistics: boolean; performanceCrux: boolean;
+}
+export function chromeNetworkMode(settings: ChromeSettings): NetworkMode {
+  return settings.schemaVersion === 1 ? 'strict' : settings.networkMode ?? (settings.connection.mode === 'launch' ? 'standard' : 'strict');
+}
+export function chromeNetworkOrigins(settings: ChromeSettings): string[] | null {
+  return chromeNetworkMode(settings) === 'strict' ? settings.networkOrigins ?? settings.allowedOrigins : null;
+}
+function validateOrigins(origins: string[], label: string) {
+  if (!Array.isArray(origins) || !origins.length || origins.some(origin => webOrigin(origin) !== origin) || new Set(origins).size !== origins.length) throw new Error(`Specify unique exact ${label} origins.`);
 }
 export function nodeCompatible(version = process.versions.node): boolean {
   const [major, minor] = version.split('.').map(Number);
@@ -24,16 +35,20 @@ export function webOrigin(value: string): string {
 }
 export function validateSettings(root: string, settings: ChromeSettings): void {
   assertNonsecret(settings);
-  if (!settings || settings.schemaVersion !== 1) throw new Error('Unsupported Chrome settings; preserve them for explicit migration.');
+  if (!settings || ![1, 2].includes(settings.schemaVersion)) throw new Error('Unsupported Chrome settings; preserve them for explicit migration.');
   requireText(settings.source, 'Actual settings source');
   if (!Array.isArray(settings.evidence) || !settings.evidence.length) throw new Error('Reference the actual settings/scope evidence.');
   settings.evidence.forEach(ref => verifyEvidence(root, ref));
   if (!['headed', 'headless'].includes(settings.visibility)) throw new Error('Set actual browser visibility.');
   for (const key of ['debuggingTools', 'javascriptEvaluation', 'usageStatistics', 'performanceCrux'] as const) if (typeof settings[key] !== 'boolean') throw new Error(`Set ${key} explicitly.`);
-  if (!Array.isArray(settings.allowedOrigins) || !settings.allowedOrigins.length || settings.allowedOrigins.some(o => webOrigin(o) !== o) || new Set(settings.allowedOrigins).size !== settings.allowedOrigins.length) throw new Error('Specify unique exact allowed origins.');
+  validateOrigins(settings.allowedOrigins, 'allowed');
+  if (settings.schemaVersion === 1 && (settings.networkMode !== undefined || settings.networkOrigins !== undefined)) throw new Error('Use Chrome settings schemaVersion 2 to select a network mode.');
+  if (settings.networkMode !== undefined && !['standard', 'strict'].includes(settings.networkMode)) throw new Error('Select Standard or Strict browser networking.');
+  if (settings.networkOrigins !== undefined) validateOrigins(settings.networkOrigins, 'network');
   if (settings.connection?.mode === 'launch') {
     if (!['isolated', 'project'].includes(settings.connection.profile) || !isAbsolute(settings.connection.executablePath) || !existsSync(settings.connection.executablePath) || !statSync(settings.connection.executablePath).isFile()) throw new Error('Select an existing absolute browser executable and project/isolated profile.');
   } else if (settings.connection?.mode === 'existing') {
+    if (chromeNetworkMode(settings) === 'standard') throw new Error('Standard networking requires a dedicated QA browser launch.');
     const url = new URL(settings.connection.browserUrl);
     if (webOrigin(url.href) !== url.origin || !['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname) || url.pathname !== '/' || url.search || url.hash) throw new Error('Select an explicitly authorized loopback debugging endpoint; do not store credentials.');
   } else if (settings.connection?.mode === 'host') requireText(settings.connection.connectionReference, 'Actual native harness connection');
@@ -62,8 +77,10 @@ export function launchArguments(root: string, settings: ChromeSettings): string[
     `--categoryExperimentalThirdParty=${settings.debuggingTools}`, '--categoryExtensions=false', '--categoryPwa=false',
     `--javascriptEvaluation=${settings.javascriptEvaluation}`, '--fileNavigations=false', '--redactNetworkHeaders=true',
     '--experimentalStructuredContent=true', `--usageStatistics=${settings.usageStatistics}`, `--performanceCrux=${settings.performanceCrux}`,
-    '--workspace', realpathSync(root), '--allowedUrlPattern', ...settings.allowedOrigins.map(o => `${o}/*`),
+    '--workspace', realpathSync(root),
   ];
+  const networkOrigins = chromeNetworkOrigins(settings);
+  if (networkOrigins) args.push('--allowedUrlPattern', ...networkOrigins.map(origin => `${origin}/*`));
   if (settings.connection.mode === 'existing') args.push('--browserUrl', settings.connection.browserUrl);
   else {
     args.push('--executablePath', settings.connection.executablePath, '--chromeArg=--enable-features=WebMCP');

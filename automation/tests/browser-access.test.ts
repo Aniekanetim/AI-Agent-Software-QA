@@ -110,6 +110,10 @@ test('native Codex update changes only qa-webmcp args and verifies the previous 
   assert.deepEqual(after.config, { ...initial, mcp_servers: { ...initial.mcp_servers, 'qa-webmcp': { ...initial.mcp_servers['qa-webmcp'], args: expectedArgs } } });
   assert.equal(nativeRuleAddition(after.args, rule).present, true);
   assert.throws(() => nativeRuleAddition(['--allowedUrlPattern=' + fixtureOrigin + '/*'], rule), /allowlist format/);
+  const standard = ['--isolated=true', '--headless=false'];
+  assert.deepEqual(nativeRuleAddition(standard, rule), { networkMode: 'standard', present: false, rules: [], args: standard });
+  assert.deepEqual(nativeRuleAddition(standard, rule, true).args, [...standard, '--allowedUrlPattern', rule]);
+  assert.throws(() => nativeRuleAddition(['--blockedUrlPattern', fixtureOrigin + '/*'], rule, true), /existing qa-webmcp blocklist/);
   state.config = structuredClone(initial);
   state.version = 'v1';
   state.droppedRule = true;
@@ -155,6 +159,46 @@ test('project origin apply preserves existing settings and requires a current ex
   const reloaded = { ...target, generation: 'new-settings' };
   assert.equal(f.prepare({ kind: 'projectChrome', activeSettingsHash: settingsHash(updated) }, reloaded).status, 'needsProbe');
   assert.equal(recordBrowserAccess(f.root, f.probe(reloaded, request.approval)).status, 'verified');
+});
+
+test('onboarding skips origin edits in Standard and adds network-only rules in opted-in Strict', () => {
+  const f = fixture(), target = { ...f.target, tool: 'chromeDevtoolsCli' as const };
+  const config: ChromeSettings = { schemaVersion: 2, source: 'Synthetic fixture', evidence: [f.source], visibility: 'headed', connection: { mode: 'launch', executablePath: process.execPath, profile: 'isolated' }, allowedOrigins: [fixtureOrigin], debuggingTools: false, javascriptEvaluation: true, usageStatistics: false, performanceCrux: false };
+  const original = f.put(settingsPath, config);
+  const standard = f.prepare({ kind: 'projectChrome', activeSettingsHash: settingsHash(config) }, target);
+  assert.equal(standard.networkMode, 'standard');
+  assert.equal(standard.status, 'needsProbe');
+  assert.equal(standard.additionalOrigin, undefined);
+  const request = { target, expectedSettingsRevision: original.sha256, approval: f.decision(target, ['navigate']) };
+  assert.equal(applyBrowserOrigin(f.root, request).changed, false);
+  assert.equal(revision(f.root, settingsPath), original.sha256);
+  openMenu(f.root, 'Synthetic browser settings request');
+  assert.equal(chooseArea(f.root, 'browser').browserNetworking?.configuredMode, 'standard');
+  const strict: ChromeSettings = { ...config, networkMode: 'strict' };
+  f.put(settingsPath, strict);
+  const planned = f.prepare({ kind: 'projectChrome', activeSettingsHash: settingsHash(strict) }, target);
+  assert.equal(planned.status, 'missingOrigin');
+  const updated = applyBrowserOrigin(f.root, { target, expectedSettingsRevision: planned.settingsRevision!, approval: f.decision(target) });
+  assert.equal(updated.access.status, 'reloadRequired');
+  const saved = JSON.parse(f.read(settingsPath));
+  assert.deepEqual(saved.allowedOrigins, config.allowedOrigins);
+  assert.deepEqual(saved.networkOrigins, [fixtureOrigin, origin]);
+});
+
+test('Standard records a reached sign-in page separately from access to the application', () => {
+  const f = fixture(), approval = f.decision();
+  assert.equal(f.prepare({ kind: 'noAllowlist' }).status, 'needsProbe');
+  const redirect = { ...f.probe(f.target, approval), outcome: 'signInReached' as const, finalUrl: 'https://sso.example.test/sign-in', scopeEnforced: false };
+  assert.throws(() => recordBrowserAccess(f.root, { ...redirect, outcome: 'rendered' }), /approved origin/);
+  assert.throws(() => recordBrowserAccess(f.root, { ...redirect, httpStatus: 503 }), /rendered HTTPS sign-in/);
+  const reached = recordBrowserAccess(f.root, redirect);
+  assert.equal(reached.status, 'signInReached');
+  assert.match(reached.next, /Verify the identity provider/);
+  assert.equal(assessBrowserAccess(f.root, f.target).status, 'signInReached');
+  const verified = recordBrowserAccess(f.root, { ...f.probe(f.target, approval), scopeEnforced: false });
+  assert.equal(verified.status, 'verified');
+  assert.equal(f.prepare({ kind: 'noAllowlist', pendingStrict: true }).status, 'reloadRequired');
+  assert.equal(f.prepare({ kind: 'noAllowlist' }).status, 'reloadRequired');
 });
 
 test('an unknown scope, an HTTP response, or an outside-origin redirect cannot certify rendered target access', () => {

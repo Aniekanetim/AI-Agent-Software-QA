@@ -68,7 +68,7 @@ const help = {
   onboarding: 'start | roadmap-shown --source | status | next | queue --input | shown/not-shown --id --source | reply --input | recover | reconcile --input | retire-tool-questions --input | pause/resume --source | clarify/defer --input | check/domains --input | finish --input',
   settings: 'open --source | show | choose --area | edit --input | present | save --input | attention-shown --source | save-attention --input | cancel | back | close',
   browser: 'versions | install | mcp-config | check --provider library/cli/mcpServer [--headless] [--context interactive/scheduled/ci] | import-report --input | fixture',
-  'browser-access': 'targets | status | prepare --input | apply --input | native-plan --input | native-apply --input | record --input : exact environment access; authorized native qa-webmcp rule changes use Codex config',
+  'browser-access': 'targets | status | prepare --input | apply --input | native-plan --input | native-apply --input | record --input : verify target access and configure authorized Strict rules',
   email: 'policy | account --input | accounts | options --input | discover --provider gmailApi/agentmail --source | create-inbox --input | select --input | verify --input | begin --input | outcome --input',
   github: 'pending-comments | reconcile-comment --input | reconcile-legacy --input --repository --number --policy --target --source | install --source | check --repository | check-in --source | event --repository --number --source | policy-digest --policy | run/dispatch --policy --target --repository --number --source | comment --policy --target --repository --number --body --source',
   evidence: '--path [--pointer] : calculate an evidence reference; no product verdict is inferred',
@@ -209,7 +209,7 @@ async function main() {
     return;
   }
   if (area === 'onboarding') {
-    if (action === 'start') { output({ roadmap: labels, progress: readState(root).value, harness: readHarness(root), next: 'Inspect existing records and reuse the supplied target. Show the roadmap and use onboarding next to present the first missing target decision before browser setup. Discover/reuse tools and prepare the selected browser for the saved target.' }); return; }
+    if (action === 'start') { output({ roadmap: labels, progress: readState(root).value, harness: readHarness(root), next: 'Inspect existing records and reuse the supplied target. Show the roadmap and use onboarding next to present the first missing target decision before browser setup. Use Standard for a new dedicated QA browser, or reuse the actual mode of an existing connection.' }); return; }
     if (action === 'status') { const state = readState(root).value; output({ state, readiness: readiness(root, state), browserAccess: browserAccess.browserAccessStatus(root) }); return; }
     if (action === 'next') { output(conversation.next(root, options.get('repeat-source'))); return; }
     if (action === 'queue') conversation.queueQuestions(root, input());

@@ -32,7 +32,7 @@ The agent saves project-specific settings through the existing [onboarding conve
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "source": "actual-settings-and-scope-decision-reference",
   "evidence": [
     { "path": "project-relative-reviewed-scope.md", "sha256": "actual-sha256-from-the-evidence-command" }
@@ -51,7 +51,9 @@ The agent saves project-specific settings through the existing [onboarding conve
 }
 ```
 
-This is a shape example, not executable configuration or approval. Calculate actual references with `npm run qa -- evidence --path <actual-file>`. Exact origins include a nondefault port when applicable. HTTPS and loopback HTTP are supported. Origin restrictions can block a legitimate cross-origin dependency; add it only within actual project authorization, with affected verification refreshed.
+Calculate actual references with `npm run qa -- evidence --path <actual-file>`. The `allowedOrigins` field scopes the agent's WebMCP actions. Use exact HTTPS or loopback HTTP origins, with a nondefault port where applicable.
+
+New dedicated launches use **Standard** networking. To opt in to the browser network allowlist, set `"networkMode": "strict"` and provide the authorized app and dependency origins in `networkOrigins`. If omitted in Strict, `networkOrigins` uses the WebMCP target origins. Existing schema 1 settings use Strict. With explicit direction, migrate a dedicated schema 1 launch to schema 2 and set `"networkMode": "standard"` to use ordinary browser networking. Check the active mode after restarting the connection.
 
 Connection alternatives:
 
@@ -62,7 +64,7 @@ Connection alternatives:
 | Existing browser | Replace connection with `{ "mode": "existing", "browserUrl": "http://127.0.0.1:9222" }`; explicitly authorize that browser/profile and verify its real settings/session |
 | Native harness | Replace connection with `{ "mode": "host", "connectionReference": "actual-native-connection-reference" }`; reuse the host connection, without launching or reconfiguring a local browser |
 
-Generated local configurations explicitly set visibility, filesystem roots, allowed origins, sensitive-header redaction and category choices. Usage statistics and CrUX requests are disabled unless deliberately enabled. Existing environment privacy opt-outs are retained. File navigation, extensions and PWA management are disabled by these examples. These controls do not form an OS sandbox or prevent all effects of application scripts. Use the actual harness/OS restrictions as well.
+Generated local configurations set visibility, workspace roots, sensitive-header redaction and category choices. Strict launches also set the browser network allowlist. Usage statistics and CrUX requests are disabled unless deliberately enabled. File navigation, extensions and PWA management are disabled by these examples.
 
 MCP and CLI have different upstream defaults. Our adapters supply explicit settings for both. The CLI uses a unique integration-owned daemon ID and private configuration; it checks the daemon before calls and detects a changed process afterward. A lost daemon is not silently treated as the same authenticated session. Do not manually start/stop the default daemon to operate an owned session.
 
@@ -146,7 +148,7 @@ The pinned bridge does not return tool frame IDs. This tree binding is a conserv
 
 Settings accept exact HTTPS origins and loopback HTTP origins. Wildcard/pattern hosts are rejected before generating browser allowlist patterns. A saved setting is still distinct from the actual configuration of a native host connection.
 
-When preparing a saved project environment, use the [browser target access check](../browser/target-access.md) before the first task. The helper can add one authorized rule to project-owned Chrome settings or to a supported Codex `qa-webmcp` allowlist. Read back native settings to verify preservation, reload the affected connection when needed and confirm actual navigation separately.
+When preparing a saved project environment, use the [browser target access check](../browser/target-access.md) before the first task. Standard skips rule setup. In Strict, the helper adds exact authorized rules to project-owned Chrome settings or to a supported Codex `qa-webmcp` allowlist. Verify the saved settings and confirm navigation through the active connection.
 
 A matching catalogue cannot establish the same signed-in principal. Refresh role/account observations after login, logout, role switches, changes through another tool or other session changes. Retain prior inventories as history. Empty catalogues mean no tools were observed under those conditions; they do not prove permanent absence or a product defect.
 

@@ -96,8 +96,12 @@ export function next(root: string, repeatOnRequest?: string): Record<string, unk
     const { status, blocker } = assessReadiness(root, state);
     if (state.completed && status.ready) return { action: 'complete', next: 'Use the existing task board and applicable scoped authorizations.' };
     const stage = blocker?.stage ?? 'handoff';
-    const browserAccess = ['tools', 'access'].includes(stage) ? browserAccessStatus(root).filter(item => item.status !== 'verified') : [];
-    return { action: 'work', stage, label: labels[stage], next: blocker?.next ?? 'Prepare and verify the onboarding handoff.', issues: status.issues, ...(browserAccess.length ? { browserAccess } : {}) };
+    const preparingBrowser = stage === 'tools' || stage === 'access';
+    const browserAccess = preparingBrowser ? browserAccessStatus(root).filter(item => item.status !== 'verified') : [];
+    return { action: 'work', stage, label: labels[stage], next: blocker?.next ?? 'Prepare and verify the onboarding handoff.', issues: status.issues, ...(preparingBrowser ? {
+      browserNetworking: 'Use Standard for a new dedicated QA browser. Reuse the actual mode of an existing connection. Configure an allowlist only for Strict.',
+      ...(browserAccess.length ? { browserAccess } : {}),
+    } : {}) };
   });
 }
 export function acknowledge(root: string, id: string, source: string, shown = true): void {
