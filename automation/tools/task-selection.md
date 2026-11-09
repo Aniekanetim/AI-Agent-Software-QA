@@ -48,6 +48,8 @@ Custom tools can use `tools import-host` with an actual host/terminal operation 
 
 The assessment checks the selected operations against current harness/context, evidence, constraints and applicable browser reports. Selected Postman operations retain account/region/resource binding checks. Native browser visibility is checked where required; other browser tools can supply actual `visibility:headed` or `visibility:headless` operation evidence through their host capability record. No unselected integration becomes a task dependency merely because it was configured.
 
+For a planned browser step against a saved environment, include `requirements[].browserAccess: { environment, connection, generation }` from the [target access check](../browser/target-access.md). The selected tool and current harness must match the actual navigation evidence. Resolve missing origin/reload steps during onboarding or preparation before the task starts. Existing untargeted plans keep their current behavior; do not add this field to API requirements. The WebMCP inventory checks below still apply to relevant work.
+
 `capabilitiesVerified` means the selected capability evidence passed these checks; `needsPreparation` identifies affected requirements/global source issues and exits 1. Neither status establishes application access, authorization, test success or release readiness. Live session/provider bindings and semantic suitability still need the agent's task-specific checks. The command writes nothing; `productVerdict` stays `Not assessed`.
 
 ## Adopt without restarting onboarding

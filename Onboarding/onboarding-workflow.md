@@ -12,7 +12,7 @@ Register one focused missing decision or a small queue of genuinely distinct dec
 
 ## 2. Establish the project and context route
 
-Identify the project name, environments, responsible people, source locations if available, test-data boundaries and review responsibilities. Record nonsecret setup references in `.local/project.json`; keep authoritative product information in its named canonical source.
+Establish the target environment first. Reuse a target already supplied or saved. After the roadmap is shown, `onboarding next` presents the first missing environment question before new tool setup questions. Save its answer in `.local/project.json`. A hosted environment needs its entry URL. A local target needs the information required to reach it. Continue with the project name, responsible people, available sources, test-data boundaries and review responsibilities. Keep authoritative product information in its named canonical source.
 
 Ask how to establish initial context, unless already answered:
 
@@ -31,6 +31,8 @@ Follow [shared tool discovery](../automation/tools/README.md) before setup quest
 For [Postman CLI](../automation/postman/README.md), reuse an accessible compatible executable. Local collection checks require no Postman account; cloud resources require the selected account, resource access and reporting scope. Match identity/resource evidence to the current account, region and credential source. After a change, recheck only affected capabilities before deciding whether login is needed; an old account's verification cannot establish readiness. Guide login only when required. Preserve application API authentication separately. Tools can be deferred with dependent-work limits; tasks still determine testing coverage.
 
 Discover existing browser/testing capabilities and establish actual visibility, permitted actions and resource constraints. The agent chooses suitable tools for each task; do not ask for a compulsory preferred browser or resolve a global recommendation. Reuse compatible installations. The bundle includes MCP, CLI, library and Test, but a host MCP connection must be registered and exercised through that host. Record the actual provider and context of a rehearsal. Do not copy authentication between sessions by assumption.
+
+As soon as the target and its browser are known, run the [target access check](../automation/browser/target-access.md). For a supported Codex `qa-webmcp` connection, inspect the saved allowlist, add the exact authorized target rule if missing, and read the configuration back to confirm the previous rules and other settings were preserved. Reuse prior scoped authorization. If the active connection needs a reload, surface that step during setup. Then verify bounded public navigation through the active browser and retain the result. Independent API and context work can continue while browser access is pending.
 
 For GitHub, inspect the CLI, verify the actual identity and selected repositories, and establish board mapping, PR filters, execution targets and reporting permissions. Guide authentication through the host's interactive sign-in only when the required session is missing or expired. Never print tokens. Defer repository-dependent capabilities for a staging-only project without access.
 

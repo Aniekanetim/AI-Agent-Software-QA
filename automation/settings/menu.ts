@@ -3,6 +3,7 @@ import { contained, load, save, revision, requireText, withLock, assertNonsecret
 import { commitReply, queueQuestions, journalPath, type Reply } from '../onboarding/conversation.js';
 import { readState, writeState, type Stage } from '../onboarding/state.js';
 import * as attention from '../attention/preferences.js';
+import { browserAccessStatus } from '../browser/access.js';
 
 import { activeSource, sourcePath } from '../task-source/config.js';
 
@@ -55,6 +56,7 @@ export function showMenu(root: string) {
   return { action: menu.open ? (area ? 'editArea' : 'chooseArea') : 'closed', area: area?.label ?? null,
     choices: area ? ['Back', 'Cancel this edit', 'Close settings'] : menuChoices.map(({ id, label }) => ({ id, label })),
     current,
+    ...(menu.open && area?.id === 'browser' ? { browserAccess: browserAccessStatus(root) } : {}),
     question: menu.questionId ? notification ? notification.question : readState(root).value.questions.find(q => q.id === menu.questionId) : null,
     questionIssue: notification?.issue ?? null,
     notificationRecoveryHistory: menu.notificationRecoveryHistory ?? [],
