@@ -57,6 +57,25 @@ export function queueQuestions(root: string, questions: Omit<Question, 'status' 
     if (changed) { current.value.completed = false; writeState(root, current.value, current.revision); }
   });
 }
+
+function firstTargetQuestion(root: string, state: SetupState): Question | undefined {
+  if (!state.roadmapShown || state.completed || state.checks.project.status === 'verified') return;
+  const path = '.local/project.json', pointer = '/environments';
+  const prior = state.questions.find(q => q.path === path && (q.pointer === pointer || q.pointer?.startsWith(pointer + '/')));
+  if (prior) return prior.status === 'queued' ? prior : undefined;
+  try {
+    const project = load<{ environments?: unknown } | null>(root, path, () => null).value;
+    if (Array.isArray(project?.environments) && project.environments.length) return;
+  } catch { return; } // Preserve unreadable project state and let readiness report it.
+  const question: Question = {
+    id: 'project-target-environment', stage: 'project', path, pointer, required: true,
+    prompt: 'Which environment should the QA agent prepare first? Share its URL if it is hosted, or describe how to reach it if it runs locally.',
+    status: 'queued', promptReferences: [], answerReferences: [], clarificationHistory: [],
+  };
+  state.questions.push(question);
+  return question;
+}
+
 export function next(root: string, repeatOnRequest?: string): Record<string, unknown> {
   return withLock(root, 'conversation', () => {
     const current = readState(root), state = current.value;
@@ -69,7 +88,7 @@ export function next(root: string, repeatOnRequest?: string): Record<string, unk
       if (repeatOnRequest) { requireText(repeatOnRequest); return { action: 'repeatOnRequest', question }; }
       return { action: question.status === 'asked' ? 'wait' : 'verifyPresentation', question };
     }
-    question = state.questions.find(q => q.status === 'queued');
+    question = firstTargetQuestion(root, state) ?? state.questions.find(q => q.status === 'queued');
     if (question) {
       question.status = 'presenting'; writeState(root, state, current.revision);
       return { action: 'present', question, instruction: 'Actually display this one question, then acknowledge presentation.' };

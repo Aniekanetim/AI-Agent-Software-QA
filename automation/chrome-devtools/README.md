@@ -146,7 +146,7 @@ The pinned bridge does not return tool frame IDs. This tree binding is a conserv
 
 Settings accept exact HTTPS origins and loopback HTTP origins. Wildcard/pattern hosts are rejected before generating browser allowlist patterns. A saved setting is still distinct from the actual configuration of a native host connection.
 
-When preparing a saved project environment, use the [browser target access check](../browser/target-access.md) to compare the intended origin with the selected active connection before the first task. The helper can add one authorized rule to project-owned Chrome settings. Native host changes use the host's supported configuration and reload path; the saved rule is not a navigation result.
+When preparing a saved project environment, use the [browser target access check](../browser/target-access.md) before the first task. The helper can add one authorized rule to project-owned Chrome settings or to a supported Codex `qa-webmcp` allowlist. Read back native settings to verify preservation, reload the affected connection when needed and confirm actual navigation separately.
 
 A matching catalogue cannot establish the same signed-in principal. Refresh role/account observations after login, logout, role switches, changes through another tool or other session changes. Retain prior inventories as history. Empty catalogues mean no tools were observed under those conditions; they do not prove permanent absence or a product defect.
 

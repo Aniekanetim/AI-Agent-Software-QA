@@ -4,9 +4,11 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { applyBrowserOrigin, assessBrowserAccess, browserAccessStatus, browserTargets, prepareBrowserAccess, recordBrowserAccess, type AccessTarget, type OriginScope } from '../browser/access.js';
+import { nativeRuleAddition, readNativeQaConfig, writeNativeQaConfig } from '../browser/codex-config.js';
 import { settingsHash, settingsPath, type ChromeSettings } from '../chrome-devtools/config.js';
 import { integrationStatus } from '../onboarding/integrations.js';
-import { emptyState, readiness, stages, writeState } from '../onboarding/state.js';
+import { emptyState, readState, readiness, stages, writeState } from '../onboarding/state.js';
+import { acknowledge, commitReply, next, queueQuestions } from '../onboarding/conversation.js';
 import { chooseArea, openMenu } from '../settings/menu.js';
 import { evidence, revision, verifyEvidence, type Evidence } from '../shared/store.js';
 import { recordHost } from '../tools/registry.js';
@@ -45,6 +47,75 @@ test('a saved staging URL surfaces its missing exact browser rule during setup a
   assert.equal(chooseArea(f.root, 'browser').browserAccess?.[0]?.status, 'missingOrigin');
   assert.equal(f.read('.local/project.json'), before);
   assert(!JSON.stringify(browserAccessStatus(f.root)).includes('private=value'));
+});
+
+test('onboarding asks for the environment before browser setup, then reuses the recorded URL', () => {
+  const f = fixture();
+  f.put('.local/project.json', { ...f.project, environments: [] });
+  const state = emptyState();
+  state.roadmapShown = true;
+  writeState(f.root, state, null);
+  queueQuestions(f.root, [{ id: 'browser-visibility', stage: 'tools', prompt: 'Which visibility should we use?', path: '.local/browser-preferences.json', required: false }]);
+  const first = next(f.root);
+  assert.equal(first.action, 'present');
+  const id = 'project-target-environment';
+  assert.equal(readState(f.root).value.questions.find(q => q.status === 'presenting')?.id, id);
+  acknowledge(f.root, id, 'Synthetic first prompt');
+  assert.equal(next(f.root).action, 'wait');
+  commitReply(f.root, {
+    id: 'synthetic-target', source: 'Synthetic target response',
+    answers: [{ id, path: '.local/project.json', pointer: '/environments', kind: 'answer' }],
+    writes: [{ path: '.local/project.json', expectedSha256: revision(f.root, '.local/project.json'), content: JSON.stringify(f.project), origin: 'human' }],
+  });
+  assert.equal(next(f.root).action, 'present');
+  assert.equal(readState(f.root).value.questions.find(q => q.status === 'presenting')?.id, 'browser-visibility');
+  const configured = fixture();
+  writeState(configured.root, state, null);
+  assert.equal(next(configured.root).action, 'work');
+  assert.equal(readState(configured.root).value.questions.length, 0);
+});
+
+test('native Codex update changes only qa-webmcp args and verifies the previous rule through readback', async () => {
+  const file = resolve('synthetic', 'config.toml');
+  const priorArgs = ['--isolated', '--allowedUrlPattern', fixtureOrigin + '/*', 'https://*.example.test/*', '--executablePath', 'fixture-browser'];
+  const initial = {
+    mcp_servers: {
+      'qa-webmcp': { command: 'fixture', args: priorArgs, env: { FIXTURE: 'retained' }, startup_timeout_sec: 15 },
+      'chrome-devtools': { command: 'other', args: ['--autoConnect'] },
+    },
+    approval_policy: 'on-request',
+  };
+  const state = { config: structuredClone(initial), version: 'v1', shadowed: false, droppedRule: false };
+  const request = async (method: string, params: object) => {
+    const qa = state.config.mcp_servers['qa-webmcp'];
+    if (method === 'config/read') {
+      const user = { name: { type: 'user', file, profile: null }, version: state.version, config: structuredClone(state.config) };
+      const project = { name: { type: 'project' }, config: { mcp_servers: { 'qa-webmcp': { args: qa.args } } }, disabledReason: null };
+      return {
+        config: { mcp_servers: { 'qa-webmcp': { ...qa, args: [...qa.args], enabled: true, environment_id: 'local' } } },
+        layers: state.shadowed ? [user, project] : [user],
+      };
+    }
+    assert.equal(method, 'config/batchWrite');
+    assert.deepEqual(params, { filePath: file, expectedVersion: 'v1', reloadUserConfig: false, edits: [{ keyPath: 'mcp_servers.qa-webmcp.args', mergeStrategy: 'replace', value: expectedArgs }] });
+    qa.args = state.droppedRule ? expectedArgs.filter(arg => arg !== fixtureOrigin + '/*') : expectedArgs;
+    state.version = 'v2';
+    return { filePath: file, status: 'ok', version: 'v2' };
+  };
+  const rule = origin + '/*';
+  const expectedArgs = [...priorArgs.slice(0, 4), rule, ...priorArgs.slice(4)];
+  const before = await readNativeQaConfig(request, process.cwd());
+  assert.deepEqual(nativeRuleAddition(before.args, rule).args, expectedArgs);
+  const after = await writeNativeQaConfig(request, process.cwd(), before, expectedArgs);
+  assert.deepEqual(after.config, { ...initial, mcp_servers: { ...initial.mcp_servers, 'qa-webmcp': { ...initial.mcp_servers['qa-webmcp'], args: expectedArgs } } });
+  assert.equal(nativeRuleAddition(after.args, rule).present, true);
+  assert.throws(() => nativeRuleAddition(['--allowedUrlPattern=' + fixtureOrigin + '/*'], rule), /allowlist format/);
+  state.config = structuredClone(initial);
+  state.version = 'v1';
+  state.droppedRule = true;
+  await assert.rejects(writeNativeQaConfig(request, process.cwd(), before, expectedArgs), /could not be verified/);
+  state.shadowed = true;
+  await assert.rejects(readNativeQaConfig(request, process.cwd()), /unshadowed/);
 });
 
 test('a saved native rule needs reload and a successful bounded probe in the refreshed connection', () => {

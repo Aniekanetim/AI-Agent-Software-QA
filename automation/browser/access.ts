@@ -4,6 +4,7 @@ import { assertNonsecret, atPointer, contained, digest, load, requireText, revis
 import { assertToolId, type ToolId } from '../tools/registry.js';
 import { readToolPolicy } from '../tools/policy.js';
 import { currentHarness, harnessKey } from '../tools/runtime.js';
+import { nativeQaConnection, nativeRuleAddition, readNativeQaConfig, withCodexConfig, writeNativeQaConfig } from './codex-config.js';
 
 const targetsPath = '.local/browser-access/targets';
 const lifetime = 24 * 60 * 60_000;
@@ -130,7 +131,9 @@ function configuration(root: string, plan: Prepared): { report: AccessReport; se
   if (scope.kind === 'observedAllowlist' && scope.activeOrigins !== null && !scope.activeOrigins.includes(origin)) {
     return { settingsRevision: null, report: scope.savedOrigins?.includes(origin)
       ? { ...base, status: 'reloadRequired', next: 'The saved rule differs from the running connection. Reload the selected connection, then verify actual access.' }
-      : { ...base, status: 'missingOrigin', additionalOrigin: origin, next: 'Prepare the exact addition for the selected host, using supported setup or a specific owner handoff. Reuse existing authorization.' } };
+      : { ...base, status: 'missingOrigin', additionalOrigin: origin, next: target.tool === 'chromeDevtoolsHost' && target.connection === nativeQaConnection
+        ? 'Plan the exact qa-webmcp addition during onboarding. Apply it with existing scoped authorization or obtain the missing decision.'
+        : 'Prepare the exact addition for the selected host, using supported setup or a specific owner handoff. Reuse existing authorization.' } };
   }
   if (scope.kind === 'observedAllowlist' && scope.activeOrigins?.includes(origin) && scope.savedOrigins && !scope.savedOrigins.includes(origin)) {
     return { settingsRevision: null, report: { ...base, status: 'scopeUnverified', next: 'The running rule differs from the saved scope. Reconcile the current authorized scope before browser work.' } };
@@ -207,6 +210,66 @@ export function applyBrowserOrigin(root: string, input: { target: AccessTarget; 
     save(root, settingsPath, updated, input.expectedSettingsRevision);
     return { changed: true, delta: { path: deltaPath, sha256: digest(JSON.stringify(delta, null, 2) + '\n') }, access: assessBrowserAccess(root, input.target, now) };
   });
+}
+
+function nativePreparation(root: string, target: AccessTarget, now: number) {
+  currentHarness(root, 'interactive');
+  const prepared = currentPrepared(root, target, now);
+  if (target.tool !== 'chromeDevtoolsHost' || target.connection !== nativeQaConnection || prepared.plan?.scope.kind !== 'observedAllowlist') {
+    throw new Error('Prepare the actual qa-webmcp host connection and its observed allowlist first.');
+  }
+  checkPolicy(root, target.tool);
+  return { ...prepared, plan: prepared.plan, scope: prepared.plan.scope };
+}
+
+export async function planNativeBrowserOrigin(root: string, target: AccessTarget, executable?: string) {
+  const { current } = nativePreparation(root, target, Date.now());
+  return withCodexConfig(async request => {
+    const config = await readNativeQaConfig(request, root);
+    const rule = current.origin + '/*';
+    const addition = nativeRuleAddition(config.args, rule);
+    return { target, rule, expectedSettingsRevision: config.revision, status: addition.present ? 'alreadySaved' : 'missingOrigin', existingRuleCount: addition.rules.length };
+  }, executable);
+}
+
+export async function applyNativeBrowserOrigin(root: string, input: { target: AccessTarget; expectedSettingsRevision: string; approval?: Evidence }, executable?: string) {
+  assertNonsecret(input);
+  const { target, approval } = input;
+  const original = nativePreparation(root, target, Date.now());
+  const rule = original.current.origin + '/*';
+  return withCodexConfig(async request => {
+    const before = await readNativeQaConfig(request, root);
+    const addition = nativeRuleAddition(before.args, rule);
+    const unchangedPreparation = () => {
+      const actual = nativePreparation(root, target, Date.now());
+      if (actual.stored.revision !== original.stored.revision || actual.current.revision !== original.current.revision) throw new Error('The browser or environment preparation changed. Recheck the current target.');
+      return actual;
+    };
+    unchangedPreparation();
+    if (!addition.present) {
+      if (before.revision !== input.expectedSettingsRevision) throw new Error('Codex settings changed. Inspect the exact addition again before applying it.');
+      if (!approval) throw new Error('Link the actual authorization for adding this exact qa-webmcp rule.');
+      authorization(root, approval, target, original.current.origin, 'addOrigin');
+    }
+    const after = addition.present ? before : await writeNativeQaConfig(request, root, before, addition.args);
+    return withLock(root, 'browser-access', () => {
+      const { path, stored, plan, scope } = unchangedPreparation();
+      const change = { schemaVersion: 1, target, rule, before: before.revision, after: after.revision, previousRulesPreserved: true, ...(addition.present ? {} : { approval }) };
+      const deltaPath = `.local/browser-access/changes/${digest(JSON.stringify(change))}.json`;
+      if (revision(root, deltaPath) === null) save(root, deltaPath, change, null);
+      const savedRules = nativeRuleAddition(after.args, rule).rules;
+      const savedOrigins = [...new Set([...(scope.activeOrigins ?? []), ...(scope.savedOrigins ?? []), original.current.origin])].filter(origin => savedRules.includes(origin + '/*'));
+      if (!scope.savedOrigins || scope.savedOrigins.length !== savedOrigins.length || savedOrigins.some(origin => !scope.savedOrigins?.includes(origin))) {
+        const { observation: _old, ...prepared } = plan;
+        save(root, path, { ...prepared, scope: { ...scope, savedOrigins } }, stored.revision);
+      }
+      return {
+        changed: !addition.present, previousRulesPreserved: true,
+        delta: { path: deltaPath, sha256: digest(JSON.stringify(change, null, 2) + '\n') },
+        access: assessBrowserAccess(root, target),
+      };
+    });
+  }, executable);
 }
 
 export function recordBrowserAccess(root: string, input: AccessObservation, now = Date.now()) {
