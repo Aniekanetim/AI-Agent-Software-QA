@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, unlinkSync } from 'node:fs';
 import { contained, privatePath, load, save, replace, revision, digest, evidence, verifyEvidence, requireText, assertNonsecret, withLock, atPointer, type Evidence } from '../shared/store.js';
-import { readState, writeState, stages, labels, statePath, readiness, type Question, type Stage, type SetupState, type Check, type ContextDomain } from './state.js';
+import { readState, writeState, stages, labels, statePath, readiness, assessReadiness, type Question, type Stage, type SetupState, type Check, type ContextDomain } from './state.js';
 
 export const journalPath = '.local/pending-response.json';
 export interface ProposedWrite { path: string; expectedSha256: string | null; content: string; origin: 'human' | 'agent' }
@@ -73,10 +73,10 @@ export function next(root: string, repeatOnRequest?: string): Record<string, unk
       question.status = 'presenting'; writeState(root, state, current.revision);
       return { action: 'present', question, instruction: 'Actually display this one question, then acknowledge presentation.' };
     }
-    const status = readiness(root, state);
+    const { status, blocker } = assessReadiness(root, state);
     if (state.completed && status.ready) return { action: 'complete', next: 'Use the existing task board and applicable scoped authorizations.' };
-    const stage = stages.find(s => !['verified', 'notApplicable'].includes(state.checks[s].status)) ?? 'handoff';
-    return { action: 'work', stage, label: labels[stage], next: state.checks[stage].nextAction ?? 'Inspect existing sources; perform agent-owned preparation or register one necessary missing question.', issues: status.issues };
+    const stage = blocker?.stage ?? 'handoff';
+    return { action: 'work', stage, label: labels[stage], next: blocker?.next ?? 'Prepare and verify the onboarding handoff.', issues: status.issues };
   });
 }
 export function acknowledge(root: string, id: string, source: string, shown = true): void {

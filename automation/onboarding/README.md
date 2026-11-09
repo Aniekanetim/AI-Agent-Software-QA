@@ -92,6 +92,8 @@ Locks retain process/time ownership. A crash can leave a lock: inspect the ownin
 
 ## Checkpoints and completion
 
+`onboarding next` uses the same readiness checks as `onboarding status`. If saved evidence or required configuration changes, it identifies the earliest affected checkpoint and the reason to revisit it.
+
 `onboarding check --input ...` takes `{ stage, check }`. A check contains `status` (pending/verified/blocked/deferred/notApplicable), `evidence` (path/sha256/optional JSON pointer), `reason`, `nextAction` and `checkedAt`. Verified needs actual evidence/time; deferral/non-applicability needs a reason. Use `npm run qa -- evidence --path <actual-file> [--pointer /field]` to calculate references. Do not invent hashes or observations.
 
 `onboarding domains --input ...` takes five entries, one per business/product/technical/design/decisions domain. Each has `domain`, `state` (documented/gap/notApplicable), `sources`, `owner` and, where applicable, `questionReference` or `reason`. Gap means an original owner question, not a fabricated requirement.
