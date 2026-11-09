@@ -33,10 +33,19 @@ function mappedQueue(choice: LiveChoice, ticket: Ticket): Queue | null {
   if (ticket.state === null) return null;
   return (Object.entries(choice.queues).find(([, ids]) => ids.includes(ticket.state!))?.[0] as Queue | undefined) ?? null;
 }
+const routeReasons = {
+  ticketClosed: 'Provider marks this task closed',
+  outsideQaQueue: 'Outside the configured QA queues',
+  ownerChanged: 'Requires assignment to the designated QA account',
+};
+function routeBlocker(ticket: Ticket, queue: Queue | null, identity: Identity): keyof typeof routeReasons | null {
+  if (ticket.closed) return 'ticketClosed';
+  if (queue !== 'ready' && queue !== 'retest') return 'outsideQaQueue';
+  return ownerMatches(ticket, identity) ? null : 'ownerChanged';
+}
 function route(choice: LiveChoice, ticket: Ticket, identity: Identity) {
-  const queue = mappedQueue(choice, ticket);
-  const eligible = !ticket.closed && (queue === 'ready' || queue === 'retest') && ownerMatches(ticket, identity);
-  return { ticket, queue, eligible, reason: ticket.closed ? 'Provider marks this task closed' : queue !== 'ready' && queue !== 'retest' ? 'Outside the configured QA queues' : eligible ? 'Mapped QA queue and assigned to the connected QA account' : 'Requires assignment to the designated QA account' };
+  const queue = mappedQueue(choice, ticket), blockedBy = routeBlocker(ticket, queue, identity);
+  return { ticket, queue, eligible: !blockedBy, reason: blockedBy ? routeReasons[blockedBy] : 'Mapped QA queue and assigned to the connected QA account' };
 }
 function ranked(choice: LiveChoice, connection: Connection) {
   return connection.tickets.map(ticket => route(choice, ticket, connection.identity)).sort((a, b) =>
@@ -119,16 +128,57 @@ function alreadyClaimed(work: Journal, key: string, ticket: Ticket, queue: Queue
     return !(previous && ticket.updatedAt && Date.parse(ticket.updatedAt) > Date.parse(previous));
   });
 }
+const resumeActions = {
+  sourceChanged: 'Review the current task source and reconcile the old claim.',
+  ticketMissing: 'Check the native ticket and its board visibility before resuming.',
+  ticketClosed: 'Confirm the native disposition and close the claim with evidence when appropriate.',
+  outsideQaQueue: 'Confirm the current native queue and record the disposition before resuming.',
+  ownerChanged: 'Confirm the current assignment with the ticket owner before resuming.',
+  revisionChanged: 'Refresh the native ticket evidence and review the affected scope.',
+  pendingPublication: 'Inspect the original board publication and reconcile its outcome before another write.',
+  executionUnresolved: 'Inspect the original execution and record its observed terminal outcome.',
+  handoffCompleted: 'Close the existing claim with the confirmed handoff before taking another retest.',
+  eligible: 'Review the applicable scope and approval evidence before resuming.',
+};
+type ResumeReason = keyof typeof resumeActions;
+type Hold = { reasonCode: Exclude<ResumeReason, 'eligible'>; relatedId?: string };
+
+function bindingHold(claim: Claim, { choice, revision, connection }: Awaited<ReturnType<typeof liveBoard>>): Hold | null {
+  if (claim.sourceRevision !== revision) return { reasonCode: 'sourceChanged' };
+  const ticket = connection.tickets.find(item => item.id === claim.ticket.id);
+  if (!ticket) return { reasonCode: 'ticketMissing' };
+  const blockedBy = routeBlocker(ticket, mappedQueue(choice, ticket), connection.identity);
+  if (blockedBy) return { reasonCode: blockedBy };
+  return ticket.revision === claim.ticket.revision ? null : { reasonCode: 'revisionChanged' };
+}
+function publicationHold(publications: Publication[], claimId: string) {
+  const pending = publications.find(p => p.claimId === claimId && p.state === 'pending');
+  if (pending) return { reasonCode: 'pendingPublication', relatedId: pending.id } as const;
+  const handoff = publications.find(p => p.claimId === claimId && p.action === 'move' && p.state === 'confirmed');
+  return handoff ? { reasonCode: 'handoffCompleted', relatedId: handoff.id } as const : null;
+}
+export class LiveCheckInError extends Error {
+  readonly guidance = {
+    kind: 'live', reasonCode: 'sourceUnavailable',
+    nextAction: 'Verify the selected board, account and access before checking in again.',
+  };
+  constructor(cause: unknown) { super(cause instanceof Error ? cause.message : 'The selected live board is unavailable.', { cause }); }
+}
+
 export async function checkIn(root: string, reader: BoardReader = readBoard) {
   const active = activeSource(root);
   if (active.value.choice.kind === 'local') return { kind: 'local', instruction: 'Use the existing local board check-in procedure.' };
-  const { choice, connection, revision } = await liveBoard(root, reader);
+  const board = await liveBoard(root, reader).catch(error => { throw new LiveCheckInError(error); });
+  const { choice, connection } = board;
   const work = journal(root).value, claims = work.claims.filter(c => c.state === 'open');
   const rows = ranked(choice, connection).filter(row => row.eligible), key = sourceKey(choice, connection.identity);
-  const resume = claims.map(c => ({
-    claim: c,
-    eligible: c.sourceRevision === revision && !work.publications.some(p => p.claimId === c.id && (p.state === 'pending' || p.action === 'move' && p.state === 'confirmed')) && !work.executions.some(run => run.claimId === c.id && !run.terminal) && rows.some(row => row.ticket.id === c.ticket.id && row.ticket.revision === c.ticket.revision),
-  }));
+  const resume = claims.map(claim => {
+    const execution = work.executions.find(run => run.claimId === claim.id && !run.terminal);
+    const hold: Hold | null = publicationHold(work.publications, claim.id) ??
+      (execution ? { reasonCode: 'executionUnresolved', relatedId: execution.id } : bindingHold(claim, board));
+    const reasonCode = hold?.reasonCode ?? 'eligible';
+    return { claim, eligible: !hold, reasonCode, nextAction: resumeActions[reasonCode], ...(hold?.relatedId ? { relatedId: hold.relatedId } : {}) };
+  });
   return { kind: 'live', identity: connection.identity, resume, candidates: rows.filter(row => !alreadyClaimed(work, key, row.ticket, row.queue)), authorization: 'Review through G1–G5.' };
 }
 export async function details(root: string, ticketId: string, reader: BoardReader = readBoard) {
@@ -162,16 +212,13 @@ export function openClaim(root: string, claimId: string): Claim {
 }
 export async function recheck(root: string, claimId: string, reader: BoardReader = readBoard) {
   const claim = openClaim(root, claimId);
-  const { choice, revision, connection } = await liveBoard(root, reader);
-  const ticket = connection.tickets.find(item => item.id === claim.ticket.id);
-  if (claim.sourceRevision !== revision || !ticket || !route(choice, ticket, connection.identity).eligible || ticket.revision !== claim.ticket.revision) {
-    throw new Error('The ticket, ownership, queue or source changed. Preserve evidence and reconcile before resuming.');
-  }
+  const board = await liveBoard(root, reader);
+  if (bindingHold(claim, board)) throw new Error('The ticket, ownership, queue or source changed. Preserve evidence and reconcile before resuming.');
   openClaim(root, claimId);
-  const publications = journal(root).value.publications.filter(p => p.claimId === claimId);
-  if (publications.some(p => p.state === 'pending')) throw new Error('Reconcile the pending board write before resuming.');
-  if (publications.some(p => p.action === 'move' && p.state === 'confirmed')) throw new Error('The board handoff already completed. Close this claim before taking the next retest.');
-  return { claim, choice, connection };
+  const publication = publicationHold(journal(root).value.publications, claimId);
+  if (publication?.reasonCode === 'pendingPublication') throw new Error('Reconcile the pending board write before resuming.');
+  if (publication?.reasonCode === 'handoffCompleted') throw new Error('The board handoff already completed. Close this claim before taking the next retest.');
+  return { claim, choice: board.choice, connection: board.connection };
 }
 export interface Gate {
   claimId: string; ticketRevision: string; gate: 'G1' | 'G2' | 'G3' | 'G4' | 'G5';
