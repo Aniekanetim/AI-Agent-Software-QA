@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync, existsSync, realpathSync } from 'node:fs';
 import { resolve, dirname, delimiter } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import * as store from '../shared/store.js';
 import { bindHarness, currentHarness, harnessKey } from '../tools/runtime.js';
 import * as registry from '../tools/registry.js';
@@ -146,6 +147,19 @@ test('local Postman execution retains assertion outcomes, removes raw secrets an
   assert(!existsSync(store.contained(f.root, `.local/postman/work/${first.id}/raw-report.json`)));
   assert(registry.status(f.root, 'postman', ['localCollectionRun']).reusable);
   let calls = 0; const same = await postman.runCollection(f.root, first, async () => { calls++; throw new Error(); }); assert.equal(same.outcome, 'passed'); assert.equal(calls, 0);
+
+  put(f.root, first.collection.reference, 'Changed after the attempt');
+  put(f.root, postman.settingsPath, '{ invalid current settings');
+  const path = `.local/postman/runs/${first.id}.json`;
+  const retained = store.revision(f.root, path);
+  const lookup = spawnSync(process.execPath, [resolve('.local/build/automation/cli.js'), '--root', f.root, 'postman', 'run-status', '--id', first.id], { encoding: 'utf8' });
+  assert.equal(lookup.status, 0, lookup.stderr);
+  const status = JSON.parse(lookup.stdout);
+  assert.equal(status.recordedState, 'completed'); assert.equal(status.outcome, 'passed');
+  assert.deepEqual(status.target, { environment: first.target.environment, build: first.target.build });
+  assert.deepEqual(status.assertions, { total: 2, failed: 0 });
+  assert.deepEqual(status.evidence, { path, sha256: retained });
+  assert.equal(store.revision(f.root, path), retained);
 });
 
 test('execution errors and missing assertions are not reported as passing API tests', () => {
@@ -169,6 +183,19 @@ test('changed approved inputs block execution and an interrupted run is not repe
   const interrupted: registry.Runner = async (command, args) => { if (args[0] === 'collection' && !args.includes('--help')) { executions++; throw new Error('Synthetic interruption'); } return fakeRunner()(command, args); };
   await assert.rejects(postman.runCollection(g.root, valid, interrupted), /interruption/);
   await assert.rejects(postman.runCollection(g.root, valid, interrupted), /unfinished/); assert.equal(executions, 1);
+  const path = `.local/postman/runs/${valid.id}.json`;
+  const retained = store.revision(g.root, path);
+  const status = postman.runStatus(g.root, valid.id);
+  assert.equal(status.recordedState, 'running');
+  assert.equal(status.outcome, 'unconfirmed');
+  assert.match(status.nextAction, /Inspect the original attempt/);
+  assert.equal(store.revision(g.root, path), retained);
+  assert.equal(executions, 1);
+
+  assert.throws(() => postman.runStatus(g.root, 'unknown-id'), /No retained Postman run/);
+  assert.throws(() => postman.runStatus(g.root, '../raw-report'), /execution ID/);
+  put(g.root, '.local/postman/runs/bad-record.json', { schemaVersion: 1, id: 'bad-record', state: 'running' });
+  assert.throws(() => postman.runStatus(g.root, 'bad-record'), /record is invalid/);
 });
 
 test('cloud mode requires selected resources, exact identity and separate reporting authorization', async () => {
