@@ -2,6 +2,8 @@ import { existsSync, readdirSync, readFileSync, mkdirSync, writeFileSync, unlink
 import { resolve, dirname, relative } from 'node:path';
 import { contained, digest, load, save, replace, revision, withLock, verifyEvidence, requireText, assertNonsecret, type Evidence } from '../shared/store.js';
 
+import { requireLocalSource } from '../task-source/config.js';
+
 export const boardRoot = 'QA task management Board';
 export const statuses = ['Ready for QA', 'Dev Todo', 'Tested-Ok', 'Retest', 'Rework', 'Deferred', 'Canceled'] as const;
 export type Status = typeof statuses[number];
@@ -64,6 +66,7 @@ function lifecycle(text: string): Lifecycle | null {
   return entry;
 }
 export function tickets(root: string): Ticket[] {
+  requireLocalSource(root);
   assertBoardStable(root);
   const found = statuses.flatMap(status => readdirSync(contained(root, `${boardRoot}/${status}`), { withFileTypes: true }).filter(e => {
     if (e.name.endsWith('.md') && e.isSymbolicLink()) throw new Error('Use regular Markdown ticket files; reconcile symbolic links before board intake.');
@@ -90,6 +93,7 @@ export function assertExecutable(root: string, id: string, generation?: string, 
 }
 /** An unrelated in-progress move must not cancel an already running operation. */
 export function assertContinuation(root: string, id: string, generation: string) {
+  requireLocalSource(root);
   if (missingFolders(root).length) throw new Error('The canonical board became unavailable.');
   for (const path of pendingTransitions(root)) if (load<Journal>(root, path, () => { throw new Error('Missing transition.'); }).value.ticketId === id) throw new Error('This ticket has a pending lifecycle transition.');
   const found: { status: Status; generation: string }[] = [];
@@ -104,7 +108,8 @@ export function assertContinuation(root: string, id: string, generation: string)
   if (found.length !== 1 || !['Ready for QA', 'Retest'].includes(found[0]!.status) || found[0]!.generation !== generation) throw new Error('The bound ticket is no longer eligible; preserve the original operation.');
 }
 export interface Operation { id: string; ticketId: string; generation: string; source: string; kind: 'localRegression' | 'workflowDispatch'; resultPath: string; state: 'running' | 'stopRequested' | 'uncertain' | 'finished'; observation?: Evidence }
-export function operations(root: string, ticketId: string) { return entries(root, '.local/board-operations').map(p => load<Operation>(root, p, () => { throw new Error('Missing operation.'); }).value).filter(o => o.ticketId === ticketId && o.state !== 'finished'); }
+export function pendingOperations(root: string) { return entries(root, '.local/board-operations').map(p => load<Operation>(root, p, () => { throw new Error('Missing operation.'); }).value).filter(o => o.state !== 'finished'); }
+export function operations(root: string, ticketId: string) { return pendingOperations(root).filter(operation => operation.ticketId === ticketId); }
 export function startOperation(root: string, ticket: Ticket, operation: Omit<Operation, 'ticketId' | 'generation' | 'state'>) {
   assertExecutable(root, ticket.id, ticket.generation);
   if (operations(root, ticket.id).length) throw new Error('This ticket has unfinished or uncertain execution; inspect its actual outcome before another start.');

@@ -9,6 +9,7 @@ import './chrome-devtools.test.js';
 import './chrome-fixture-browser.test.js';
 import './board.test.js';
 import './attention.test.js';
+import './task-source.test.js';
 import './documents.test.js';
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync, renameSync, existsSync } from 'node:fs';
@@ -23,6 +24,8 @@ import * as menu from '../settings/menu.js';
 import * as mail from '../email/email.js';
 import { AgentMailAdapter, GmailAdapter, htmlText } from '../email/adapters.js';
 import * as gh from '../github/github.js';
+import * as taskSource from '../task-source/work.js';
+import { type LiveChoice } from '../task-source/config.js';
 import { upgradeBoard } from '../board/board.js';
 import { artifact, expectedChecksum, archiveDirectory } from '../github/install.js';
 import { validateReport, type BrowserReport } from '../browser/tools.js';
@@ -244,4 +247,42 @@ test('pinned GitHub CLI artifacts and checksum selection reject unsupported or u
   assert.equal(archiveDirectory('gh_2.102.0_windows_amd64.zip', ['LICENSE', 'bin/gh.exe']), 'gh_2.102.0_windows_amd64');
   assert.equal(archiveDirectory('gh_2.102.0_macOS_arm64.zip', ['gh_2.102.0_macOS_arm64/bin/gh']), '.');
   assert.throws(() => archiveDirectory('gh_2.102.0_windows_amd64.zip', ['../escape']));
+});
+
+test('source switching waits for local GitHub comment delivery or evidence-backed reconciliation', async () => {
+  const r = root(), { policy, target } = reviewedPolicy(r);
+  policy.repositories = [{ ...rule, reporting: 'comment' }];
+  policy.approval = put(r, '.local/approval.json', { decision: 'Approved', reviewer: 'Synthetic QA', source: 'Synthetic reporting approval', policyDigest: gh.policyDigest(policy) });
+  const body = put(r, '.local/report.md', '# Synthetic report');
+  const choice: LiveChoice = { kind: 'live', board: { provider: 'clickup', scopeId: 'list', clickupWorkspaceId: 'workspace' }, queues: { ready: ['qa'], retest: ['retest'] }, actions: [] };
+  const reader = async () => ({
+    identity: { accountId: 'qa-agent', workspaceId: 'workspace', scopeId: 'list', scopeName: 'Synthetic board' },
+    states: [{ id: 'qa', name: 'QA' }, { id: 'retest', name: 'Retest' }], tickets: [],
+  });
+  const preview = await taskSource.preview(r, choice, reader);
+  const activate = () => taskSource.configure(r, { choice, previewDigest: preview.digest, source: 'Synthetic source selection' }, reader);
+  let release!: () => void;
+  const hold = new Promise<void>(resolve => { release = resolve; });
+  const posting = gh.publishComment(r, policy, pr(), target, body.path, async () => { await hold; throw new Error('Synthetic ambiguous delivery'); });
+  const rejected = assert.rejects(posting, /outcome is uncertain/);
+  try {
+    const [pending] = gh.pendingCommentPublications(r);
+    assert(pending);
+    assert.deepEqual(pending.pr, { repository: pr().repository, number: pr().number });
+    const { key } = pending;
+    const decision = { key, state: 'notPublished' as const, source: 'Synthetic independent PR inspection after the writer stopped', evidence: [put(r, '.local/observed-comment.json', { posted: false })] };
+    await assert.rejects(activate(), /pending GitHub comments/);
+    assert.throws(() => gh.reconcileCommentPublication(r, decision), /writer may still be running/);
+    release();
+    await rejected;
+    await assert.rejects(activate(), /pending GitHub comments/);
+    assert.equal(gh.reconcileCommentPublication(r, decision).reconciliation?.previousState, 'uncertain');
+    assert.deepEqual(gh.pendingCommentPublications(r), []);
+    assert.equal((await activate()).choice.kind, 'live');
+    const different = put(r, '.local/another-report.md', '# Synthetic different report');
+    await assert.rejects(gh.publishComment(r, policy, pr(), target, different.path, async () => { assert.fail('Publisher ran after the source switch'); }), /uses the local task manager/);
+  } finally {
+    release();
+    await rejected;
+  }
 });

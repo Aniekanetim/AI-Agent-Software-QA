@@ -1,10 +1,12 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { readFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, mkdirSync } from 'node:fs';
 import { tickets, assertExecutable, assertContinuation, startOperation, operationState, inactive, type Ticket } from '../board/board.js';
 import { resolve } from 'node:path';
 import { selectedCommand, runProcess } from '../tools/registry.js';
 import { contained, load, save, revision, replace, digest, requireText, verifyEvidence, withLock, assertNonsecret, type Evidence } from '../shared/store.js';
+
+import { requireLocalSource } from '../task-source/config.js';
 
 const exec = promisify(execFile);
 export type GhRunner = (args: string[]) => Promise<string>;
@@ -273,15 +275,68 @@ export async function dispatchRegression(root: string, policy: RegressionPolicy,
   finally { operationState(root, operationId, sent ? 'uncertain' : 'finished'); }
   return { key, operationId, ticketId: ticket.id, action: 'dispatched', state: 'dispatched', result: 'Remote run state not yet observed' };
 }
+const commentDirectory = '.local/github-comments';
+interface CommentPublication {
+  key: string;
+  state: 'publishing' | 'published' | 'uncertain' | 'notPublished';
+  pr?: { repository: string; number: number };
+  writerPid?: number;
+  observation?: string;
+  reconciliation?: { previousState: 'publishing' | 'uncertain'; source: string; evidence: Evidence[] };
+}
+function commentPath(key: string) {
+  if (!/^[a-f0-9]{64}$/.test(key)) throw new Error('Select an existing GitHub comment publication key.');
+  return `${commentDirectory}/${key}.json`;
+}
+export function pendingCommentPublications(root: string) {
+  const folder = contained(root, commentDirectory);
+  if (!existsSync(folder)) return [];
+  return readdirSync(folder).filter(name => /^[a-f0-9]{64}\.json$/.test(name)).flatMap(name => {
+    const record = load<CommentPublication | null>(root, `${commentDirectory}/${name}`, () => null).value;
+    if (!record) return [];
+    if (record.key !== name.slice(0, -5) || !['publishing', 'published', 'uncertain', 'notPublished'].includes(record.state)) throw new Error('Reconcile the saved GitHub comment publication.');
+    return record.state === 'publishing' || record.state === 'uncertain' ? [{ key: record.key, state: record.state, pr: record.pr }] : [];
+  });
+}
+export function reconcileCommentPublication(root: string, request: { key: string; state: 'published' | 'notPublished'; source: string; evidence: Evidence[] }) {
+  requireText(request.source, 'Actual GitHub comment observation');
+  if (!['published', 'notPublished'].includes(request.state) || !request.evidence?.length) throw new Error('Record an independently observed terminal comment outcome with evidence.');
+  const path = commentPath(request.key);
+  return withLock(root, 'qa-board', () => {
+    const current = load<CommentPublication | null>(root, path, () => null);
+    const record = current.value;
+    if (!record || record.key !== request.key || record.state !== 'publishing' && record.state !== 'uncertain') throw new Error('Select a pending GitHub comment publication.');
+    if (record.writerPid !== undefined) {
+      let running = true;
+      try { process.kill(record.writerPid, 0); }
+      catch (error) { running = (error as NodeJS.ErrnoException).code !== 'ESRCH'; }
+      if (running) throw new Error('The GitHub comment writer may still be running.');
+    }
+    for (const evidence of request.evidence) {
+      if (contained(root, evidence.path) === contained(root, path)) throw new Error('Use independent GitHub evidence for the comment outcome.');
+      verifyEvidence(root, evidence);
+    }
+    const next: CommentPublication = { key: request.key, state: request.state, pr: record.pr, observation: request.source, reconciliation: { previousState: record.state, source: request.source, evidence: request.evidence } };
+    save(root, path, next, current.revision);
+    return next;
+  });
+}
 export async function publishComment(root: string, policy: RegressionPolicy, pr: PullRequest, target: ObservedTarget, bodyFile: string, runner: GhRunner = runGh) {
   assertRegression(root, policy, pr, target);
   if (!policy.repositories.find(r => eligible(pr, r))?.reporting || policy.repositories.find(r => eligible(pr, r))?.reporting !== 'comment') throw new Error('This policy does not authorize PR comments.');
   const body = contained(root, bodyFile); const content = readFileSync(body, 'utf8'); requireText(content, 'Reviewed report body'); assertNonsecret(content);
-  const key = digest(assertRegression(root, policy, pr, target) + digest(content)), path = `.local/github-comments/${key}.json`;
-  const previous = load<{ state: string; observation?: string } | null>(root, path, () => null).value;
-  if (previous?.state === 'published') return { action: 'unchanged', observation: previous.observation };
-  if (previous) throw new Error('This exact report already has an uncertain publication attempt. Check its actual PR comment before repeating.');
-  withLock(root, `comment-${key}`, () => save(root, path, { state: 'publishing', key }, null));
-  try { const observation = await runner(['pr', 'comment', String(pr.number), '--repo', pr.repository, '--body-file', body]); save(root, path, { state: 'published', key, observation: observation.trim() }, revision(root, path)); return { action: 'published', observation: observation.trim() }; }
-  catch { save(root, path, { state: 'uncertain', key }, revision(root, path)); throw new Error('Comment publication outcome is uncertain; inspect GitHub before retrying.'); }
+  const key = digest(assertRegression(root, policy, pr, target) + digest(content)), path = commentPath(key);
+  const prRef = { repository: pr.repository, number: pr.number };
+  const published = withLock(root, 'qa-board', () => {
+    requireLocalSource(root);
+    const previous = load<CommentPublication | null>(root, path, () => null).value;
+    if (previous?.state === 'published') return previous;
+    if (previous?.state === 'notPublished') throw new Error('The prior attempt is reconciled as not published. Use a separately reviewed scope for a new attempt.');
+    if (previous) throw new Error('This exact report already has an uncertain publication attempt. Check its actual PR comment before repeating.');
+    save<CommentPublication>(root, path, { state: 'publishing', key, pr: prRef, writerPid: process.pid }, null);
+    return null;
+  });
+  if (published) return { action: 'unchanged', observation: published.observation };
+  try { const observation = await runner(['pr', 'comment', String(pr.number), '--repo', pr.repository, '--body-file', body]); save(root, path, { state: 'published', key, pr: prRef, observation: observation.trim() }, revision(root, path)); return { action: 'published', observation: observation.trim() }; }
+  catch { save(root, path, { state: 'uncertain', key, pr: prRef }, revision(root, path)); throw new Error('Comment publication outcome is uncertain; inspect GitHub before retrying.'); }
 }

@@ -4,6 +4,8 @@ A portable workflow for an AI QA agent to join a project, build product understa
 
 **Package version:** 1.11.0 — updated 6 November 2026. **Project state:** unconfigured. **Live tickets/discovery requests:** none. **Product schedules/PR regression/notifications:** not activated. Start with [SETUP.md](SETUP.md) and [guided onboarding](Onboarding/README.md).
 
+Choose a [task source](automation/task-source/README.md) during onboarding or in Settings. The local QA folders are available by default. Jira, ClickUp, Linear and Asana adapters are available for sandbox verification.
+
 ## Use with your AI agent
 
 Give an agent this prompt from the QA project for the application you want to learn about or test:

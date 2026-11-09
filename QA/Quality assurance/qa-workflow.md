@@ -63,7 +63,9 @@ The workflow supports functional and non-functional objectives. API and browser 
 
 A cycle can combine or change testing types. Preserve its current progress and evidence, revise the affected method/criteria, and return to the affected review point. Supporting a type does not mean executing it automatically.
 
-Configured GitHub intake can supply a linked PR assignment. A reusable regression policy may carry an already reviewed G1/G2 execution scope: read its exact approved content, suite revisions, target, command and limits; verify current eligibility/build and reuse that authorization only while it still matches. Its initial briefing must explain every covered action/pass criterion and rationale. Do not request the same unchanged approval on every run, weaken expectations or infer approval from a configuration file. Material changes return to the affected gate. Actual findings, G3 confirmation and G5 sign-off/handoff remain separate required decisions. [GitHub controls](../../automation/github/README.md)
+A [connected live board](../../automation/task-source/README.md) supplies the native QA ticket and controls its status and ownership. Record its claim and revision with the gate packet, observe the target build and recheck the native ticket before executing or publishing. Keep results and gate evidence linked to that ticket.
+
+In local mode, configured GitHub intake can supply a linked PR assignment. A reusable regression policy may carry an already reviewed G1/G2 execution scope: read its exact approved content, suite revisions, target, command and limits; verify current eligibility/build and reuse that authorization only while it still matches. Its initial briefing must explain every covered action/pass criterion and rationale. Do not request the same unchanged approval on every run, weaken expectations or infer approval from a configuration file. Material changes return to the affected gate. Actual findings, G3 confirmation and G5 sign-off/handoff remain separate required decisions. [GitHub controls](../../automation/github/README.md)
 
 ## Task-based tools and data preparation
 

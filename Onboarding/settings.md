@@ -13,12 +13,17 @@ Say **Open settings** at any point. The agent shows current values and these are
 9. Reporting and evidence preferences
 10. API tools and Postman
 11. Close settings
+12. Task source
 
 Direct requests such as “Keep browser sessions visible,” “Use Postman for this collection” or “Check every hour” also work. Distinguish a task-specific instruction from a project constraint; ask only when its scope is materially unclear. Reuse the clear instruction, show the affected current value and consequence, and ask only for a genuinely missing decision. A request to change cadence authorizes its relevant scheduler change; retain any existing required concrete briefing and inspect the actual saved schedule afterwards.
 
 Choose **Back** to return to the area list, **Cancel this edit** to discard an uncommitted edit, or **Close settings** to leave settings. Completed saves remain. The agent preserves the interrupted onboarding question and pause state. A pending interrupted save must be recovered before navigation that would lose it.
 
 The agent uses `settings open`, `choose`, `edit`, `present`, `save`, `cancel`, `back` and `close`. Mailbox changes use the guarded email selection procedure rather than raw JSON replacement. After recovering a saved settings answer, `settings present` clears its completed focus without asking it again.
+
+## Task source
+
+Show the active source and its board, queue mappings and permitted actions. Use [task source inspection, preview and save](../automation/task-source/README.md) for changes. Back, Cancel this edit and Close settings leave the active source in effect. A failed connection leaves other settings accessible. The project can switch after its active claims and pending operations are reconciled.
 
 ## Optional notification recovery
 

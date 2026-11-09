@@ -7,7 +7,7 @@ export const labels: Record<Stage, string> = {
   project: 'Establish the project, environments and owners', contextRoute: 'Choose how context is established',
   tools: 'Verify existing tools and prepare missing browser, API and GitHub capabilities', email: 'Discover providers and select verification mailboxes',
   access: 'Establish application access', understanding: 'Build and review initial project/product understanding',
-  operation: 'Configure check-ins, PR triggers and reporting', handoff: 'Verify readiness and explain how work begins',
+  operation: 'Choose the task source and configure check-ins, PR triggers and reporting', handoff: 'Verify readiness and explain how work begins',
 };
 export type CheckStatus = 'pending' | 'verified' | 'blocked' | 'deferred' | 'notApplicable';
 export interface Check { status: CheckStatus; evidence: Evidence[]; reason: string | null; nextAction: string | null; checkedAt: string | null }

@@ -14,6 +14,9 @@ import { AgentMailAdapter, GmailAdapter } from './email/adapters.js';
 import * as github from './github/github.js';
 import { installGh } from './github/install.js';
 import * as board from './board/board.js';
+import * as taskSource from './task-source/work.js';
+import { activeSource, providers as taskProviders, requireLocalSource } from './task-source/config.js';
+import { linearOAuthVariable, tokenVariables } from './task-source/provider.js';
 import * as attentionPreferences from './attention/preferences.js';
 import * as blockers from './attention/blockers.js';
 import * as attention from './attention/notifications.js';
@@ -22,7 +25,7 @@ import { bindHarness, currentHarness, readHarness, harnessKey, type ExecutionCon
 import * as postman from './postman/postman.js';
 import { assessCoverage, type CoverageSnapshot } from './coverage/coverage.js';
 import { validateFlowMap, traceFlowMap, type FlowMapSnapshot, type Direction } from './flow-map/flow-map.js';
-import { assessTaskTools, type TaskToolPlan } from './tools/task.js';
+import { assessTaskTools, assessLiveTaskTools, type TaskToolPlan } from './tools/task.js';
 import { assessData, type DataPreparation } from './data/preparation.js';
 import * as chromeConfig from './chrome-devtools/config.js';
 import * as chromeTransport from './chrome-devtools/transport.js';
@@ -53,10 +56,11 @@ async function currentPr(repository: string, number: number) {
 }
 const help = {
   attention: 'status | proposal/configure --input | record --input | list --recipient [--offset N --limit N --snapshot hash --all] | index | update-index --input | preview --recipient --notifier [--at ISO] | reserve --input | preflight --id --notifier | receipt --input | respond --input : optional blocker reminders; no task execution, lifecycle move or approval',
+  'task-source': 'status | providers | inspect --input | preview --input | save --input | check-in | details --ticket | claim --input | history --claim | recheck --claim | preflight --input | begin --input | settle --input | publication-preview --input | publish --input | reconcile-publication --input | close --input',
   board: 'status [--ticket ID] | upgrade --source | transition --input | recover --id | reviews [--at ISO] [--trigger key] | acknowledge-review --input | assert-executable --ticket ID [--generation ID] | operations --ticket ID | settle-operation --input : lifecycle controls preserve actual human decisions; no test authorization',
   'flow-map': 'validate --input | trace --input --features id,id [--direction upstream/downstream/both] [--max-depth 8] : read-only candidate impact; no test execution or approval',
   coverage: 'assess --input : read-only consistency/count check of a canonical-record snapshot; no execution, approval or product verdict',
-  tools: 'bind --input | scan --source [--tool] | select --input | status --tool [--requires operation,operation] | import-host --input | assess-task --input : read-only assessment of agent-selected capabilities',
+  tools: 'bind --input | scan --source [--tool] | select --input | status --tool [--requires operation,operation] | import-host --input | assess-task --input [--claim ID] : read-only assessment of agent-selected capabilities',
   data: 'assess --input : read-only preparation/state assessment; no generation, application mutations or approval',
   chrome: 'check --source | mcp-config | rehearse --provider cli/mcpServer [--headless] [--executable path] | session-start --input | page --input | inventory --input | import-host-inventory --input | execute --input | confirm --input | session-stop --id : explicit scoped WebMCP operations; no implicit product authorization',
   postman: 'check --source | login-instructions | run --input | run-status --id : detects/reuses the CLI; local runs need no login; cloud operations need selected account/reporting scope',
@@ -64,7 +68,7 @@ const help = {
   settings: 'open --source | show | choose --area | edit --input | present | save --input | attention-shown --source | save-attention --input | cancel | back | close',
   browser: 'versions | install | mcp-config | check --provider library/cli/mcpServer [--headless] [--context interactive/scheduled/ci] | import-report --input | fixture',
   email: 'policy | account --input | accounts | options --input | discover --provider gmailApi/agentmail --source | create-inbox --input | select --input | verify --input | begin --input | outcome --input',
-  github: 'reconcile-legacy --input --repository --number --policy --target --source | install --source | check --repository | check-in --source | event --repository --number --source | policy-digest --policy | run/dispatch --policy --target --repository --number --source | comment --policy --target --repository --number --body --source',
+  github: 'pending-comments | reconcile-comment --input | reconcile-legacy --input --repository --number --policy --target --source | install --source | check --repository | check-in --source | event --repository --number --source | policy-digest --policy | run/dispatch --policy --target --repository --number --source | comment --policy --target --repository --number --body --source',
   evidence: '--path [--pointer] : calculate an evidence reference; no product verdict is inferred',
   note: 'Use project-private JSON under .local/ for inputs. The agent presents questions and performs authorized host connections. CLI output is a model, not an actual human conversation or approval. See Onboarding/README.md.',
 };
@@ -88,7 +92,29 @@ async function main() {
     else throw new Error('Use an attention command from help. CLI output is not proof of actual host presentation.');
     return;
   }
+  if (area === 'task-source') {
+    if (action === 'status') output(activeSource(root));
+    else if (action === 'providers') output(taskProviders.map(provider => ({ provider, credentials: (provider === 'linear' ? [tokenVariables.linear, linearOAuthVariable] : [tokenVariables[provider]]).map(variable => ({ variable, present: !!process.env[variable] })), readiness: 'Verify the actual account and board with inspect.' })));
+    else if (action === 'inspect') output(await taskSource.inspect(input()));
+    else if (action === 'preview') output(await taskSource.preview(root, input()));
+    else if (action === 'save') output(await taskSource.configure(root, input()));
+    else if (action === 'check-in') output(await taskSource.checkIn(root));
+    else if (action === 'details') output(await taskSource.details(root, option('ticket')));
+    else if (action === 'claim') output(await taskSource.claim(root, input()));
+    else if (action === 'history') output(taskSource.claimHistory(root, option('claim')));
+    else if (action === 'recheck') { const { claim } = await taskSource.recheck(root, option('claim')); output(claim); }
+    else if (action === 'preflight') output(await taskSource.preflight(root, input()));
+    else if (action === 'begin') output(await taskSource.beginExecution(root, input()));
+    else if (action === 'settle') output(taskSource.settleExecution(root, input()));
+    else if (action === 'publication-preview') output(await taskSource.publicationPreview(root, input()));
+    else if (action === 'publish') output(await taskSource.publish(root, input()));
+    else if (action === 'reconcile-publication') output(taskSource.reconcilePublication(root, input()));
+    else if (action === 'close') output(taskSource.closeClaim(root, input()));
+    else throw new Error('Unknown task-source operation; use help.');
+    return;
+  }
   if (area === 'board') {
+    requireLocalSource(root);
     if (action === 'upgrade') output(board.upgradeBoard(root, option('source')));
     else if (action === 'status') {
       const missing = board.missingFolders(root), pending = board.pendingTransitions(root);
@@ -140,7 +166,11 @@ async function main() {
       output(tool === 'postman' ? postman.status(root, required) : registry.status(root, tool, required));
     }
     else if (action === 'import-host') output(registry.recordHost(root, input()));
-    else if (action === 'assess-task') { const report = assessTaskTools(root, input<TaskToolPlan>()); output(report); if (report.status === 'needsPreparation') process.exitCode = 1; }
+    else if (action === 'assess-task') {
+      const plan = input<TaskToolPlan>();
+      const report = options.has('claim') ? await assessLiveTaskTools(root, plan, option('claim')) : assessTaskTools(root, plan);
+      output(report); if (report.status === 'needsPreparation') process.exitCode = 1;
+    }
     else throw new Error('Unknown tools command.');
     return;
   }
@@ -262,6 +292,9 @@ async function main() {
       output(access); return;
     }
     if (action === 'policy-digest') { output({ policyDigest: github.policyDigest(fromFile(option('policy'))) }); return; }
+    if (action === 'pending-comments') { output(github.pendingCommentPublications(root)); return; }
+    if (action === 'reconcile-comment') { output(github.reconcileCommentPublication(root, input())); return; }
+    requireLocalSource(root);
     const configuration = fromFile<github.GithubSettings>('.local/github-settings.json'); github.validateSettings(configuration);
     const source = option('source');
     if (action === 'check-in' || action === 'event') {

@@ -54,9 +54,11 @@ Brief the human on intended versus observed/inferred connections and remaining u
 
 ## 5. Configure operation and reporting
 
+Ask where the project’s QA agent should pick up work. Offer **Use the local task manager** and **Connect a task management app**. For a live board, show Jira, ClickUp, Linear and Asana, describe their verification status, then use the [task source setup and preview](../automation/task-source/README.md) to verify the connection, scope and queue mappings. Present the eligible tickets and proposed board actions before the user saves the choice. Saving activates the selected source. Keep the prior choice while the setup is incomplete and record any work that depends on it. Existing projects without a saved choice use their local folders. Settings → Task source opens the same setup.
+
 Establish on-demand, scheduled, events or combined operation. Reuse already supplied preferences; do not ask for them again. Discuss cadence/timezone, eligible repositories/PRs, evidence retention, reporting channels and accountable reviewers. Settings remain available after onboarding.
 
-A schedule must be configured through the actual host scheduling feature after authorization. PR polling/event intake creates or updates linked assignments without executing tests. A reviewed reusable regression policy can authorize matching automatic runs; brief every covered action, expected outcome and limit before that policy decision. A new policy is not approved because it was generated or saved. Preserve G3 findings decisions and G5 sign-off/handoff.
+A schedule must be configured through the actual host scheduling feature after authorization. In local mode, PR polling/event intake creates or updates linked assignments without executing tests. For a live board, start from its native ticket and follow the live-board scope and build checks. A reviewed reusable regression policy can authorize matching automatic runs; brief every covered action, expected outcome and limit before that policy decision. A new policy is not approved because it was generated or saved. Preserve G3 findings decisions and G5 sign-off/handoff.
 
 ## Establish the project's testing foundation
 

@@ -53,6 +53,10 @@ The trusted command receives QA_PR_HEAD, QA_TESTED_COMMIT, QA_BUILD_ID, QA_RUN_K
 
 For a separately approved workflow dispatch, use `github dispatch` with the same arguments. Its workflow must accept qa_run_key, pr_head and tested_commit inputs. A dispatch receipt is not completed CI execution. Match the actual GitHub run/artifacts back to the key and tested revision; inspect uncertain dispatches before retrying. `github comment ... --body <reviewed-report-path>` requires comment permission in the exact policy and prevents duplicate/uncertain publication attempts. Do not publish automatically under localOnly policy.
 
+### Reconcile an interrupted comment
+
+Run `npm run qa -- github pending-comments` to find outstanding publication keys and their PRs when recorded. After confirming the writer has stopped, inspect the actual PR discussion. Use `npm run qa -- github reconcile-comment --input .local/comment-observation.json` with the `key`, observed `state` (`published` or `notPublished`), actual `source` and independent `evidence` references. The recorded outcome clears the source-switch hold and preserves the previous publication state. Any new posting attempt needs separately reviewed scope.
+
 ## PR-triggered CI example
 
 [qa-regression.example.yml](examples/qa-regression.example.yml) is an **inactive adoption template**, outside `.github/workflows`. It requires a reviewed policy, actual bot settings and project-owned current-board and preview-identity adapters. The default-deny variable and missing project-specific files prevent accidental execution. Review/replace the placeholders in your project before enabling it. It runs trusted base-branch QA code, excludes forks and uses read-only permissions; never switch to privileged `pull_request_target` while executing untrusted PR code with secrets.
