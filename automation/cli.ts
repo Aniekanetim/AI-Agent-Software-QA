@@ -30,6 +30,8 @@ import { assessTaskTools, assessLiveTaskTools, type TaskToolPlan } from './tools
 import { assessData, type DataPreparation } from './data/preparation.js';
 import { datasetDirectory, inspectDatasets, type DatasetIndex } from './data/datasets.js';
 import { preflightLocalData } from './data/local.js';
+import { inspectSource, type SourceFormat } from './data/source-inspection.js';
+import { listIntake, previewIntake, registerIntake, type IntakeRequest } from './data/intake.js';
 import * as chromeConfig from './chrome-devtools/config.js';
 import * as chromeTransport from './chrome-devtools/transport.js';
 import * as webmcp from './chrome-devtools/webmcp.js';
@@ -64,7 +66,7 @@ const help = {
   'flow-map': 'validate --input | trace --input --features id,id [--direction upstream/downstream/both] [--max-depth 8] : read-only candidate impact; no test execution or approval',
   coverage: 'assess --input : read-only consistency/count check of a canonical-record snapshot; no execution, approval or product verdict',
   tools: 'bind --input | scan --source [--tool] | select --input | status --tool [--requires operation,operation] | import-host --input | assess-task --input [--claim ID] : read-only assessment of agent-selected capabilities',
-  data: 'inventory [--input] | assess --input | preflight --input : read-only data assessment and local execution readiness',
+  data: 'inventory [--input] | assess --input | preflight --input | intake-inspect --file [--format] [--table N] [--from-line N] [--through-line N] | intake-preview --input | intake-register --input --preview-sha256 --review-source | intake-list',
   chrome: 'check --source | mcp-config | rehearse --provider cli/mcpServer [--headless] [--executable path] | session-start --input | page --input | inventory --input | import-host-inventory --input | execute --input | confirm --input | session-stop --id : explicit scoped WebMCP operations; no implicit product authorization',
   postman: 'check --source | login-instructions | run --input | run-status --id : detects/reuses the CLI; local runs need no login; cloud operations need selected account/reporting scope',
   onboarding: 'start | roadmap-shown --source | status | next | queue --input | shown/not-shown --id --source | reply --input | recover | reconcile --input | retire-tool-questions --input | pause/resume --source | clarify/defer --input | check/domains --input | finish --input',
@@ -137,6 +139,21 @@ async function main() {
     return;
   }
   if (area === 'data') {
+    if (action === 'intake-inspect') {
+      output(inspectSource({
+        file: option('file'), format: options.get('format') as SourceFormat | undefined,
+        table: options.has('table') ? Number(option('table')) : undefined,
+        fromLine: options.has('from-line') ? Number(option('from-line')) : undefined,
+        throughLine: options.has('through-line') ? Number(option('through-line')) : undefined,
+      }).summary);
+      return;
+    }
+    if (action === 'intake-preview') { output(previewIntake(root, input<IntakeRequest>())); return; }
+    if (action === 'intake-register') {
+      output(registerIntake(root, input<IntakeRequest>(), option('preview-sha256'), option('review-source')));
+      return;
+    }
+    if (action === 'intake-list') { output(listIntake(root)); return; }
     if (action === 'inventory') {
       const privateIndex = options.has('input');
       const index = privateIndex ? input<DatasetIndex>() : store.load<DatasetIndex>(root, `${datasetDirectory}/index.json`, () => ({ schemaVersion: 1, datasets: [] })).value;
@@ -145,7 +162,7 @@ async function main() {
       return;
     }
     if (action === 'preflight') { output(preflightLocalData(root, input())); return; }
-    if (action !== 'assess') throw new Error('Use data inventory, assess or preflight.');
+    if (action !== 'assess') throw new Error('Use data inventory, assess, preflight, or an intake command listed in help.');
     const report = assessData(root, input<DataPreparation>()); output(report);
     if (report.status === 'needsPreparation') process.exitCode = 1; return;
   }

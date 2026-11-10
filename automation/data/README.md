@@ -1,5 +1,7 @@
 # Read-only test-data preparation assessment
 
+Use [guided intake](intake.md) to inspect supplied files and register reviewed project datasets before preparing the data record.
+
 The agent follows the [data preparation policy](../../QA%20Process%20Context/Test%20Data%20Management/preparation-policy.md), chooses suitable generation/preparation tools, performs authorized work and retains its canonical [record](../../QA%20Process%20Context/Test%20Data%20Management/data-preparation-record.md). This optional helper inspects a private projection of that record. It generates no values and changes no application state.
 
 ```shell

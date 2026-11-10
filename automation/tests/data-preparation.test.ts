@@ -8,6 +8,7 @@ import { assessData, type DataPreparation } from '../data/preparation.js';
 import { datasetDirectory, inspectDatasets, type Dataset } from '../data/datasets.js';
 import { assertDataReady, type DataScope } from '../data/readiness.js';
 import { preflightLocalData } from '../data/local.js';
+import { previewIntake, registerIntake, type IntakeRequest } from '../data/intake.js';
 import { findTicket, upgradeBoard } from '../board/board.js';
 
 function fixture() {
@@ -135,6 +136,29 @@ test('a reviewed dataset must retain its permitted environment, classification a
   assert.deepEqual(assertDataReady(f.root, scope, target).items[0]?.dataset, f.item.dataset);
   write(f.root, asset.path, { amount: 101 });
   assert.throws(() => assertDataReady(f.root, scope, target), /selected dataset files and recorded hashes/);
+});
+
+test('new intake revisions remain usable alongside an earlier approved data scope', () => {
+  const f = fixture(); f.prepare();
+  const file = resolve(f.root, 'supplied.csv');
+  writeFileSync(file, 'amount\n100\n');
+  const request: IntakeRequest = {
+    dataset: { id: 'boundary', revision: '1', owner: 'Fixture QA', purpose: 'Boundary inputs', classification: 'synthetic', environments: [f.plan.environment] },
+    reference: 'fixture-source/boundary', mode: 'curate', source: { file }, fields: [{ from: 1, to: 'amount' }],
+  };
+  const register = () => registerIntake(f.root, request, previewIntake(f.root, request).previewSha256, 'Synthetic review reference');
+  const first = register();
+  f.item.dataset = { index: first.index, id: first.id, revision: first.revision };
+  const scope: DataScope = {
+    schemaVersion: 1, mode: 'required', checks: [{ id: 'READY', conditionIds: ['COND-1'], dataItemIds: ['DATA-1'] }],
+    plan: write(f.root, '.local/approved-plan.json', f.plan),
+  };
+  const target = { environment: f.plan.environment, buildId: f.plan.build! };
+  const before = assertDataReady(f.root, scope, target);
+  request.dataset.revision = '2';
+  writeFileSync(file, 'amount\n101\n');
+  assert.notEqual(register().index.path, first.index.path);
+  assert.deepEqual(assertDataReady(f.root, scope, target), before);
 });
 
 test('a refreshed starting state must match the reviewed plan, identity, target and validity window', () => {
