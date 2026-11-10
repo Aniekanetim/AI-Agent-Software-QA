@@ -36,6 +36,8 @@ Version 1.8.0 introduces agent tool selection per task and explicit test-data in
 
 Version 1.12.0 applies a 10-character limit to newly generated test-email local parts, including the physical inbox prefix and plus sign. Readable account, purpose and run details stay in the private register. Existing recorded aliases remain unchanged for reuse. The reusable package still contains no selected live mailbox or registered application account.
 
+The [dataset index](QA%20Process%20Context/Test%20Data%20Management/datasets/README.md) gives adopting projects a place for approved reusable files and storage references. The [execution data binding](automation/data/README.md#bind-readiness-to-execution) ties an approved batch to selected data and current state at local preflight, live reservation, or reviewed GitHub regression. Existing records keep their original scope. New bound runs retain data receipts with execution evidence.
+
 ## WebMCP package capability
 
 Version 1.9.0 adds [Chrome DevTools MCP/CLI and WebMCP support](automation/chrome-devtools/README.md). The package remains unconfigured: no product connection, browser profile, live catalogue or WebMCP task authorization is supplied. Existing adopting-project onboarding remains schemaVersion 1 and is preserved. [Validation](docs/webmcp-validation.md) records actual helper/browser results separately from native-harness and real-product access. In an adopting project, retain exact source/build/context/connection references and uncertain invocation history before resuming work.

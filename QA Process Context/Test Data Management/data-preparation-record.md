@@ -8,6 +8,7 @@
 | Conditions / required data and state / applicable source revision | <IDs; unknowns and owner questions> |
 | Environment/build / map dependencies | <separate identities; Unknown when undisclosed> |
 | Preparation authority / permitted operations, volume and limits | <actual task/standing-policy source; do not pre-fill Approved> |
+| Dataset ID/revision and inventory reference | <actual references for supplied data> |
 
 | Data ID / conditions | Required state / origin | Generate, create, reuse or supplied / method and reason | Planned or actual reference / generation rules | Preparation evidence / actual state evidence | Isolation, concurrency, retention and cleanup | Gap / owner question |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -21,3 +22,5 @@ Distinguish local inputs prepared, application records prepared, and application
 ## Review and later use
 
 <Actual preparation/execution authorization and scope, state verification before use, changes, results/defects, retention/reuse actions and accountable owners. A preparation record or structural assessment does not grant approval.>
+
+Link the applicable [readiness receipt](../../automation/data/README.md#bind-readiness-to-execution), including the approved checks, exact input or record identity, state observation window and any refreshed observations. Use a stable scope snapshot for the preparation record's task evidence. Keep historical revisions available where reproduction or retention policy requires them.

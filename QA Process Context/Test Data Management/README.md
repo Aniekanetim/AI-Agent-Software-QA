@@ -2,6 +2,8 @@
 
 Plan data for the conditions being tested, including valid inputs, invalid inputs, boundaries, roles, lifecycle states and relevant combinations. Use synthetic or explicitly permitted data. A prepared account or fixture is not proof of its actual application state.
 
+Place reusable files approved for sharing in [datasets](datasets/README.md). Use its index to find available revisions and permitted environments. Keep locally approved private files under `.local/test-data/` and reference restricted or externally maintained datasets from their approved storage. Add the selected dataset and its actual revision to the task preparation record.
+
 ## Agent initiative and preparation records
 
 Follow the [preparation policy](preparation-policy.md) to decide what can be generated, created or reused within existing authorization and what needs owner assistance. Use the [preparation record](data-preparation-record.md) to distinguish planned work, local inputs prepared and application state verified. Missing attached data is not an automatic blocker. Keep rules, original identities, failed attempts and exact assistance requests visible. The optional [read-only assessor](../../automation/data/README.md) checks record structure/references; it generates nothing and grants no approval.
