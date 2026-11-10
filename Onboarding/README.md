@@ -22,7 +22,7 @@ The commands support the agent's conversation; they do not conduct a standalone 
 1. Establish the project, environments and responsible people.
 2. Choose **provide context**, **discover context** or **combine both**.
 3. Verify existing tools; prepare missing browser, API and GitHub capabilities where applicable.
-4. Discover email integrations and select verification mailboxes.
+4. Reuse or prepare a verification mailbox when a journey needs email.
 5. Establish application access.
 6. Build and review initial project/product understanding.
 7. Choose the task source and configure check-ins, PR triggers and reporting.

@@ -7,11 +7,15 @@ Apply the [global test-mailbox policy](mailbox-policy.md) across projects. When 
 ## Discover, then select
 
 1. Inspect the host's supported integration/plugin/tool directory and nonsecret connected-account metadata. Search there for Gmail when it is not initially exposed. Do not conclude “Gmail unavailable” merely from the initial tool list.
-2. Present **Google — Gmail / Google Workspace**, other discovered providers, **AgentMail**, **Human-assisted verification** and **Set up later**. Show accessible account addresses from profile metadata; do not open email bodies to discover identities.
+2. Reuse a suitable connected account and existing project mailbox selection. Present available account addresses from profile metadata when a choice is needed. Offer **Google — Gmail / Google Workspace**, other discovered providers, **AgentMail** or **Human-assisted verification** as applicable. When the current journey has no email dependency, offer **Set up later**.
 3. Reuse an actual selected account or ask which account/inbox this project should use. Refresh inventory when asked to recheck or when an inbox deletion/change is reported; preserve obsolete snapshots as history. Multiple accounts require explicit bindings. For Gmail, the selected account is its mailbox. Optional query/label filters narrow retrieval, not OAuth authorization.
 4. Establish permitted message scope and verify the required access. Metadata-only permission does not establish OTP/link access. Keep unavailable or deferred capability visible.
 
 The host agent builds an Inventory from actual metadata using the [types](email.ts). `email options --input .local/inventory.json` presents its choice model. An Inventory has schemaVersion 1, harness, executionContext, actual source, providers and accounts. Account fields are provider, accountId, mailboxId, address, connectionReference and authentication (connected/needsAuthentication/denied/unverified). Native connectors use HostMailAdapter callbacks; the package does not invent a universal connector API or authenticate a host account merely by loading JSON.
+
+Run `npm run qa -- email plan --input .local/email-plan.json` for the current journey. Use `{ "needed": false }` when email can wait. For dependent work, supply `needed: true`, the environment, actual destination when known, `operation` (`headers` or `message`), and the current metadata-only inventory. Set the host inventory's `harness` to the ID recorded by `tools bind`; direct discovery uses `directApi`. Include the project `bindingId` when a specific selection applies.
+
+The planner distinguishes a suitable connected account that still needs project selection from an existing binding that can be reused or needs scoped verification. It compares the environment and exact recipient, including an explicitly authorized alias route on a saved binding. A changed identity, destination or harness calls for the affected verification. Header-only checks need identity and listing. OTPs and links also need permitted message content. Use human assistance or wait only on the dependent checks if the destination cannot be accessed.
 
 ## Direct adapters
 

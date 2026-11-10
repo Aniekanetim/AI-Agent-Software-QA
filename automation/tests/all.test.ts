@@ -24,6 +24,7 @@ import * as c from '../onboarding/conversation.js';
 import { readState, readiness, stages, writeState } from '../onboarding/state.js';
 import * as menu from '../settings/menu.js';
 import * as mail from '../email/email.js';
+import { planEmail, type EmailPlanRequest } from '../email/planning.js';
 import { AgentMailAdapter, GmailAdapter, htmlText } from '../email/adapters.js';
 import * as gh from '../github/github.js';
 import { dataScopeDigest } from '../data/readiness.js';
@@ -203,6 +204,36 @@ const inventory = (): mail.Inventory => ({ schemaVersion: 1, harness: 'Synthetic
 function binding(): mail.Binding { return { ...account, id: 'test', environment: 'Synthetic staging', transport: 'host', choiceSource: 'Synthetic mailbox choice', scope: {} }; }
 function mailFixture(r: string) { mail.selectBinding(r, binding(), inventory()); const time = 1_800_000_000_000; const attempt = mail.beginVerification(r, 'test', account.address, 'service@example.test', 'Verification', 'Synthetic authorized attempt', 30_000, time); return { time, attempt }; }
 function message(time: number): mail.Message { return { id: 'message', mailboxId: account.mailboxId, sentAt: new Date(time + 100).toISOString(), from: 'Service <service@example.test>', to: [account.address], subject: 'Verification code', text: 'Your synthetic code is 123456' }; }
+test('email planning defers until needed and reuses only matching scoped mailbox capability', async () => {
+  const r = root();
+  assert.equal(planEmail(r, { needed: false }).state, 'deferred');
+  bindHarness(r, { id: inventory().harness, version: '1', profile: 'test', executionContext: 'interactive', source: 'Synthetic harness' });
+  const request: EmailPlanRequest = { needed: true, environment: binding().environment, recipient: account.address, inventory: inventory(), operation: 'headers' };
+  assert.equal(planEmail(r, { ...request, inventory: undefined }).state, 'discover');
+  assert.equal(planEmail(r, request).state, 'selectConnectedMailbox');
+  const dual = planEmail(r, { ...request, inventory: { ...inventory(), accounts: [account, { ...account, connectionReference: 'host:second-connection' }] } });
+  assert.equal(dual.state, 'selectConnectedMailbox');
+  assert.equal(dual.connected?.length, 2);
+  assert.equal(planEmail(r, { ...request, inventory: { ...inventory(), accounts: [{ ...account, authentication: 'needsAuthentication' }] } }).state, 'reconnectOrChoose');
+  assert.equal(planEmail(r, { ...request, recipient: 'unknown@example.test' }).state, 'chooseAccessRoute');
+  mail.selectBinding(r, binding(), inventory());
+  assert.equal(planEmail(r, request).state, 'verifyAccess');
+  const ref = put(r, '.local/access.md', 'Synthetic scoped operation evidence');
+  let reads = 0;
+  const adapter: mail.MailAdapter = { account: async () => account, list: async () => [message(Date.now())], read: async () => { reads++; return message(Date.now()); } };
+  await mail.verifyBinding(r, 'test', adapter, 'interactive', [ref]);
+  assert.equal(reads, 0);
+  assert.equal(planEmail(r, request).state, 'reuseBinding');
+  assert.equal(planEmail(r, { ...request, operation: 'message' }).state, 'verifyAccess');
+  assert.equal(planEmail(r, { ...request, environment: 'Another environment', bindingId: 'test' }).state, 'confirmBinding');
+  assert.equal(planEmail(r, { ...request, inventory: { ...inventory(), harness: 'Different harness' } }).state, 'discover');
+  await assert.rejects(mail.verifyBinding(r, 'test', adapter, 'scheduled', [ref], 'message'), /Rebind/);
+  assert.equal(reads, 0);
+  await mail.verifyBinding(r, 'test', adapter, 'interactive', [ref], 'message');
+  assert.equal(planEmail(r, { ...request, operation: 'message' }).state, 'reuseBinding');
+  mail.selectBinding(r, { ...binding(), scope: { labels: ['Other scope'] } }, inventory());
+  assert.equal(planEmail(r, request).state, 'verifyAccess');
+});
 test('provider availability does not choose an account or establish message access', async () => {
   const r = root(); assert.equal(mail.providerOptions(inventory())[0]!.accounts.length, 2);
   assert.throws(() => mail.selectBinding(r, { ...binding(), mailboxId: 'missing' }, inventory()));

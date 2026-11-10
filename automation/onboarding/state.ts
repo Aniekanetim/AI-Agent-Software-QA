@@ -6,7 +6,7 @@ export type Stage = typeof stages[number];
 export const mandatoryCheckpoints: ReadonlySet<Stage> = new Set(['project', 'contextRoute', 'understanding', 'operation', 'handoff']);
 export const labels: Record<Stage, string> = {
   project: 'Establish the project, environments and owners', contextRoute: 'Choose how context is established',
-  tools: 'Verify existing tools and prepare missing browser, API and GitHub capabilities', email: 'Discover providers and select verification mailboxes',
+  tools: 'Verify existing tools and prepare missing browser, API and GitHub capabilities', email: 'Reuse or prepare a verification mailbox when needed',
   access: 'Establish application access', understanding: 'Build and review initial project/product understanding',
   operation: 'Choose the task source and configure check-ins, PR triggers and reporting', handoff: 'Verify readiness and explain how work begins',
 };

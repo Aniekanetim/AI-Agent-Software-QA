@@ -9,6 +9,7 @@ import * as browser from './browser/tools.js';
 import * as browserAccess from './browser/access.js';
 import { startFixture } from './browser/fixture.js';
 import * as email from './email/email.js';
+import { planEmail, type EmailPlanRequest } from './email/planning.js';
 import { mailboxPolicy } from './email/policy.js';
 import { prepareTestAccount, readTestAccounts, type AccountRequest } from './email/accounts.js';
 import { AgentMailAdapter, GmailAdapter } from './email/adapters.js';
@@ -31,7 +32,7 @@ import { assessData, type DataPreparation } from './data/preparation.js';
 import { datasetDirectory, inspectDatasets, type DatasetIndex } from './data/datasets.js';
 import { preflightLocalData } from './data/local.js';
 import { inspectSource, type SourceFormat } from './data/source-inspection.js';
-import { dataStatus, listIntake, previewIntake, registerIntake, type IntakeRequest } from './data/intake.js';
+import { dataStatus, listIntake, noteCandidate, previewIntake, registerIntake, type CandidateRequest, type IntakeRequest } from './data/intake.js';
 import * as chromeConfig from './chrome-devtools/config.js';
 import * as chromeTransport from './chrome-devtools/transport.js';
 import * as webmcp from './chrome-devtools/webmcp.js';
@@ -66,14 +67,14 @@ const help = {
   'flow-map': 'validate --input | trace --input --features id,id [--direction upstream/downstream/both] [--max-depth 8] : read-only candidate impact; no test execution or approval',
   coverage: 'assess --input : read-only consistency/count check of a canonical-record snapshot; no execution, approval or product verdict',
   tools: 'bind --input | scan --source [--tool] | select --input | status --tool [--requires operation,operation] | import-host --input | assess-task --input [--claim ID] : read-only assessment of agent-selected capabilities',
-  data: 'status [--input] | inventory [--input] | assess --input | preflight --input | intake-inspect --file [--format] [--table N] [--from-line N] [--through-line N] | intake-preview --input | intake-register --input --preview-sha256 --review-source | intake-list',
+  data: 'status [--input] | inventory [--input] | assess --input | preflight --input | intake-inspect --file [--format] [--table N] [--from-line N] [--through-line N] | intake-note --input | intake-preview --input | intake-register --input --preview-sha256 --review-source | intake-list',
   chrome: 'check --source | mcp-config | rehearse --provider cli/mcpServer [--headless] [--executable path] | session-start --input | page --input | inventory --input | import-host-inventory --input | execute --input | confirm --input | session-stop --id : explicit scoped WebMCP operations; no implicit product authorization',
   postman: 'check --source | login-instructions | run --input | run-status --id : detects/reuses the CLI; local runs need no login; cloud operations need selected account/reporting scope',
   onboarding: 'start | roadmap-shown --source | status | next | queue --input | shown/not-shown --id --source | reply --input | recover | reconcile --input | retire-tool-questions --input | pause/resume --source | clarify/defer --input | check/domains --input | finish --input',
   settings: 'open --source | show | choose --area | edit --input | present | save --input | attention-shown --source | save-attention --input | cancel | back | close',
   browser: 'versions | install | mcp-config | check --provider library/cli/mcpServer [--headless] [--context interactive/scheduled/ci] | import-report --input | fixture',
   'browser-access': 'targets | status | ensure-standard --input | prepare --input | apply --input | native-plan --input | native-apply --input | record --input : prepare the project browser and verify target access',
-  email: 'policy | account --input | accounts | options --input | discover --provider gmailApi/agentmail --source | create-inbox --input | select --input | verify --input | begin --input | outcome --input',
+  email: 'policy | account --input | accounts | options --input | plan --input | discover --provider gmailApi/agentmail --source | create-inbox --input | select --input | verify --input | begin --input | outcome --input',
   github: 'pending-comments | reconcile-comment --input | reconcile-legacy --input --repository --number --policy --target --source | install --source | check --repository | check-in --source | event --repository --number --source | policy-digest --policy | run/dispatch --policy --target --repository --number --source [--data-observations] [--data-scope-digest] | comment --policy --target --repository --number --body --source',
   evidence: '--path [--pointer] : calculate an evidence reference; no product verdict is inferred',
   note: 'Use project-private JSON under .local/ for inputs. The agent presents questions and performs authorized host connections. CLI output is a model, not an actual human conversation or approval. See Onboarding/README.md.',
@@ -152,6 +153,7 @@ async function main() {
   }
   if (area === 'data') {
     if (action === 'status') { output(dataStatus(root, options.has('input') ? option('input') : undefined)); return; }
+    if (action === 'intake-note') { output(noteCandidate(root, input<CandidateRequest>())); return; }
     if (action === 'intake-inspect') {
       output(inspectSource({
         file: option('file'), format: options.get('format') as SourceFormat | undefined,
@@ -321,6 +323,7 @@ async function main() {
     else if (action === 'account') output(prepareTestAccount(root, input<AccountRequest>()));
     else if (action === 'accounts') output(readTestAccounts(root).value);
     else if (action === 'options') output(email.providerOptions(input()));
+    else if (action === 'plan') output(planEmail(root, input<EmailPlanRequest>()));
     else if (action === 'create-inbox') { const v = input<{ source: string; purpose: string }>(); const inbox = await AgentMailAdapter.createInbox(process.env.AGENTMAIL_API_KEY ?? '', v); output({ inbox, next: 'Refresh AgentMail inbox metadata and ask for mailbox selection; creating it does not select or authorize testing it.' }); }
     else if (action === 'discover') {
       const provider = option('provider'); const source = option('source'); let accounts: email.Account[];
@@ -328,7 +331,7 @@ async function main() {
       else if (provider === 'agentmail') accounts = await AgentMailAdapter.inboxes(process.env.AGENTMAIL_API_KEY ?? '');
       else throw new Error('Inspect actual host integration/account metadata for native connectors; direct discovery supports gmailApi or agentmail.');
       const inventory: email.Inventory = { schemaVersion: 1, harness: 'directApi', executionContext: context(), source, providers: [{ id: provider === 'gmailApi' ? 'gmail' : 'agentmail', name: provider, available: true }], accounts };
-      const path = '.local/email-inventory.json'; store.save(root, path, inventory, store.revision(root, path)); output({ inventory, next: 'Present available account addresses and ask for an actual mailbox selection. No message bodies were read.' });
+      const path = '.local/email-inventory.json'; store.save(root, path, inventory, store.revision(root, path)); output({ inventory, next: 'Check the destination and any saved mailbox with email plan. Use the observed addresses when a selection is needed.' });
     } else if (action === 'select') { const v = input<{ binding: email.Binding; inventory: email.Inventory }>(); email.selectBinding(root, v.binding, v.inventory); output({ saved: true, next: 'Verify the required selected-mailbox access.' }); }
     else if (action === 'verify') { const v = input<{ bindingId: string; evidence: store.Evidence[]; messageId?: string }>(); const b = selectedBinding(v.bindingId); const verified = await email.verifyBinding(root, b.id, adapter(b), context(), v.evidence, v.messageId); output({ id: verified.id, verification: verified.verification }); }
     else if (action === 'begin') { const v = input<{ bindingId: string; recipient: string; sender: string; subjectContains: string; source: string; durationMs?: number }>(); output(email.beginVerification(root, v.bindingId, v.recipient, v.sender, v.subjectContains, v.source, v.durationMs)); }

@@ -1,14 +1,17 @@
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { assertNonsecret, contained, digest, load, privatePath, requireText, withLock } from '../shared/store.js';
+import { assertNonsecret, contained, digest, load, privatePath, requireText, save, withLock } from '../shared/store.js';
 import { datasetDirectory, inspectDatasets, type Dataset, type DatasetIndex } from './datasets.js';
 import { inspectSource, type SourceSelection } from './source-inspection.js';
 
 const privateDirectory = '.local/test-data/registrations';
+const candidateDirectory = '.local/test-data/candidates';
 const json = (value: unknown) => JSON.stringify(value, null, 2) + '\n';
 
 interface FieldMapping { from: number; to: string; required?: boolean }
 interface Exclusion { line: number; reason: string }
+interface ProposedUse { task: string; checks: string[]; basis: string[]; openQuestions?: string[] }
+export interface CandidateRequest { reference: string; source?: SourceSelection }
 export interface IntakeRequest {
   dataset: Omit<Dataset, 'source'>;
   reference: string;
@@ -17,6 +20,38 @@ export interface IntakeRequest {
   source?: SourceSelection;
   fields?: FieldMapping[];
   exclude?: Exclusion[];
+  use?: ProposedUse;
+}
+
+function validateReference(reference: string) {
+  requireText(reference, 'Nonsecret canonical source reference');
+  if (/[?#]/.test(reference) || /:\/\/[^/]*@/.test(reference)) throw new Error('Use a source reference without URL credentials, query or fragment.');
+  assertNonsecret(reference);
+}
+
+function proposedUse(use: ProposedUse) {
+  requireText(use.task, 'Task or project-use reference');
+  for (const values of [use.checks, use.basis, use.openQuestions ?? []]) {
+    if (!Array.isArray(values)) throw new Error('Use lists for checks, basis and open questions.');
+    for (const value of values) requireText(value);
+  }
+  if (!use.checks.length || !use.basis.length) throw new Error('Identify the checks and their source basis, or keep the source as a candidate.');
+  return { task: use.task, checks: use.checks, basis: use.basis, openQuestions: use.openQuestions ?? [] };
+}
+
+export function noteCandidate(root: string, request: CandidateRequest) {
+  validateReference(request.reference);
+  const inspection = request.source ? inspectSource(request.source).summary : null;
+  const candidate = { reference: request.reference, inspection };
+  const id = digest(json(candidate));
+  const path = `${candidateDirectory}/${id}.json`;
+  return withLock(root, 'dataset-intake', () => {
+    realDestination(root, path, true);
+    const existing = load<typeof candidate | null>(root, path, () => null);
+    if (existing.revision === null) save(root, path, candidate, null);
+    else if (digest(json(existing.value)) !== id) throw new Error('The retained candidate note changed. Review it before continuing.');
+    return { state: 'candidate', id, path, ...candidate, next: 'Identify the task and permitted use before preparing a dataset revision.' };
+  });
 }
 
 function portableName(value: string) {
@@ -92,6 +127,7 @@ function prepare(root: string, request: IntakeRequest) {
   const indexReference = { path: `${directory}/index.json`, sha256: digest(json(index)) };
   const preview = {
     dataset: entry, reference, mode, visibility, inspection: inspected?.summary ?? null,
+    ...(request.use === undefined ? {} : { use: proposedUse(request.use) }),
     selection: selection && {
       fields: request.fields!.map(({ from, to, required }) => ({ from, to, required: required ?? false })),
       sourceLines: selection.sourceLines, exclusions: selection.exclusions,
@@ -121,6 +157,7 @@ export function registerIntake(root: string, request: IntakeRequest, approvedPre
   assertNonsecret(reviewSource);
   const { preview, previewSha256, directory, index, artifact } = prepare(root, request);
   if (previewSha256 !== approvedPreview) throw new Error('The source or intake plan changed. Review a fresh preview before registration.');
+  if (preview.use?.openQuestions.length) throw new Error('Resolve the open questions or narrow the proposed use before registering the dataset.');
   const isPrivate = preview.visibility === 'private';
   const receipt = json({ previewSha256, reviewSource, ...preview });
   const files = [
@@ -188,9 +225,13 @@ export function listIntake(root: string) {
           if (receipt.index?.path !== indexPath || receipt.index.sha256 !== revision) throw new Error('The registration index changed.');
           const report = inspectDatasets(root, value, isPrivate).datasets;
           if (report.length !== 1 || report[0]!.id !== id.name || report[0]!.revision !== rev.name) throw new Error('Invalid registration identity.');
-          registrations.push({ ...report[0]!, index: { path: indexPath, sha256: revision } });
+          const { purpose, environments, source } = value.datasets[0]!;
+          registrations.push({ ...report[0]!, purpose, environments, sourceKind: source.kind, index: { path: indexPath, sha256: revision } });
         } catch {
-          registrations.push({ id: id.name, revision: rev.name, status: 'needsReview', issues: ['Registration index or dataset files need review.'] });
+          registrations.push({
+            id: id.name, revision: rev.name, purpose: null, environments: [], sourceKind: null,
+            status: 'needsReview', issues: ['Registration index or dataset files need review.'],
+          });
         }
       }
     }
@@ -207,18 +248,38 @@ export function dataStatus(root: string, privateIndex = '.local/dataset-index.js
       if (!existsSync(target)) return [];
       const { value, revision } = load<DatasetIndex>(root, path, () => ({ schemaVersion: 1, datasets: [] }));
       const report = inspectDatasets(root, value, position === 1);
-      return report.datasets.map(dataset => ({ ...dataset, index: { path, sha256: revision } }));
+      return report.datasets.map((dataset, i) => {
+        const { purpose, environments, source } = value.datasets[i]!;
+        return { ...dataset, purpose, environments, sourceKind: source.kind, index: { path, sha256: revision } };
+      });
     } catch {
       issues.push(`Review the ${position === 1 ? 'private' : 'shared'} manual dataset index and its entries.`);
       return [];
     }
   });
+  const candidates = [];
+  try {
+    const folder = realDestination(root, candidateDirectory, true);
+    if (existsSync(folder)) for (const entry of readdirSync(folder, { withFileTypes: true })) {
+      if (!entry.isFile() || !/^[a-f0-9]{64}\.json$/.test(entry.name)) continue;
+      const path = `${candidateDirectory}/${entry.name}`;
+      try {
+        realDestination(root, path, true);
+        const { value } = load<{ reference: string; inspection: { sha256: string; format: string } | null } | null>(root, path, () => null);
+        if (!value || digest(json(value)) + '.json' !== entry.name) throw new Error('Candidate note changed.');
+        validateReference(value.reference);
+        assertNonsecret(value);
+        candidates.push({ reference: value.reference, sourceSha256: value.inspection?.sha256 ?? null, format: value.inspection?.format ?? null, path });
+      } catch { issues.push('Review a changed or unreadable candidate source note.'); }
+    }
+  } catch { issues.push('Check access to the private candidate source notes.'); }
   const datasets = [...manual, ...registrations];
   const needsReview = Boolean(issues.length || datasets.some(item => item.status === 'needsReview'));
   return {
-    datasets, issues, state: needsReview ? 'needsReview' : datasets.length ? 'available' : 'empty',
+    datasets, candidates, issues, state: needsReview ? 'needsReview' : datasets.length ? 'available' : candidates.length ? 'candidates' : 'empty',
     next: needsReview ? 'Review the affected entries. Use other applicable datasets for independent work.'
       : datasets.length ? 'Select a revision that fits the task and verify its permitted use and required starting state.'
+      : candidates.length ? 'Use the task and project rules to assess whether a candidate source fits, then preview its proposed use.'
       : 'Continue onboarding or task planning. When a check needs data, share a source or prepare suitable synthetic inputs within scope.',
     guide: 'automation/data/intake.md',
   };
