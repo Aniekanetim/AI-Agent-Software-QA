@@ -73,6 +73,8 @@ For each sandbox, verify inspection and preview, initial QA pickup, retest picku
 
 Record the gate decision as private JSON after the actual conversation. Use `claimId`, `ticketRevision`, `gate`, `decision` (`Approved` or `Approved with limits`), `reviewer`, `source` and `packet` (evidence reference). Include `target: { buildId, environment }` for G2/G4. Retain any limits in the referenced packet and apply them during execution.
 
+For a [data-aware scope](../data/README.md#bind-readiness-to-execution), include the approved `dataScope` in G2 and, on retest, the matching G4 decision. Supply any refreshed `dataObservations` to preflight and begin. Run preflight again before resumed actions. Begin checks the binding before reservation and retains it with the run. Use the original ticket question for a blocked dependency and approve an independent batch separately.
+
 ## Publish reviewed results
 
 Prepare `{ id, claimId, action, ... }` for `task-source publication-preview --input`. For `comment`, include the reviewed `body`. For `createDefect`, include `title` and `body`; the helper links the originating native ticket. For `move`, set `to` to `testedOk` after G5 or `rework` for a G3-confirmed failed retest. Review the exact preview with the human. Include its `publicationDigest` in the actual decision record. When one decision covers several exact previews, record their digests in `publicationDigests`.

@@ -7,6 +7,7 @@ import { selectedCommand, runProcess } from '../tools/registry.js';
 import { contained, load, save, revision, replace, digest, requireText, verifyEvidence, withLock, assertNonsecret, type Evidence } from '../shared/store.js';
 
 import { requireLocalSource } from '../task-source/config.js';
+import { assertDataReady, dataScopeDigest, type DataReceipt, type DataScope } from '../data/readiness.js';
 
 const exec = promisify(execFile);
 export type GhRunner = (args: string[]) => Promise<string>;
@@ -90,7 +91,8 @@ export interface RegressionPolicy {
   schemaVersion: 1; id: string; revision: string; approval: Evidence; repositories: RepositoryRule[];
   allowForks: boolean; allowMergeCommit: boolean; suiteId: string; suiteEvidence: Evidence[];
   command: { executable: string; args: string[] }; timeoutMs: number; targetId: string;
-  dispatch?: { workflow: string; ref: string };
+  dataScope?: DataScope;
+  dispatch?: { workflow: string; ref: string; dataReceiver?: Evidence };
 }
 export interface ObservedTarget { id: string; commit: string; buildId: string; evidence: Evidence }
 export function policyDigest(policy: RegressionPolicy): string { const { approval: _approval, ...scope } = policy; return digest(JSON.stringify(scope)); }
@@ -108,7 +110,30 @@ export function assertRegression(root: string, policy: RegressionPolicy, pr: Pul
   if (!policy.command.executable || !Array.isArray(policy.command.args) || policy.command.args.some(a => typeof a !== 'string') || /[\r\n\0]/.test(policy.command.executable)) throw new Error('Use an explicit executable and argument array without a shell.');
   return digest(JSON.stringify({ repository: pr.repository, pr: pr.number, head: pr.head, tested: target.commit, build: target.buildId, policy: policy.id, revision: policy.revision, scopeDigest: policyDigest(policy), suite: policy.suiteId, evidence: policy.suiteEvidence, target: target.id }));
 }
-interface RunRecord { schemaVersion: 1; key: string; head: string; testedCommit: string; buildId: string; status: 'running' | 'completed' | 'uncertain'; startedAt: string; completedAt?: string; exitCode?: number; productVerdict: 'Not assessed'; source: string; ticketId: string; generation: string; operationId: string; lifecycleStopRequested?: boolean }
+interface RunRecord { schemaVersion: 1; key: string; head: string; testedCommit: string; buildId: string; status: 'running' | 'completed' | 'uncertain'; startedAt: string; completedAt?: string; exitCode?: number; productVerdict: 'Not assessed'; source: string; ticketId: string; generation: string; operationId: string; lifecycleStopRequested?: boolean; data?: DataReceipt }
+interface RegressionData { observations?: Evidence[]; expectedDigest?: string }
+
+function checkDataRequest(policy: RegressionPolicy, input: RegressionData) {
+  if (policy.dataScope === undefined && (input.observations !== undefined || input.expectedDigest !== undefined)) throw new Error('Data arguments need a reviewed regression data scope.');
+  if (input.expectedDigest !== undefined && (!policy.dataScope || input.expectedDigest !== dataScopeDigest(policy.dataScope))) throw new Error('The dispatched data scope must match the runner policy.');
+}
+function regressionData(root: string, policy: RegressionPolicy, target: ObservedTarget, input: RegressionData) {
+  return policy.dataScope === undefined ? undefined : assertDataReady(root, policy.dataScope, { environment: target.id, buildId: target.buildId }, input.observations);
+}
+
+async function verifyDataReceiver(root: string, dispatch: NonNullable<RegressionPolicy['dispatch']>, repository: string, runner: GhRunner) {
+  validateRepository(repository);
+  const receiver = dispatch.dataReceiver;
+  if (!receiver || receiver.pointer !== undefined || !/^[\w.-]+\.ya?ml$/.test(dispatch.workflow) || receiver.path !== `.github/workflows/${dispatch.workflow}`) {
+    throw new Error('Data-aware dispatch needs the reviewed receiver workflow and its full-file hash.');
+  }
+  verifyEvidence(root, receiver);
+  const remote = JSON.parse(await runner(['api', `repos/${repository}/contents/${receiver.path}?ref=${encodeURIComponent(dispatch.ref)}`]));
+  if (remote?.type !== 'file' || remote.encoding !== 'base64' || typeof remote.content !== 'string' ||
+      digest(Buffer.from(remote.content, 'base64')) !== receiver.sha256) {
+    throw new Error('The workflow at the dispatch ref differs from the reviewed data receiver.');
+  }
+}
 export type RegressionRunner = (command: { executable: string; args: string[] }, options: { cwd: string; windowsHide: boolean; timeout: number; maxBuffer: number; env: NodeJS.ProcessEnv; signal: AbortSignal }) => Promise<unknown>;
 type LegacyKind = 'localRegression' | 'workflowDispatch';
 interface LegacyObservation { ticketId: string; generation?: string; kind?: LegacyKind; terminalState: 'completed' | 'stopped' | 'notStarted'; nextAction?: 'retain' | 'retry'; retrySource?: string; legacyRecords: Evidence[]; evidence: Evidence[]; history?: Evidence }
@@ -195,7 +220,8 @@ function watchTicket(root: string, ticket: Ticket, operationId: string, onStop: 
   const timer = setInterval(check, 100);
   return { finish: () => { clearInterval(timer); check(); return requested; } };
 }
-export async function executeRegression(root: string, policy: RegressionPolicy, pr: PullRequest, target: ObservedTarget, source: string, runner: RegressionRunner = (command, options) => exec(command.executable, command.args, options)) {
+export async function executeRegression(root: string, policy: RegressionPolicy, pr: PullRequest, target: ObservedTarget, source: string, runner: RegressionRunner = (command, options) => exec(command.executable, command.args, options), dataInput: RegressionData = {}) {
+  checkDataRequest(policy, dataInput);
   requireText(source); let binding = runBinding(root, policy, pr, target, 'localRegression');
   const { ticket, key } = binding, path = `.local/github-runs/${key}.json`;
   const existing = load<RunRecord | null>(root, path, () => null);
@@ -219,10 +245,13 @@ export async function executeRegression(root: string, policy: RegressionPolicy, 
       assertExecutable(root, ticket.id, ticket.generation);
       if (revision(root, path)) throw new Error('Another worker already claimed this regression.');
       assertLegacyStart(root, binding);
+      const data = regressionData(root, policy, target, dataInput);
+      if (data) record.data = data;
       startOperation(root, ticket, { id: operationId, source, kind: 'localRegression', resultPath: path });
       save(root, path, record, null);
       monitor = watchTicket(root, ticket, operationId, () => controller.abort());
-      return runner(policy.command, { cwd: root, windowsHide: true, signal: controller.signal, timeout: policy.timeoutMs, maxBuffer: 8_000_000, env: { ...process.env, QA_PR_HEAD: pr.head, QA_TESTED_COMMIT: target.commit, QA_BUILD_ID: target.buildId, QA_RUN_KEY: key, QA_RESULT_DIR: resultFolder } });
+      const dataEnv = data ? { QA_DATA_SCOPE_DIGEST: data.scopeDigest, QA_DATA_CHECK_IDS: JSON.stringify(data.checks.map(check => check.id)), QA_DATA_PLAN_PATH: data.plan?.path ?? '', QA_DATA_PLAN_SHA256: data.plan?.sha256 ?? '' } : {};
+      return runner(policy.command, { cwd: root, windowsHide: true, signal: controller.signal, timeout: policy.timeoutMs, maxBuffer: 8_000_000, env: { ...process.env, QA_PR_HEAD: pr.head, QA_TESTED_COMMIT: target.commit, QA_BUILD_ID: target.buildId, QA_RUN_KEY: key, QA_RESULT_DIR: resultFolder, ...dataEnv } });
     });
     await work;
   }
@@ -238,7 +267,8 @@ export async function executeRegression(root: string, policy: RegressionPolicy, 
   if (uncertain) throw new Error('Regression outcome is uncertain. A stop request or AbortError does not prove process-tree termination; inspect actual state and retained results before recovery.');
   return { action: 'executed', record, resultFolder, next: 'Retain redacted suite artifacts in QA_RESULT_DIR, inspect their actual checks and continue findings review; process exit alone is not a QA verdict.' };
 }
-export async function dispatchRegression(root: string, policy: RegressionPolicy, pr: PullRequest, target: ObservedTarget, runner: GhRunner = runGh) {
+export async function dispatchRegression(root: string, policy: RegressionPolicy, pr: PullRequest, target: ObservedTarget, runner: GhRunner = runGh, dataInput: RegressionData = {}) {
+  checkDataRequest(policy, dataInput);
   let binding = runBinding(root, policy, pr, target, 'workflowDispatch');
   const { ticket, key } = binding; if (!policy.dispatch) throw new Error('No workflow dispatch was approved.');
   const path = `.local/github-dispatch/${key}.json`;
@@ -252,26 +282,41 @@ export async function dispatchRegression(root: string, policy: RegressionPolicy,
   }
   const retained = retainLegacy(root, binding);
   if (retained) return { key, action: 'unchanged', retained, result: 'Original dispatch and terminal observation retained; suite results and QA verdict require their actual evidence.' };
+  if (policy.dataScope !== undefined) {
+    regressionData(root, policy, target, dataInput);
+    await verifyDataReceiver(root, policy.dispatch, pr.repository, runner);
+  }
   const operationId = `dispatch-${key}`;
+  let data: DataReceipt | undefined;
   const previous = withLock(root, 'qa-board', () => {
     assertExecutable(root, ticket.id, ticket.generation);
     const existing = load<{ state: string } | null>(root, path, () => null).value;
     if (existing?.state === 'dispatched') return existing;
     if (existing) throw new Error('A dispatch already exists and its outcome is uncertain. Inspect its actual GitHub run before repeating.');
     assertLegacyStart(root, binding);
+    data = regressionData(root, policy, target, dataInput);
     startOperation(root, ticket, { id: operationId, source: `Reviewed policy ${policy.id}/${policy.revision}; ${pr.url}`, kind: 'workflowDispatch', resultPath: path });
-    save(root, path, { key, state: 'invoking', head: pr.head, testedCommit: target.commit, ticketId: ticket.id, generation: ticket.generation, operationId, workflow: policy.dispatch!.workflow, ref: policy.dispatch!.ref }, null);
+    save(root, path, { key, state: 'invoking', head: pr.head, testedCommit: target.commit, ticketId: ticket.id, generation: ticket.generation, operationId, workflow: policy.dispatch!.workflow, ref: policy.dispatch!.ref, ...(data ? { data } : {}) }, null);
     return null;
   });
   if (previous) return { ...previous, key, action: 'unchanged', result: 'Not yet observed' };
   const monitor = watchTicket(root, ticket, operationId, () => {});
   let sent = false;
   try {
-    const work = withLock(root, 'qa-board', () => { assertExecutable(root, ticket.id, ticket.generation); sent = true; return runner(['workflow', 'run', policy.dispatch!.workflow, '--repo', pr.repository, '--ref', policy.dispatch!.ref, '-f', `qa_run_key=${key}`, '-f', `pr_head=${pr.head}`, '-f', `tested_commit=${target.commit}`]); });
+    const work = withLock(root, 'qa-board', () => {
+      assertExecutable(root, ticket.id, ticket.generation);
+      regressionData(root, policy, target, dataInput);
+      sent = true;
+      return runner(['workflow', 'run', policy.dispatch!.workflow, '--repo', pr.repository, '--ref', policy.dispatch!.ref, '-f', `qa_run_key=${key}`, '-f', `pr_head=${pr.head}`, '-f', `tested_commit=${target.commit}`, ...(data ? ['-f', `qa_data_scope=${data.scopeDigest}`] : [])]);
+    });
     const observed = await work;
     const requested = monitor.finish();
-    save(root, path, { key, state: 'dispatched', head: pr.head, testedCommit: target.commit, ticketId: ticket.id, generation: ticket.generation, operationId, observation: observed.trim(), lifecycleStopRequested: requested, result: 'Remote run state not yet observed; dispatch acknowledgement is not completion or cancellation.' }, revision(root, path));
-  } catch { monitor.finish(); save(root, path, { key, state: sent ? 'uncertain' : 'notStarted', head: pr.head, ticketId: ticket.id, operationId }, revision(root, path)); throw new Error(sent ? 'Workflow dispatch outcome is uncertain; inspect GitHub rather than dispatching again.' : 'Ticket changed before dispatch; no workflow request was sent.'); }
+    save(root, path, { key, state: 'dispatched', head: pr.head, testedCommit: target.commit, ticketId: ticket.id, generation: ticket.generation, operationId, observation: observed.trim(), lifecycleStopRequested: requested, result: 'Remote run state not yet observed; dispatch acknowledgement is not completion or cancellation.', ...(data ? { data } : {}) }, revision(root, path));
+  } catch (error) {
+    monitor.finish(); save(root, path, { key, state: sent ? 'uncertain' : 'notStarted', head: pr.head, ticketId: ticket.id, operationId, ...(data ? { data } : {}) }, revision(root, path));
+    if (!sent) throw new Error(`No workflow request was sent. ${(error as Error).message}`);
+    throw new Error('Workflow dispatch outcome is uncertain; inspect GitHub rather than dispatching again.');
+  }
   finally { operationState(root, operationId, sent ? 'uncertain' : 'finished'); }
   return { key, operationId, ticketId: ticket.id, action: 'dispatched', state: 'dispatched', result: 'Remote run state not yet observed' };
 }

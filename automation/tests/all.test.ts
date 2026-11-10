@@ -25,6 +25,7 @@ import * as menu from '../settings/menu.js';
 import * as mail from '../email/email.js';
 import { AgentMailAdapter, GmailAdapter, htmlText } from '../email/adapters.js';
 import * as gh from '../github/github.js';
+import { dataScopeDigest } from '../data/readiness.js';
 import * as taskSource from '../task-source/work.js';
 import { type LiveChoice } from '../task-source/config.js';
 import { upgradeBoard } from '../board/board.js';
@@ -226,6 +227,41 @@ test('uncertain dispatch cannot be duplicated and local-only policy cannot publi
   assert.equal((await gh.publishComment(r2, reviewed.policy, pr(), reviewed.target, '.local/report.md', async () => { publications++; return 'Synthetic comment receipt'; })).action, 'published');
   assert.equal((await gh.publishComment(r2, reviewed.policy, pr(), reviewed.target, '.local/report.md', async () => { publications++; return ''; })).action, 'unchanged'); assert.equal(publications, 2);
 });
+test('reviewed GitHub data scopes bind the runner and verify the remote dispatch receiver', async () => {
+  const r = root(), { policy, target } = reviewedPolicy(r);
+  policy.dataScope = { schemaVersion: 1, mode: 'none', checks: [{ id: 'CHECK-1', conditionIds: ['COND-1'], dataItemIds: [] }] };
+  const receiver = put(r, '.github/workflows/fixture.yml', '# Synthetic receiver verifies qa_data_scope at start');
+  policy.dispatch!.dataReceiver = receiver;
+  policy.approval = put(r, '.local/approval.json', { decision: 'Approved', reviewer: 'Synthetic fixture', source: 'Synthetic data approval', policyDigest: gh.policyDigest(policy) });
+  const expectedDigest = dataScopeDigest(policy.dataScope);
+  let invocations = 0;
+  await assert.rejects(gh.dispatchRegression(r, policy, pr(), target, async () => {
+    invocations++; return JSON.stringify({ type: 'file', encoding: 'base64', content: Buffer.from('different workflow').toString('base64') });
+  }), /differs from the reviewed/);
+  assert.equal(invocations, 1);
+  const dispatch = await gh.dispatchRegression(r, policy, pr(), target, async args => {
+    invocations++;
+    if (args[0] === 'api') {
+      const content = readFileSync(resolve(r, receiver.path)).toString('base64');
+      return JSON.stringify({ type: 'file', encoding: 'base64', content });
+    }
+    assert(args.includes(`qa_data_scope=${expectedDigest}`));
+    return 'Synthetic dispatch acknowledgement';
+  });
+  assert.equal(dispatch.action, 'dispatched');
+  assert.equal(invocations, 3);
+  const r2 = root(), reviewed = reviewedPolicy(r2);
+  reviewed.policy.dataScope = policy.dataScope;
+  reviewed.policy.approval = put(r2, '.local/approval.json', { decision: 'Approved', reviewer: 'Synthetic fixture', source: 'Synthetic data approval', policyDigest: gh.policyDigest(reviewed.policy) });
+  await assert.rejects(gh.executeRegression(r2, reviewed.policy, pr(), reviewed.target, 'Fixture', async () => { throw new Error('Unexpected start'); }, { expectedDigest: 'different' }), /must match the runner policy/);
+  const execution = await gh.executeRegression(r2, reviewed.policy, pr(), reviewed.target, 'Fixture', async (_command, { env }) => {
+    assert.equal(env.QA_DATA_SCOPE_DIGEST, expectedDigest);
+    assert.equal(env.QA_DATA_CHECK_IDS, '["CHECK-1"]');
+  }, { expectedDigest });
+  assert.equal(execution.record.data?.scopeDigest, expectedDigest);
+  assert.equal(execution.record.exitCode, 0);
+});
+
 test('regression records completed failures, preserves results per revision and blocks uncertain retries', async () => {
   const r = root(), { policy, target } = reviewedPolicy(r); let calls = 0;
   const run: gh.RegressionRunner = async (_command, options) => { calls++; assert.equal(options.env.QA_TESTED_COMMIT, target.commit); assert(options.env.QA_RESULT_DIR); throw { code: 1, killed: false }; };

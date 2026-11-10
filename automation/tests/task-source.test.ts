@@ -9,6 +9,7 @@ import { prepareWrite, readBoard, type Connection } from '../task-source/provide
 import * as live from '../task-source/work.js';
 import { upgradeBoard, tickets } from '../board/board.js';
 import * as menu from '../settings/menu.js';
+import type { DataScope } from '../data/readiness.js';
 
 const time = '2026-01-01T00:00:00Z';
 const epoch = String(Date.parse(time));
@@ -167,6 +168,54 @@ test('Claims are exclusive and status, assignment and pending work control conti
   live.closeClaim(f.root, { claimId: claim.id, source: 'Synthetic verified disposition', evidence: [f.put('.local/disposition.json', { checked: true })] });
   f.board.tickets[0]!.state = 'qa';
   assert.deepEqual((await live.checkIn(f.root, f.reader)).candidates, []);
+});
+
+test('live execution holds a required data dependency before reservation and records an approved independent run', async () => {
+  const f = fixture(); await f.select(); const claim = await f.claim();
+  const packet = f.put('.local/packet.json', { scope: 'Synthetic gate packet' });
+  const observed = { claimId: claim.id, ticketRevision: claim.ticket.revision, buildId: 'B-1', environment: 'staging', source: 'Synthetic target', observedAt: time };
+  const target = f.put('.local/target.json', observed);
+  const plan = f.put('.local/plan.json', {
+    schemaVersion: 1, id: 'fixture-plan', revision: '1', task: packet, environment: observed.environment, build: observed.buildId,
+    items: [{ id: 'DATA-1', conditionIds: ['COND-1'], requiredState: 'Confirmed settlement', kind: 'externalState', approach: 'supplied', classification: 'synthetic',
+      basis: [packet], authorization: [packet], identity: { mode: 'none', originalReference: null },
+      controls: { isolation: 'fixture', concurrency: 'exclusive', retention: 'retain evidence', cleanup: 'none' },
+      preparation: { status: 'blocked', method: 'Approved fixture', dataReference: null, generationRules: null, evidence: [] },
+      stateVerification: { status: 'notVerified', dataReference: null, environment: null, build: null, evidence: [] },
+      blocker: { reason: 'Settlement unavailable', attempts: 'Checked sandbox', needed: 'Supply confirmed settlement', owner: 'Fixture owner', questionReference: 'Q1' } }],
+  });
+  const decisions = (dataScope: DataScope) => {
+    const decision = { claimId: claim.id, ticketRevision: claim.ticket.revision, decision: 'Approved', reviewer: 'Synthetic QA', source: 'Synthetic response', packet };
+    return { G1: f.put('.local/g1.json', { ...decision, gate: 'G1' }), G2: f.put('.local/g2.json', { ...decision, gate: 'G2', target: observed, dataScope }) };
+  };
+  const blocked = decisions({ schemaVersion: 1, mode: 'required', plan, checks: [{ id: 'SETTLEMENT', conditionIds: ['COND-1'], dataItemIds: ['DATA-1'] }] });
+  const request = { id: 'run', claimId: claim.id, target, buildId: observed.buildId };
+  await assert.rejects(live.beginExecution(f.root, { ...request, gates: blocked }, f.reader), /SETTLEMENT.*Supply confirmed settlement/);
+  assert.equal(live.claimHistory(f.root, claim.id).executions.length, 0);
+  const independent = decisions({ schemaVersion: 1, mode: 'none', checks: [{ id: 'INPUT-VALIDATION', conditionIds: ['COND-2'], dataItemIds: [] }] });
+  const run = await live.beginExecution(f.root, { ...request, gates: independent }, f.reader);
+  assert.equal(run.data?.checks[0]?.id, 'INPUT-VALIDATION');
+  assert.deepEqual(live.claimHistory(f.root, claim.id).executions[0]?.data, run.data);
+});
+
+test('a managed live retest requires matching G2 and G4 data decisions', async () => {
+  const f = fixture();
+  f.board.tickets[0]!.state = 'retest';
+  await f.select(); const claim = await f.claim();
+  const packet = f.put('.local/packet.json', { scope: 'Synthetic retest' });
+  const observed = { claimId: claim.id, ticketRevision: claim.ticket.revision, buildId: 'B-1', environment: 'staging', source: 'Synthetic target', observedAt: time };
+  const target = f.put('.local/target.json', observed);
+  const dataScope: DataScope = { schemaVersion: 1, mode: 'none', checks: [{ id: 'RETEST', conditionIds: ['COND-1'], dataItemIds: [] }] };
+  const decision = (gate: live.Gate['gate'], scope?: DataScope) => f.put(`.local/${gate}.json`, {
+    claimId: claim.id, ticketRevision: claim.ticket.revision, decision: 'Approved', reviewer: 'Synthetic QA', source: 'Synthetic response', packet,
+    gate, target: observed, dataScope: scope,
+  });
+  const gates = { G1: decision('G1'), G2: decision('G2', dataScope), G4: decision('G4') };
+  const request = { id: 'run', claimId: claim.id, target, buildId: observed.buildId, gates };
+  await assert.rejects(live.beginExecution(f.root, request, f.reader), /must agree/);
+  assert.equal(live.claimHistory(f.root, claim.id).executions.length, 0);
+  gates.G4 = decision('G4', dataScope);
+  assert.equal((await live.beginExecution(f.root, request, f.reader)).data?.mode, 'none');
 });
 
 test('Execution and publication bind actual review evidence, and uncertain publication cannot be repeated', async () => {

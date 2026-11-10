@@ -6,7 +6,8 @@ export interface DataItem {
   kind: 'localInput' | 'applicationState' | 'externalState'; approach: 'generate' | 'create' | 'reuse' | 'supplied';
   classification: 'synthetic' | 'explicitlyPermitted'; basis: Evidence[]; authorization: Evidence[];
   preparation: { status: 'planned' | 'prepared' | 'blocked'; method: string; dataReference: string | null; generationRules: string | null; evidence: Evidence[] };
-  stateVerification: { status: 'notVerified' | 'verified'; dataReference: string | null; environment: string | null; build: string | null; evidence: Evidence[] };
+  stateVerification: { status: 'notVerified' | 'verified'; dataReference: string | null; environment: string | null; build: string | null; evidence: Evidence[]; observedAt?: string; recheckAfter?: string };
+  dataset?: { index: Evidence; id: string; revision: string };
   identity: { mode: 'fresh' | 'reuse' | 'none'; originalReference: string | null };
   controls: { isolation: string; concurrency: string; retention: string; cleanup: string };
   blocker: { reason: string; attempts: string; needed: string; owner: string; questionReference: string } | null;
