@@ -30,6 +30,8 @@ The commands support the agent's conversation; they do not conduct a standalone 
 
 The sequence follows dependencies. A staging-only project does not need an application checkout. A project without GitHub access can still use discovery and the local board. Email can be deferred when no current journey needs it. Every context domain must still have a source, justified non-applicability or a question with an owner.
 
+If your project data will arrive later, say **I’ll add test data when I have a task that needs it**. The agent records this in the handoff and continues the remaining onboarding steps. Later, share the file or storage reference with the task, or open **Settings → Test data and datasets** to see what is available. [Guided data intake](../automation/data/intake.md)
+
 ## Choose and verify integrations
 
 Start with [shared tool discovery](../automation/tools/README.md). The agent inspects existing installations, saved selections and native connections through the actual calling harness. Working setup is reused; only missing choices or capabilities need preparation. Version checks, authenticated identity and successful operations remain separate.

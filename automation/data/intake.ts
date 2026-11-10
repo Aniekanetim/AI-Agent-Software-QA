@@ -158,12 +158,23 @@ export function registerIntake(root: string, request: IntakeRequest, approvedPre
 
 export function listIntake(root: string) {
   const registrations = [];
+  const issues: string[] = [];
   for (const [directory, isPrivate] of [[datasetDirectory, false], [privateDirectory, true]] as const) {
-    const base = realDestination(root, directory, isPrivate);
-    if (!existsSync(base)) continue;
-    for (const id of readdirSync(base, { withFileTypes: true })) {
+    let base: string;
+    let entries;
+    try {
+      base = realDestination(root, directory, isPrivate);
+      entries = existsSync(base) ? readdirSync(base, { withFileTypes: true }) : [];
+    } catch {
+      issues.push(`Check access to the ${isPrivate ? 'private' : 'shared'} dataset registration folder.`);
+      continue;
+    }
+    for (const id of entries) {
       if (!id.isDirectory() || !portableName(id.name)) continue;
-      for (const rev of readdirSync(join(base, id.name), { withFileTypes: true })) {
+      let revisions;
+      try { revisions = readdirSync(join(base, id.name), { withFileTypes: true }); }
+      catch { issues.push(`Check access to dataset ${id.name} in the ${isPrivate ? 'private' : 'shared'} registration folder.`); continue; }
+      for (const rev of revisions) {
         if (!rev.isDirectory() || !portableName(rev.name)) continue;
         const path = `${directory}/${id.name}/${rev.name}`;
         if (!existsSync(join(base, id.name, rev.name, 'intake.json'))) continue;
@@ -184,5 +195,31 @@ export function listIntake(root: string) {
       }
     }
   }
-  return { registrations };
+  return { registrations, issues };
+}
+
+export function dataStatus(root: string, privateIndex = '.local/dataset-index.json') {
+  const { registrations, issues } = listIntake(root);
+  const indexes = [`${datasetDirectory}/index.json`, privateIndex];
+  const manual = indexes.flatMap((path, position) => {
+    try {
+      const target = position === 1 ? privatePath(root, path) : contained(root, path);
+      if (!existsSync(target)) return [];
+      const { value, revision } = load<DatasetIndex>(root, path, () => ({ schemaVersion: 1, datasets: [] }));
+      const report = inspectDatasets(root, value, position === 1);
+      return report.datasets.map(dataset => ({ ...dataset, index: { path, sha256: revision } }));
+    } catch {
+      issues.push(`Review the ${position === 1 ? 'private' : 'shared'} manual dataset index and its entries.`);
+      return [];
+    }
+  });
+  const datasets = [...manual, ...registrations];
+  const needsReview = Boolean(issues.length || datasets.some(item => item.status === 'needsReview'));
+  return {
+    datasets, issues, state: needsReview ? 'needsReview' : datasets.length ? 'available' : 'empty',
+    next: needsReview ? 'Review the affected entries. Use other applicable datasets for independent work.'
+      : datasets.length ? 'Select a revision that fits the task and verify its permitted use and required starting state.'
+      : 'Continue onboarding or task planning. When a check needs data, share a source or prepare suitable synthetic inputs within scope.',
+    guide: 'automation/data/intake.md',
+  };
 }

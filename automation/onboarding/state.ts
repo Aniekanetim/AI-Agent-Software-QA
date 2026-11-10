@@ -3,6 +3,7 @@ import { integrationStatus } from './integrations.js';
 
 export const stages = ['project', 'contextRoute', 'tools', 'email', 'access', 'understanding', 'operation', 'handoff'] as const;
 export type Stage = typeof stages[number];
+export const mandatoryCheckpoints: ReadonlySet<Stage> = new Set(['project', 'contextRoute', 'understanding', 'operation', 'handoff']);
 export const labels: Record<Stage, string> = {
   project: 'Establish the project, environments and owners', contextRoute: 'Choose how context is established',
   tools: 'Verify existing tools and prepare missing browser, API and GitHub capabilities', email: 'Discover providers and select verification mailboxes',
@@ -48,12 +49,25 @@ export function writeState(root: string, state: SetupState, expected: string | n
 export function assessReadiness(root: string, state: SetupState, includeHandoff = true) {
   validateState(state);
   const findings: { stage: Stage; message: string; next: string }[] = [];
+  const deferredChecks: { stage: Stage; label: string; reason: string; next: string }[] = [];
   const report = (stage: Stage, message: string, next = message) => { findings.push({ stage, message, next }); };
   for (const stage of stages.filter(s => includeHandoff || s !== 'handoff')) {
     const check = state.checks[stage];
-    if (['project', 'contextRoute', 'understanding', 'operation', 'handoff'].includes(stage) && check.status === 'notApplicable') report(stage, `${stage}: this checkpoint is mandatory; record scoped knowledge and gaps instead`);
-    if (!['verified', 'notApplicable'].includes(check.status)) report(stage, `${stage}: ${check.nextAction ?? check.reason ?? check.status}`,
-      check.nextAction ?? check.reason ?? 'Inspect existing sources and prepare the missing evidence for this checkpoint.');
+    const optional = !mandatoryCheckpoints.has(stage);
+    if (!optional && ['deferred', 'notApplicable'].includes(check.status)) {
+      report(stage, `${labels[stage]} is required. Record the scope and any open questions.`);
+      continue;
+    }
+    if (optional && check.status === 'deferred' && check.reason?.trim()) {
+      deferredChecks.push({ stage, label: labels[stage], reason: check.reason, next: check.nextAction ?? 'Verify this capability when an assigned task needs it.' });
+      continue;
+    }
+    if (!['verified', 'notApplicable'].includes(check.status)) {
+      const next = stage === 'handoff' ? 'Prepare the scoped handoff and submit its evidence with onboarding finish.'
+        : optional && check.status === 'pending' ? 'Verify what the project needs now, or record why this checkpoint can wait.'
+        : 'Inspect existing sources and prepare the missing evidence for this checkpoint.';
+      report(stage, `${stage}: ${check.nextAction ?? check.reason ?? check.status}`, check.nextAction ?? check.reason ?? next);
+    }
     if (check.status === 'notApplicable' && !check.reason) report(stage, `${stage}: a non-applicability reason is required`);
     if (check.status === 'verified' && (!check.evidence.length || !check.checkedAt)) report(stage, `${stage}: observed evidence is required`);
     for (const ref of check.evidence) {
@@ -92,7 +106,7 @@ export function assessReadiness(root: string, state: SetupState, includeHandoff 
   if (state.paused) issues.push('Onboarding is paused.');
   const stage = stages.find(stage => findings.some(finding => finding.stage === stage));
   const blocker = findings.find(finding => finding.stage === stage);
-  return { status: { ready: !issues.length, issues, capabilityIssues }, blocker };
+  return { status: { ready: !issues.length, issues, capabilityIssues, deferredChecks }, blocker };
 }
 export function readiness(root: string, state: SetupState, includeHandoff = true) {
   return assessReadiness(root, state, includeHandoff).status;

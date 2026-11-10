@@ -31,7 +31,7 @@ import { assessData, type DataPreparation } from './data/preparation.js';
 import { datasetDirectory, inspectDatasets, type DatasetIndex } from './data/datasets.js';
 import { preflightLocalData } from './data/local.js';
 import { inspectSource, type SourceFormat } from './data/source-inspection.js';
-import { listIntake, previewIntake, registerIntake, type IntakeRequest } from './data/intake.js';
+import { dataStatus, listIntake, previewIntake, registerIntake, type IntakeRequest } from './data/intake.js';
 import * as chromeConfig from './chrome-devtools/config.js';
 import * as chromeTransport from './chrome-devtools/transport.js';
 import * as webmcp from './chrome-devtools/webmcp.js';
@@ -66,7 +66,7 @@ const help = {
   'flow-map': 'validate --input | trace --input --features id,id [--direction upstream/downstream/both] [--max-depth 8] : read-only candidate impact; no test execution or approval',
   coverage: 'assess --input : read-only consistency/count check of a canonical-record snapshot; no execution, approval or product verdict',
   tools: 'bind --input | scan --source [--tool] | select --input | status --tool [--requires operation,operation] | import-host --input | assess-task --input [--claim ID] : read-only assessment of agent-selected capabilities',
-  data: 'inventory [--input] | assess --input | preflight --input | intake-inspect --file [--format] [--table N] [--from-line N] [--through-line N] | intake-preview --input | intake-register --input --preview-sha256 --review-source | intake-list',
+  data: 'status [--input] | inventory [--input] | assess --input | preflight --input | intake-inspect --file [--format] [--table N] [--from-line N] [--through-line N] | intake-preview --input | intake-register --input --preview-sha256 --review-source | intake-list',
   chrome: 'check --source | mcp-config | rehearse --provider cli/mcpServer [--headless] [--executable path] | session-start --input | page --input | inventory --input | import-host-inventory --input | execute --input | confirm --input | session-stop --id : explicit scoped WebMCP operations; no implicit product authorization',
   postman: 'check --source | login-instructions | run --input | run-status --id : detects/reuses the CLI; local runs need no login; cloud operations need selected account/reporting scope',
   onboarding: 'start | roadmap-shown --source | status | next | queue --input | shown/not-shown --id --source | reply --input | recover | reconcile --input | retire-tool-questions --input | pause/resume --source | clarify/defer --input | check/domains --input | finish --input',
@@ -81,6 +81,9 @@ const help = {
 async function main() {
   const [area, action] = positional;
   if (!area || area === 'help') { output(help); return; }
+  if (Object.hasOwn(help, area) && (action === 'help' || options.has('help') || (!action && area !== 'evidence'))) {
+    output({ area, commands: help[area as keyof typeof help] }); return;
+  }
   if (area === 'evidence') { output(store.evidence(root, option('path'), options.get('pointer'))); return; }
   if (area === 'attention') {
     if (action === 'status') output(attention.status(root));
@@ -125,7 +128,16 @@ async function main() {
     else if (action === 'status') {
       const missing = board.missingFolders(root), pending = board.pendingTransitions(root);
       if (missing.length || pending.length) output({ missing, pending, next: missing.length ? 'Run board upgrade with the actual instruction.' : 'Recover the original transition ID; do not reset its journal.' });
-      else output({ tickets: board.tickets(root).filter(t => !options.has('ticket') || t.id === option('ticket')).map(({ text, ...ticket }) => ({ ...ticket, issues: [...ticket.issues, ...(board.inactive(ticket.status) && !ticket.lifecycle ? ['Actual lifecycle decision is missing; execution remains blocked.'] : [])] })), authorization: 'Not established by folder placement or metadata.' });
+      else {
+        const tickets = board.tickets(root).filter(t => !options.has('ticket') || t.id === option('ticket')).map(({ text, ...ticket }) => ({
+          ...ticket, issues: [...ticket.issues, ...(board.inactive(ticket.status) && !ticket.lifecycle ? ['Actual lifecycle decision is missing; execution remains blocked.'] : [])],
+        }));
+        const next = options.has('ticket') && !tickets.length ? 'Check the ticket ID or run board status to list all tickets.'
+          : tickets.some(ticket => ['Ready for QA', 'Retest'].includes(ticket.status))
+            ? 'Review Ready for QA and Retest tickets for eligible work and the next required decision.'
+            : 'Share a testing objective to prepare a Ready for QA ticket, or wait for a defect to return for retest.';
+        output({ tickets, authorization: 'Use the reviewed task scope before execution.', next });
+      }
     } else if (action === 'transition' || action === 'recover') {
       const record = action === 'transition' ? board.transitionTicket(root, input<board.Transition>()) : board.recoverTransition(root, option('id'));
       output({ id: record.id, ticketId: record.ticketId, state: record.state, recordedDestination: record.to, ownerUpdates: record.ownerUpdates, linkUpdates: record.linkUpdates ?? [] });
@@ -139,6 +151,7 @@ async function main() {
     return;
   }
   if (area === 'data') {
+    if (action === 'status') { output(dataStatus(root, options.has('input') ? option('input') : undefined)); return; }
     if (action === 'intake-inspect') {
       output(inspectSource({
         file: option('file'), format: options.get('format') as SourceFormat | undefined,
@@ -236,7 +249,7 @@ async function main() {
     return;
   }
   if (area === 'onboarding') {
-    if (action === 'start') { output({ roadmap: labels, progress: readState(root).value, harness: readHarness(root), next: 'Inspect existing records and reuse the supplied target. Show the roadmap and use onboarding next to present the first missing target decision before browser setup. Reconcile legacy browser setup with the Standard default unless the project opted in to Strict.' }); return; }
+    if (action === 'start') { output({ roadmap: labels, progress: readState(root).value, harness: readHarness(root), next: 'Inspect existing records and reuse the supplied target. Show the roadmap and use onboarding next to present the first missing target decision before browser setup. Reconcile legacy browser setup with the Standard default unless the project opted in to Strict.', testData: 'Continue if data will arrive later. When a task needs it, use data status to find or prepare a suitable dataset.' }); return; }
     if (action === 'status') { const state = readState(root).value; output({ state, readiness: readiness(root, state), browserAccess: browserAccess.browserAccessStatus(root) }); return; }
     if (action === 'next') { output(conversation.next(root, options.get('repeat-source'))); return; }
     if (action === 'queue') conversation.queueQuestions(root, input());
@@ -253,7 +266,7 @@ async function main() {
     else if (action === 'domains') conversation.recordDomains(root, input());
     else if (action === 'finish') conversation.finish(root, input());
     else throw new Error('Unknown onboarding command. Run help.');
-    output({ saved: true, next: conversation.next(root) }); return;
+    output({ saved: true, next: conversation.next(root, undefined, false) }); return;
   }
   if (area === 'settings') {
     let value: unknown;

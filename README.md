@@ -119,9 +119,9 @@ The agent chooses suitable accessible tools for each task or step, explaining si
 
 The agent can generate synthetic inputs and prepare/reuse authorized application state. Missing attached datasets are not automatic blockers. Generated values, prepared records and verified starting states remain distinct; continuation/retests retain the exact identity where required. Genuine missing rules/access/state produce a precise owner question while independent authorized work continues. Read [the data policy](QA%20Process%20Context/Test%20Data%20Management/preparation-policy.md).
 
-Add approved shareable data to [the dataset directory](QA%20Process%20Context/Test%20Data%20Management/datasets/README.md). Link the selected revision and verified starting state to the [reviewed execution scope](automation/data/README.md#bind-readiness-to-execution).
+You can finish onboarding and supply data later. Ask **What test data is available?** or open **Settings → Test data and datasets** to find registered revisions. When a task needs new inputs, follow [guided intake](automation/data/intake.md), then link the selected revision and verified starting state to the [reviewed execution scope](automation/data/README.md#bind-readiness-to-execution).
 
-Project readiness exposes optional capability gaps separately from blockers. Read-only task-tool/data assessment supports preparation, without choosing tools, mutating the application or authorizing execution. Material changes retain existing human gates; ordinary choices within authorization need no per-call approval. Existing onboarding answers, visibility/explicit constraints, context ownership and five board statuses are preserved.
+Project readiness lists deferred checkpoints and optional capability gaps separately from blockers. Read-only assessments support task preparation. Use the human review gates for material changes and the existing authorization for routine choices.
 
 ## Ticket movement
 

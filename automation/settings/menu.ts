@@ -5,6 +5,7 @@ import { readState, writeState, type Stage } from '../onboarding/state.js';
 import * as attention from '../attention/preferences.js';
 import { browserAccessStatus } from '../browser/access.js';
 import { chromeNetworkMode, settingsPath, type ChromeSettings } from '../chrome-devtools/config.js';
+import { dataStatus } from '../data/intake.js';
 
 import { activeSource, sourcePath } from '../task-source/config.js';
 
@@ -21,8 +22,9 @@ const existingAreas = [
   { id: 'postman', label: 'API tools and Postman', files: ['.local/postman-settings.json'], stage: 'tools' },
 ] as const;
 const taskSource = { id: 'taskSource', label: 'Task source', files: [sourcePath], stage: 'operation' } as const;
-export const areas = [...existingAreas, taskSource] as const;
-const menuChoices = [...existingAreas, { id: 'close', label: 'Close settings' }, taskSource] as const;
+const testData = { id: 'testData', label: 'Test data and datasets', files: [], stage: 'operation' } as const;
+export const areas = [...existingAreas, taskSource, testData] as const;
+const menuChoices = [...existingAreas, { id: 'close', label: 'Close settings' }, taskSource, testData] as const;
 interface NotificationRecovery { questionId: string; preferencesPath: string; preferencesRevision: string | null; recordedAt: string; action: 'leftWithoutUpdatingNotificationEdit' }
 interface Menu { schemaVersion: 1; open: boolean; area: string | null; questionId: string | null; source: string | null; questionKind?: 'attention'; notificationRecoveryHistory?: NotificationRecovery[] }
 const path = '.local/settings-menu.json';
@@ -50,7 +52,14 @@ export function showMenu(root: string) {
       catch { return { path: file, value: 'Task source settings need reconciliation. Other settings remain available.' }; }
     }
     if (file === attention.preferencesPath) { try { const value = attention.settings(root).value ?? 'Not configured'; assertNonsecret(value); return { path: file, value }; } catch { return { path: file, value: 'Notification preferences need reconciliation; other settings remain available.' }; } }
-    return { path: file, value: existsSync(contained(root, file)) ? JSON.parse(readFileSync(contained(root, file), 'utf8')) : 'Not configured' };
+    try {
+      const target = contained(root, file);
+      const value: unknown = existsSync(target) ? JSON.parse(readFileSync(target, 'utf8')) : 'Not configured';
+      assertNonsecret(value);
+      return { path: file, value };
+    } catch {
+      return { path: file, value: 'This setting needs review. Use Back to choose another area or Close settings to return to your work.' };
+    }
   }) : [];
   assertNonsecret(current);
   const chrome = current.find(item => item.path === settingsPath)?.value as ChromeSettings | undefined;
@@ -58,6 +67,7 @@ export function showMenu(root: string) {
   return { action: menu.open ? (area ? 'editArea' : 'chooseArea') : 'closed', area: area?.label ?? null,
     choices: area ? ['Back', 'Cancel this edit', 'Close settings'] : menuChoices.map(({ id, label }) => ({ id, label })),
     current,
+    ...(menu.open && area?.id === 'testData' ? { testData: dataStatus(root) } : {}),
     ...(menu.open && area?.id === 'browser' ? {
       browserAccess: browserAccessStatus(root),
       browserNetworking: {
@@ -70,7 +80,9 @@ export function showMenu(root: string) {
     question: menu.questionId ? notification ? notification.question : readState(root).value.questions.find(q => q.id === menu.questionId) : null,
     questionIssue: notification?.issue ?? null,
     notificationRecoveryHistory: menu.notificationRecoveryHistory ?? [],
-    instruction: 'Present the actual choices/current values in the conversation. CLI output is not a user-facing menu.' };
+    instruction: menu.open && area?.id === 'testData'
+      ? 'Show the dataset status and next step. To add data, use the source and intended use to prepare a guided intake preview.'
+      : 'Show the available choices and current values in the conversation.' };
 }
 export function openMenu(root: string, source: string) {
   requireText(source, 'Actual settings request');
@@ -89,6 +101,7 @@ export function chooseArea(root: string, selection: string) {
 }
 export function startEdit(root: string, input: { id: string; prompt: string; file: string; pointer?: string; source: string }) {
   const current = menuState(root), area = areas.find(a => a.id === current.value.area);
+  if (current.value.open && area?.id === 'testData') throw new Error('Share the source and intended use, then prepare a guided data intake preview.');
   if (!current.value.open || !area || current.value.questionId || !(area.files as readonly string[]).includes(input.file)) throw new Error('Bind the edit to the selected area and its canonical destination.');
   requireText(input.source);
   if (area.id === 'taskSource') throw new Error('Use task-source inspect, preview and save for this area.');
@@ -139,8 +152,11 @@ export function cancelEdit(root: string, back = false) {
       current.value.questionId = null; delete current.value.questionKind; if (back) current.value.area = null;
       save(root, path, current.value, current.revision); return;
     }
-    const state = readState(root);
-    if (current.value.questionId) { const q = state.value.questions.find(q => q.id === current.value.questionId); if (q && q.status !== 'answered') { q.status = 'canceled'; writeState(root, state.value, state.revision); } }
+    if (current.value.questionId) {
+      const state = readState(root);
+      const q = state.value.questions.find(q => q.id === current.value.questionId);
+      if (q && q.status !== 'answered') { q.status = 'canceled'; writeState(root, state.value, state.revision); }
+    }
     current.value.questionId = null; if (back) current.value.area = null; save(root, path, current.value, current.revision);
   }); return showMenu(root);
 }

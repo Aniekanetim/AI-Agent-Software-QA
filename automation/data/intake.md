@@ -1,6 +1,8 @@
 # Bring project data into QA
 
-Give the agent the source file or canonical storage reference and explain which check needs the data. The agent looks for an applicable revision using `data inventory` for manually indexed datasets and `data intake-list` for guided registrations. Reuse the exact reviewed revision when it still serves the check. During onboarding, record any data already available and defer intake until a task needs it if the project is still setting up.
+Give the agent the source file or canonical storage reference and explain which check needs the data. Start with **Settings → Test data and datasets** or run `npm run qa -- data status` to see the shared and default private manual indexes alongside guided registrations. Use `--input` to supply a different private index. Reuse the exact reviewed revision when it still serves the check.
+
+If you have no dataset during onboarding, record that in the handoff and continue. When an assignment needs data, the agent can inspect a new source, reuse an applicable revision, or prepare synthetic inputs within scope. If only some checks need data or state you cannot supply yet, record that dependency on those checks and continue separately approved work.
 
 ## Inspect the source
 

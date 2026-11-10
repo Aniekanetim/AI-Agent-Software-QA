@@ -14,7 +14,7 @@ Register one focused missing decision or a small queue of genuinely distinct dec
 
 Establish the target environment first. Reuse a target already supplied or saved. After the roadmap is shown, `onboarding next` presents the first missing environment question before new tool setup questions. Save its answer in `.local/project.json`. A hosted environment needs its entry URL. A local target needs the information required to reach it. Continue with the project name, responsible people, available sources, test-data boundaries and review responsibilities. Keep authoritative product information in its named canonical source.
 
-If the user supplies test-data sources, offer [guided data intake](../automation/data/intake.md). Reuse existing indexed revisions, record any permissions already established, and defer preparation until the task needs it where appropriate. Onboarding can continue while an individual dataset awaits review.
+If the user supplies test-data sources, offer [guided data intake](../automation/data/intake.md). Reuse applicable revisions and permissions. If data will come later, note that in the handoff and continue onboarding. When a task needs data, check `data status`, prepare synthetic inputs within scope, or inspect the supplied source. Raise an owner question only when a specific check still depends on missing data, permission, or state.
 
 Ask how to establish initial context, unless already answered:
 
@@ -74,7 +74,7 @@ The handoff links the strategy, design guide/charters, RTM/coverage definitions,
 
 ## 6. Check readiness and hand over
 
-Record each checkpoint with redacted evidence and date, a blocker, or a reasoned deferral/non-applicability. Project identity, context route, context establishment, operating choice and handoff are mandatory. Optional integrations may be inapplicable; unmet dependent capabilities cannot be called ready.
+Record each checkpoint with redacted evidence and date, a blocker, or a reasoned deferral or non-applicability. Project identity, context route, context establishment, operating choice and handoff are mandatory. When tools, email or application access can wait, record the reason and when to revisit the checkpoint. The readiness summary lists those deferrals separately so work can begin on tasks that have what they need.
 
 `onboarding status` revalidates stored evidence, selected integrations and context coverage. It reports incomplete preparation; it does not judge semantic completeness of a PRD or impersonate a reviewer. The agent must inspect actual sources and explain any remaining limits in the handoff.
 

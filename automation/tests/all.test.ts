@@ -21,12 +21,13 @@ import { realpathSync } from 'node:fs';
 import { platform, arch } from 'node:os';
 import * as s from '../shared/store.js';
 import * as c from '../onboarding/conversation.js';
-import { readState, readiness, stages } from '../onboarding/state.js';
+import { readState, readiness, stages, writeState } from '../onboarding/state.js';
 import * as menu from '../settings/menu.js';
 import * as mail from '../email/email.js';
 import { AgentMailAdapter, GmailAdapter, htmlText } from '../email/adapters.js';
 import * as gh from '../github/github.js';
 import { dataScopeDigest } from '../data/readiness.js';
+import { dataStatus, previewIntake, registerIntake, type IntakeRequest } from '../data/intake.js';
 import * as taskSource from '../task-source/work.js';
 import { type LiveChoice } from '../task-source/config.js';
 import { upgradeBoard } from '../board/board.js';
@@ -65,6 +66,20 @@ test('focused conversation saves the whole clear reply and does not repeat asked
   c.pause(r, true, 'Synthetic pause'); assert.equal(c.next(r).action, 'paused'); c.pause(r, false, 'Synthetic resume');
   c.clarify(r, 'name', 'Which fixture name?', 'Synthetic clarification'); assert.equal(readState(r).value.questions[0]!.clarificationHistory.length, 1);
 });
+test('saving progress leaves the next onboarding prompt available for actual presentation', () => {
+  const r = root(), state = readState(r);
+  state.value.roadmapShown = true;
+  writeState(r, state.value, state.revision);
+  const before = readState(r).revision;
+  assert.equal(c.next(r, undefined, false).action, 'questionReady');
+  assert.equal(readState(r).revision, before);
+  assert.equal(c.next(r).action, 'present');
+  assert.match(String(c.next(r).next), /onboarding not-shown/);
+  c.acknowledge(r, 'project-target-environment', 'Synthetic interruption before display', false);
+  assert.equal(c.next(r, undefined, false).action, 'questionReady');
+  assert.equal(readState(r).value.questions[0]?.status, 'queued');
+  assert.equal(c.next(r).action, 'present');
+});
 test('interrupted response recovers applied writes and preserves history exactly once', () => {
   const r = root(); c.queueQuestions(r, [question('name', undefined, '/name')]); const value = reply(r, 'interrupted', { name: 'Fixture' });
   assert.throws(() => c.commitReply(r, value, () => { throw new Error('Synthetic interruption'); }));
@@ -100,6 +115,17 @@ test('settings save preserves unrelated fields and can recover a cleared answer 
   value.writes[0]!.content = JSON.stringify({ method: 'inApp', visibility: 'headed', source: 'Synthetic reply' }); c.commitReply(r, value);
   menu.presentEdit(r); assert.equal(menu.menuState(r).value.questionId, null); assert.equal(JSON.parse(readFileSync(s.contained(r, '.local/browser-preferences.json'), 'utf8')).visibility, 'headed');
 });
+test('unreadable settings stay visible with recovery guidance and let the user leave', () => {
+  const r = root(), file = '.local/project.json';
+  const broken = put(r, file, '{');
+  menu.openMenu(r, 'Synthetic open');
+  assert.match(String(menu.chooseArea(r, 'project').current[0]?.value), /Close settings/);
+  assert.equal(menu.cancelEdit(r, true).action, 'chooseArea');
+  assert.equal(menu.chooseArea(r, 'testData').area, 'Test data and datasets');
+  menu.closeMenu(r);
+  assert.equal(menu.showMenu(r).action, 'closed');
+  assert.equal(s.revision(r, file), broken.sha256);
+});
 test('readiness requires all five domains and evidence, not folders or booleans', () => {
   const r = root(); assert.equal(readiness(r, readState(r).value).ready, false);
   const ref = put(r, '.local/actual-source.md', '# Synthetic reviewed context; no product execution');
@@ -129,6 +155,48 @@ test('scoped onboarding completion revalidates actual sources and does not survi
   assert.equal(next.stage, 'project');
   assert.match(String(next.next), /source\.md/);
   assert.equal(s.revision(r, '.local/onboarding-state.json'), stateRevision);
+});
+test('a project can finish without a dataset, cancel an optional edit and add data later', () => {
+  const r = root(), ref = put(r, '.local/handoff.md', '# Synthetic onboarding handoff. Dataset intake is deferred until a task requires it.');
+  bindHarness(r, { id: 'synthetic', version: '1', profile: 'test', executionContext: 'interactive', source: 'Synthetic harness' });
+  put(r, '.local/project.json', { name: 'Fixture', environments: ['staging'], owners: ['Fixture QA'], source: 'Synthetic project' });
+  put(r, '.local/context-settings.json', { route: 'provide', source: 'Synthetic context' });
+  put(r, '.local/operation-preferences.json', { mode: 'onDemand', source: 'Synthetic operating choice' });
+  for (const stage of ['project', 'contextRoute', 'understanding', 'operation'] as const) {
+    c.recordCheck(r, stage, { status: 'verified', checkedAt: new Date().toISOString(), evidence: [ref], reason: null, nextAction: null });
+  }
+  const deferred = { status: 'deferred' as const, evidence: [], reason: 'Wait until the task needs this capability.', nextAction: null, checkedAt: null };
+  for (const stage of ['tools', 'email', 'access'] as const) c.recordCheck(r, stage, deferred);
+  assert.throws(() => c.recordCheck(r, 'operation', deferred), /is required/);
+  c.recordDomains(r, ['business', 'product', 'technical', 'design', 'decisions'].map(domain => ({
+    domain: domain as any, state: 'documented' as const, owner: 'Fixture QA', sources: [ref],
+  })));
+  assert.equal(dataStatus(r).state, 'empty');
+  c.finish(r, ref);
+  assert.equal(readiness(r, readState(r).value).ready, true);
+  assert.deepEqual(readiness(r, readState(r).value).deferredChecks.map(check => check.stage), ['tools', 'email', 'access']);
+  menu.openMenu(r, 'Synthetic settings request');
+  const data = menu.chooseArea(r, 'testData');
+  assert.equal(data.testData?.state, 'empty');
+  assert.match(data.testData!.next, /Continue onboarding or task planning/);
+  menu.chooseArea(r, 'project');
+  menu.startEdit(r, { id: 'rename', prompt: 'Rename the fixture?', file: '.local/project.json', pointer: '/name', source: 'Synthetic edit' });
+  menu.closeMenu(r);
+  assert.equal(c.next(r).action, 'complete');
+  const before = readState(r).revision;
+  const request: IntakeRequest = {
+    dataset: { id: 'later-data', revision: '1', owner: 'Fixture QA', purpose: 'Test setup', environments: ['staging'], classification: 'synthetic' },
+    reference: 'fixture-source/version-1',
+  };
+  registerIntake(r, request, previewIntake(r, request).previewSha256, 'Synthetic dataset review');
+  assert.equal(dataStatus(r).datasets[0]?.id, 'later-data');
+  assert.equal(readState(r).revision, before);
+  assert.equal(c.next(r).action, 'complete');
+  put(r, '.local/dataset-index.json', '{');
+  const report = dataStatus(r);
+  assert.equal(report.state, 'needsReview');
+  assert.equal(report.datasets[0]?.id, 'later-data');
+  assert.equal(c.next(r).action, 'complete');
 });
 const account: mail.Account = { provider: 'gmail', accountId: 'qa@example.test', mailboxId: 'qa@example.test', address: 'qa@example.test', connectionReference: 'host:test-connection', authentication: 'connected' };
 const inventory = (): mail.Inventory => ({ schemaVersion: 1, harness: 'Synthetic fixture', executionContext: 'interactive', source: 'Synthetic metadata observation', providers: [{ id: 'gmail', name: 'Gmail', available: true }], accounts: [account, { ...account, accountId: 'other@example.test', mailboxId: 'other@example.test', address: 'other@example.test' }] });

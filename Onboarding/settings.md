@@ -14,6 +14,7 @@ Say **Open settings** at any point. The agent shows current values and these are
 10. API tools and Postman
 11. Close settings
 12. Task source
+13. Test data and datasets
 
 Direct requests such as “Keep browser sessions visible,” “Use Postman for this collection” or “Check every hour” also work. Distinguish a task-specific instruction from a project constraint; ask only when its scope is materially unclear. Reuse the clear instruction, show the affected current value and consequence, and ask only for a genuinely missing decision. A request to change cadence authorizes its relevant scheduler change; retain any existing required concrete briefing and inspect the actual saved schedule afterwards.
 
@@ -46,6 +47,8 @@ Use the existing review-responsibilities/execution-policies setting for proposed
 Use existing project/context and review-policy settings for actual source or responsibility changes. Link canonical [map records](../Application%20Flow%20Map/README.md); do not maintain another graph in settings. Reopen affected preparation only. A saved preference or accepted observation capture is not test execution approval.
 
 ## Agent tool choice and data initiative
+
+Choose **Test data and datasets** or ask **What test data is available?** to see manual and guided dataset entries together. If you have a source, give the agent its path or storage reference and intended use. It prepares a [guided intake preview](../automation/data/intake.md) for review. If data will arrive later, close Settings and continue onboarding or task planning.
 
 Use [task selection](../automation/tools/task-selection.md) to set actual constraints in `.local/tool-policy.json`; never require a preferred tool as an onboarding condition. Historical browser settings/replies remain available. Changing an optional tool does not invalidate unrelated task capabilities. Project readiness lists capability gaps separately; it is not permission to run an unverified task.
 

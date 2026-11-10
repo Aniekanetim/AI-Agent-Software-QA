@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, unlinkSync } from 'node:fs';
 import { contained, privatePath, load, save, replace, revision, digest, evidence, verifyEvidence, requireText, assertNonsecret, withLock, atPointer, type Evidence } from '../shared/store.js';
-import { readState, writeState, stages, labels, statePath, readiness, assessReadiness, type Question, type Stage, type SetupState, type Check, type ContextDomain } from './state.js';
+import { readState, writeState, stages, labels, mandatoryCheckpoints, statePath, readiness, assessReadiness, type Question, type Stage, type SetupState, type Check, type ContextDomain } from './state.js';
 import { browserAccessStatus } from '../browser/access.js';
 
 export const journalPath = '.local/pending-response.json';
@@ -52,9 +52,11 @@ export function queueQuestions(root: string, questions: Omit<Question, 'status' 
         if (old.path !== question.path || old.pointer !== question.pointer || old.stage !== question.stage) throw new Error('A question ID cannot be rebound to another field.');
         continue;
       }
-      current.value.questions.push({ ...question, status: 'queued', promptReferences: [], answerReferences: [], clarificationHistory: [] }); changed = true;
+      current.value.questions.push({ ...question, status: 'queued', promptReferences: [], answerReferences: [], clarificationHistory: [] });
+      if (question.required) current.value.completed = false;
+      changed = true;
     }
-    if (changed) { current.value.completed = false; writeState(root, current.value, current.revision); }
+    if (changed) writeState(root, current.value, current.revision);
   });
 }
 
@@ -72,11 +74,10 @@ function firstTargetQuestion(root: string, state: SetupState): Question | undefi
     prompt: 'Which environment should the QA agent prepare first? Share its URL if it is hosted, or describe how to reach it if it runs locally.',
     status: 'queued', promptReferences: [], answerReferences: [], clarificationHistory: [],
   };
-  state.questions.push(question);
   return question;
 }
 
-export function next(root: string, repeatOnRequest?: string): Record<string, unknown> {
+export function next(root: string, repeatOnRequest?: string, reserveQuestion = true): Record<string, unknown> {
   return withLock(root, 'conversation', () => {
     const current = readState(root), state = current.value;
     if (existsSync(contained(root, journalPath))) return { action: 'recoverResponse', next: 'Recover the retained response before new questions or edits.' };
@@ -86,15 +87,23 @@ export function next(root: string, repeatOnRequest?: string): Record<string, unk
     let question = state.questions.find(q => ['presenting', 'asked'].includes(q.status));
     if (question) {
       if (repeatOnRequest) { requireText(repeatOnRequest); return { action: 'repeatOnRequest', question }; }
-      return { action: question.status === 'asked' ? 'wait' : 'verifyPresentation', question };
+      return { action: question.status === 'asked' ? 'wait' : 'verifyPresentation', question, next: question.status === 'asked'
+        ? 'Wait for the reply or save an answer already supplied.'
+        : 'If you displayed the question, record it with onboarding shown. Otherwise use onboarding not-shown to make it available again.' };
     }
     question = firstTargetQuestion(root, state) ?? state.questions.find(q => q.status === 'queued');
     if (question) {
+      if (!reserveQuestion) return { action: 'questionReady', next: 'Run onboarding next to prepare the next question for display.' };
+      if (!state.questions.includes(question)) state.questions.push(question);
       question.status = 'presenting'; writeState(root, state, current.revision);
-      return { action: 'present', question, instruction: 'Actually display this one question, then acknowledge presentation.' };
+      return { action: 'present', question, instruction: 'Display this question in the conversation, then record it with onboarding shown.' };
     }
     const { status, blocker } = assessReadiness(root, state);
-    if (state.completed && status.ready) return { action: 'complete', next: 'Use the existing task board and applicable scoped authorizations.' };
+    if (state.completed && status.ready) return {
+      action: 'complete', next: 'Run task-source check-in to find the next QA assignment.',
+      deferredChecks: status.deferredChecks,
+      testData: 'Add or find datasets later with data status when a task needs them.',
+    };
     const stage = blocker?.stage ?? 'handoff';
     const preparingBrowser = stage === 'tools' || stage === 'access';
     const browserAccess = preparingBrowser ? browserAccessStatus(root).filter(item => item.status !== 'verified') : [];
@@ -124,7 +133,8 @@ export function clarify(root: string, id: string, prompt: string, source: string
   withLock(root, 'conversation', () => {
     const current = readState(root), q = current.value.questions.find(q => q.id === id);
     if (!q || !['asked', 'presenting', 'answered'].includes(q.status)) throw new Error('Clarify the existing decision, not a new interview.');
-    q.clarificationHistory.push({ prompt: q.prompt, source }); q.prompt = prompt; q.status = 'queued'; current.value.completed = false;
+    q.clarificationHistory.push({ prompt: q.prompt, source }); q.prompt = prompt; q.status = 'queued';
+    if (q.required) current.value.completed = false;
     writeState(root, current.value, current.revision);
   });
 }
@@ -133,6 +143,8 @@ export function deferQuestion(root: string, id: string, source: string): void {
   withLock(root, 'conversation', () => {
     const current = readState(root), q = current.value.questions.find(q => q.id === id);
     if (!q || q.required) throw new Error('A required answer cannot be silently deferred.');
+    if (q.status === 'deferred') return;
+    if (!['queued', 'presenting', 'asked'].includes(q.status)) throw new Error('Select an unanswered optional question to defer.');
     q.status = 'deferred'; q.promptReferences.push(source); writeState(root, current.value, current.revision);
   });
 }
@@ -216,6 +228,9 @@ export function reconcile(root: string, writes: ProposedWrite[], comparisonSourc
 }
 export function recordCheck(root: string, stage: Stage, check: Check): void {
   if (!stages.includes(stage)) throw new Error('Unknown preparation stage.');
+  if (mandatoryCheckpoints.has(stage) && ['deferred', 'notApplicable'].includes(check.status)) {
+    throw new Error(`${labels[stage]} is required. Record the scope and any open questions.`);
+  }
   if (['verified', 'notApplicable', 'deferred'].includes(check.status)) {
     if (check.status === 'verified' && (!check.evidence.length || !check.checkedAt)) throw new Error('A verified check needs actual evidence and time.');
     if (check.status !== 'verified') requireText(check.reason, 'Deferral/non-applicability reason');

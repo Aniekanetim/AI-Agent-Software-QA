@@ -94,11 +94,13 @@ Locks retain process/time ownership. A crash can leave a lock: inspect the ownin
 
 `onboarding next` uses the same readiness checks as `onboarding status`. If saved evidence or required configuration changes, it identifies the earliest affected checkpoint and the reason to revisit it.
 
+Save commands report `questionReady` when another question is queued. Run `onboarding next` to prepare it, display it in the conversation, and record the actual presentation. If a display was interrupted, record what happened with `shown` or `not-shown` before moving on.
+
 `onboarding check --input ...` takes `{ stage, check }`. A check contains `status` (pending/verified/blocked/deferred/notApplicable), `evidence` (path/sha256/optional JSON pointer), `reason`, `nextAction` and `checkedAt`. Verified needs actual evidence/time; deferral/non-applicability needs a reason. Use `npm run qa -- evidence --path <actual-file> [--pointer /field]` to calculate references. Do not invent hashes or observations.
 
 `onboarding domains --input ...` takes five entries, one per business/product/technical/design/decisions domain. Each has `domain`, `state` (documented/gap/notApplicable), `sources`, `owner` and, where applicable, `questionReference` or `reason`. Gap means an original owner question, not a fabricated requirement.
 
-`onboarding finish --input ...` takes the evidence reference to the actual scoped Markdown handoff. It requires checkpoints, five-domain accounting, matching configured capabilities and closed settings/pending saves. It cannot judge whether a source is substantively adequate; the agent and reviewer must assess that. Optional integrations can be inapplicable with a reason. Unresolved intent blocks affected testing even if initial onboarding is complete.
+`onboarding finish --input ...` takes the evidence reference to the actual scoped Markdown handoff. Complete the required checkpoints, account for the five context domains, and close Settings and pending saves. Reasoned deferrals for tools, email and access appear in `deferredChecks`. If data will arrive later, record that in the handoff. Assess task-specific data, intent and capabilities when preparing the affected checks.
 
 For `pause/resume`, supply `--source` for the actual request. `defer` takes `{ id, source }` and only supports optional questions. `clarify` takes `{ id, prompt, source }` and preserves the original decision history.
 
