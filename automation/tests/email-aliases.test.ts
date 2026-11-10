@@ -4,8 +4,8 @@ import { mkdirSync, realpathSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import * as mail from '../email/email.js';
-import { prepareTestAccount, readTestAccounts } from '../email/accounts.js';
-import { recipientAllowed } from '../email/policy.js';
+import { generateShortAlias, prepareTestAccount, readTestAccounts } from '../email/accounts.js';
+import { MAX_ALIAS_LOCAL_PART_LENGTH, recipientAllowed } from '../email/policy.js';
 import * as store from '../shared/store.js';
 
 const account: mail.Account = { provider: 'agentmail', accountId: null, mailboxId: 'qa@example.test', address: 'qa@example.test', connectionReference: 'synthetic:agentmail', authentication: 'connected' };
@@ -89,7 +89,8 @@ test('account preparation records identity/purpose/run/state and exact reuse wit
   const { root } = fixture();
   const input = { mode: 'fresh' as const, id: 'signup-one', bindingId: 'shared', creatorProfile: 'Creator one', objective: 'Signup', startingState: 'Fresh unregistered account required', runId: 'run01', source: 'Synthetic task authorization' };
   const first = prepareTestAccount(root, input);
-  assert.match(first.address, /^qa\+creator-one-signup-run01-[a-f0-9]{8}@example\.test$/);
+  assert.match(first.address, /^qa\+[a-z][a-z0-9]{6}@example\.test$/);
+  assert.ok(first.address.split('@')[0]!.length <= MAX_ALIAS_LOCAL_PART_LENGTH);
   assert.equal(first.creatorProfile, input.creatorProfile); assert.equal(first.startingState, input.startingState);
   assert.equal(first.applicationState, 'notVerified'); assert.equal(first.environment, 'Synthetic staging');
   assert.throws(() => prepareTestAccount(root, input), /already exists/);
@@ -97,6 +98,33 @@ test('account preparation records identity/purpose/run/state and exact reuse wit
   assert.equal(reused.address, first.address); assert.equal(reused.startingState, first.startingState); assert.equal(reused.uses.length, 2);
   const second = prepareTestAccount(root, { ...input, id: 'signup-two' }); assert.notEqual(second.address, first.address);
   assert.equal(readTestAccounts(root).value.accounts.length, 2);
+});
+
+test('fresh aliases stay within ten local-part characters and retry register collisions', () => {
+  const generated = generateShortAlias('uat@agentmail.to', 'Chef Tolani / Diary of a Kitchen Lover', [], () => '4m2qx');
+  assert.equal(generated, 'uat+c4m2qx@agentmail.to');
+  assert.equal(generated.split('@')[0]!.length, MAX_ALIAS_LOCAL_PART_LENGTH);
+  const values = ['04m2qx', '05n3wy'];
+  const afterCollision = generateShortAlias('qa@example.test', 'Chef Tolani', ['qa+c04m2qx@example.test'], () => values.shift()!);
+  assert.equal(afterCollision, 'qa+c05n3wy@example.test');
+});
+
+test('short aliases fail closed when the physical mailbox leaves too little room', () => {
+  assert.throws(() => generateShortAlias('longbase@example.test', 'Creator'), /too little room/);
+  assert.throws(() => generateShortAlias('qa@example.test', '!!!'), /creator\/profile name/);
+});
+
+test('long legacy aliases remain exactly reusable for recorded application accounts', () => {
+  const { root } = fixture();
+  const input = { mode: 'fresh' as const, id: 'legacy-account', bindingId: 'shared', creatorProfile: 'Creator one', objective: 'Signup', startingState: 'Existing account', runId: 'run01', source: 'Synthetic account authorization' };
+  const prepared = prepareTestAccount(root, input);
+  const legacyAddress = 'qa+creator-signup-run01-12345678@example.test';
+  const current = readTestAccounts(root);
+  current.value.accounts[0]!.address = legacyAddress;
+  store.save(root, '.local/test-accounts.json', current.value, current.revision);
+  const reused = prepareTestAccount(root, { mode: 'reuse', id: prepared.id, bindingId: 'shared', runId: 'retest01', source: 'Synthetic retest' });
+  assert.equal(reused.address, legacyAddress);
+  assert.equal(reused.uses.at(-1)?.mode, 'reuse');
 });
 
 test('account preparation rejects missing originals, unsupported aliases, revoked routes and secret fields', () => {

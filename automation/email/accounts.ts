@@ -1,7 +1,7 @@
-import { randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
 import { load, save, withLock, requireText } from '../shared/store.js';
 import { readConnections } from './email.js';
-import { recipientAllowed, validateRecipientPolicy } from './policy.js';
+import { isAddress, MAX_ALIAS_LOCAL_PART_LENGTH, recipientAllowed, validateRecipientPolicy } from './policy.js';
 
 export interface TestAccount {
   id: string; bindingId: string; mailboxId: string; mailboxAddress: string; environment: string; address: string;
@@ -13,12 +13,33 @@ export type AccountRequest = { mode: 'fresh'; id: string; bindingId: string; cre
   | { mode: 'reuse'; id: string; bindingId: string; runId: string; source: string };
 interface Register { schemaVersion: 1; accounts: TestAccount[] }
 const path = '.local/test-accounts.json';
+const MIN_RANDOM_SUFFIX_LENGTH = 4;
+const MAX_ALIAS_ATTEMPTS = 10;
 export function readTestAccounts(root: string) {
   const current = load<Register>(root, path, () => ({ schemaVersion: 1, accounts: [] }));
   if (current.value.schemaVersion !== 1 || !Array.isArray(current.value.accounts)) throw new Error('Invalid test-account register; preserve and reconcile it.');
   return current;
 }
 const slug = (value: string, limit: number) => value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, limit).replace(/-$/g, '');
+
+/** Generate a compact fresh alias; purpose, run and source stay in the private register. */
+export function generateShortAlias(mailboxAddress: string, creatorProfile: string, existingAddresses: readonly string[] = [], randomSuffix: (length: number) => string = length => randomInt(36 ** length).toString(36).padStart(length, '0')): string {
+  const [local, domain] = mailboxAddress.split('@');
+  if (!local || !domain || !isAddress(mailboxAddress)) throw new Error('Use the selected, valid physical mailbox address.');
+  const suffixLength = MAX_ALIAS_LOCAL_PART_LENGTH - local.length - 1 - 1;
+  if (suffixLength < MIN_RANDOM_SUFFIX_LENGTH) throw new Error(`The selected mailbox leaves too little room for a unique alias within ${MAX_ALIAS_LOCAL_PART_LENGTH} local-part characters.`);
+  const profileCode = slug(creatorProfile, 1);
+  if (!profileCode) throw new Error('Supply a creator/profile name with at least one letter or number.');
+  const existing = new Set(existingAddresses.map(value => value.toLowerCase()));
+  for (let attempt = 0; attempt < MAX_ALIAS_ATTEMPTS; attempt++) {
+    const suffix = randomSuffix(suffixLength);
+    if (!new RegExp(`^[a-z0-9]{${suffixLength}}$`).test(suffix)) throw new Error('Alias suffix generator returned an invalid value.');
+    const candidate = `${local}+${profileCode}${suffix}@${domain}`;
+    if (candidate.split('@')[0]!.length > MAX_ALIAS_LOCAL_PART_LENGTH) throw new Error('Generated alias exceeds the local-part limit.');
+    if (!existing.has(candidate.toLowerCase())) return candidate;
+  }
+  throw new Error('Could not prepare a distinct short alias after several attempts; preserve existing identities and reconcile the mailbox register.');
+}
 
 /** Prepares an identity only. Registration and observed application state belong to the authorized task. */
 export function prepareTestAccount(root: string, input: AccountRequest): TestAccount {
@@ -38,13 +59,8 @@ export function prepareTestAccount(root: string, input: AccountRequest): TestAcc
     if (old) throw new Error('This account reference already exists. Reuse it or supply a new reference for genuinely fresh state.');
     if (!binding.recipientPolicy) throw new Error('Establish provider/application plus support and configure the standard recipient policy first.');
     for (const value of [input.creatorProfile, input.objective, input.startingState]) requireText(value);
-    const [local, domain] = binding.address.split('@');
-    const budget = 64 - local!.length - 1, partSize = Math.min(16, Math.floor((budget - 11) / 3));
-    if (partSize < 3) throw new Error('Use a shorter selected test mailbox to retain identity, purpose and run in the alias.');
-    const parts = [input.creatorProfile, input.objective, input.runId].map(value => slug(value, partSize));
-    if (parts.some(part => !part)) throw new Error('Supply identity, objective and run with usable letters or numbers.');
-    const address = `${local}+${parts.join('-')}-${randomUUID().slice(0, 8)}@${domain}`;
-    if (!recipientAllowed(binding.address, address, binding.recipientPolicy) || current.value.accounts.some(a => a.address.toLowerCase() === address.toLowerCase())) throw new Error('Could not prepare a distinct authorized alias; preserve existing identities.');
+    const address = generateShortAlias(binding.address, input.creatorProfile, current.value.accounts.map(a => a.address));
+    if (!recipientAllowed(binding.address, address, binding.recipientPolicy)) throw new Error('Could not prepare a distinct authorized alias; preserve existing identities.');
     const preparedAt = new Date().toISOString();
     const account: TestAccount = { id: input.id, bindingId: binding.id, mailboxId: binding.mailboxId, mailboxAddress: binding.address, environment: binding.environment, address,
       creatorProfile: input.creatorProfile, objective: input.objective, startingState: input.startingState, runId: input.runId, preparedAt,

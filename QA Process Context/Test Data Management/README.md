@@ -20,6 +20,6 @@ Follow the [preparation policy](preparation-policy.md) to decide what can be gen
 | Evidence and secret-redaction rules | Not supplied |
 | Actual review reference / unresolved questions | Pending |
 
-Keep shared plans nonsecret. Private account bindings and credentials use the existing secure/ignored mechanisms. Apply the [global mailbox policy](../../automation/email/mailbox-policy.md): a fresh identity uses a supported purpose/run alias, continuation/retests reuse the original alias, and verification correlates exact recipient, purpose/sender and trigger time. Link the actual private account reference without copying passwords, OTPs or reusable links here.
+Keep shared plans nonsecret. Private account bindings and credentials use the existing secure/ignored mechanisms. Apply the [global mailbox policy](../../automation/email/mailbox-policy.md): a fresh identity uses a supported alias with a maximum 10-character email local part, continuation/retests reuse the exact original alias (including legacy longer aliases), and verification correlates exact recipient, purpose/sender and trigger time. Link the actual private account reference without copying passwords, OTPs or reusable links here.
 
 Record generated-data rules or seeds when reproducibility requires them. Confirm the required state before execution and preserve failed-run data/evidence when authorized. A reset must not silently erase a finding or another worker's data. Data changes reopen only affected preparation; new retention, access or cleanup limits require the responsible owner's decision.
