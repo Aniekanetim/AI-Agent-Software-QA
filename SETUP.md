@@ -40,7 +40,7 @@ Include [Application Flow Map](Application%20Flow%20Map/README.md) in the QA roo
 
 Read [task-based selection](automation/tools/task-selection.md) and the [data preparation policy](QA%20Process%20Context/Test%20Data%20Management/preparation-policy.md). Preserve installations, prior answers, constraints and history. Introduce a sourced tool policy only when needed; do not reset onboarding or create a compulsory preferred browser. Retire only exact obsolete unanswered tool-choice questions through the documented procedure. Keep product requirements, board statuses and human gates unchanged.
 
-Data preparation includes agent-generated local inputs and authorized state creation/reuse. Missing attached datasets are not automatic blockers. Establish limits once where possible, verify actual starting state and link precise unresolved dependencies. The master has no granted application/data access or live preparation records.
+Data preparation includes synthetic local inputs and authorized application records. If data will arrive later, finish onboarding with that note in the handoff. When a task needs data, ask the agent to check available datasets or give it a source for [guided intake](automation/data/intake.md). Verify starting state and record dependencies against the affected checks.
 
 ## 3. Verify tools for the chosen objective
 

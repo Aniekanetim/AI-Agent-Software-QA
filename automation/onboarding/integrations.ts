@@ -84,9 +84,9 @@ export function integrationStatus(root: string) {
   inspect('Email', () => {
     if (present('.local/email-connections.json')) for (const binding of readConnections(root).value.bindings) {
       if (binding.transport === 'human') continue;
-      if (binding.authentication !== 'connected' || !binding.verification?.bodyReadAt || binding.verification.context !== executionContext) issues.push(`${binding.id}: full-message ${executionContext} access is not verified.`);
+      if (binding.authentication !== 'connected' || !binding.verification?.listedAt || binding.verification.context !== executionContext) issues.push(`${binding.id}: verify mailbox identity and listing for ${executionContext} work when needed.`);
       for (const ref of binding.verification?.evidence ?? []) { try { verifyEvidence(root, ref); } catch { issues.push(`${binding.id}: email capability evidence changed.`); } }
-      if (readHarness(root)) issues.push(...readinessIssues(root, readRecord(root, `email:${binding.id}`), ['account', 'listMessages', 'readMessage']).map(i => `${binding.id}: ${i}`));
+      if (readHarness(root)) issues.push(...readinessIssues(root, readRecord(root, `email:${binding.id}`), ['account', 'listMessages']).map(i => `${binding.id}: ${i}`));
     }
   });
   inspect('GitHub', () => {

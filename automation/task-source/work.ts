@@ -168,7 +168,7 @@ export class LiveCheckInError extends Error {
 
 export async function checkIn(root: string, reader: BoardReader = readBoard) {
   const active = activeSource(root);
-  if (active.value.choice.kind === 'local') return { kind: 'local', instruction: 'Use the existing local board check-in procedure.' };
+  if (active.value.choice.kind === 'local') return { kind: 'local', instruction: 'Run board status to see Ready for QA and Retest tickets, then follow the local board check-in procedure.' };
   const board = await liveBoard(root, reader).catch(error => { throw new LiveCheckInError(error); });
   const { choice, connection } = board;
   const work = journal(root).value, claims = work.claims.filter(c => c.state === 'open');
@@ -180,7 +180,12 @@ export async function checkIn(root: string, reader: BoardReader = readBoard) {
     const reasonCode = hold?.reasonCode ?? 'eligible';
     return { claim, eligible: !hold, reasonCode, nextAction: resumeActions[reasonCode], ...(hold?.relatedId ? { relatedId: hold.relatedId } : {}) };
   });
-  return { kind: 'live', identity: connection.identity, resume, candidates: rows.filter(row => !alreadyClaimed(work, key, row.ticket, row.queue)), authorization: 'Review through G1–G5.' };
+  const candidates = rows.filter(row => !alreadyClaimed(work, key, row.ticket, row.queue));
+  const next = resume.some(item => item.eligible) ? 'Resume eligible claimed work first.'
+    : candidates.length ? 'Read the highest-priority eligible ticket and review its scope.'
+    : resume.length ? 'Review the next action on each held claim. Check in again when the dependency changes.'
+    : 'Wait for a ticket to enter a configured QA queue or share a testing objective with the project owner.';
+  return { kind: 'live', identity: connection.identity, resume, candidates, authorization: 'Review through G1–G5.', next };
 }
 export async function details(root: string, ticketId: string, reader: BoardReader = readBoard) {
   const { connection } = await liveBoard(root, reader);

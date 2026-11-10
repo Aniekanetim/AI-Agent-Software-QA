@@ -1,6 +1,10 @@
 # Bring project data into QA
 
-Give the agent the source file or canonical storage reference and explain which check needs the data. The agent looks for an applicable revision using `data inventory` for manually indexed datasets and `data intake-list` for guided registrations. Reuse the exact reviewed revision when it still serves the check. During onboarding, record any data already available and defer intake until a task needs it if the project is still setting up.
+Give the agent the source file or canonical storage reference. Include the intended use if you already know it. Start with **Settings → Test data and datasets** or run `npm run qa -- data status` to see the shared and default private manual indexes alongside guided registrations. Use `--input` to supply a different private index. Reuse the exact reviewed revision when it still serves the check.
+
+When a source arrives, read the assignment, accepted requirements and data rules, existing data decisions, and relevant source labels or notes. Propose the feature and checks it can support, the fields to use, and any gaps. Treat file names and source labels as clues. The project rules establish validity, and actual permissions establish permitted use. Ask one focused question if the intended use, field meaning, or permitted storage materially changes the proposal.
+
+If you have no dataset during onboarding, record that in the handoff and continue. When an assignment needs data, the agent can inspect a new source, reuse an applicable revision, or prepare synthetic inputs within scope. If only some checks need data or state you cannot supply yet, record that dependency on those checks and continue separately approved work.
 
 ## Inspect the source
 
@@ -15,6 +19,8 @@ npm run qa -- data intake-inspect --file "path/to/source.md" --format markdown-p
 CSV uses a header and comma delimiters, with support for quoted commas, line breaks, doubled quotes, and UTF-8 with or without a BOM. Markdown table mode recognizes pipe tables with outer pipes and a delimiter row. Profile mode uses headings followed by lines such as <code>- &#96;field_name&#96;: value</code>. Choose the intended line range when a document mixes profiles with research notes or other records. Fenced code is skipped. A source can be up to 4 MiB. For an unsupported format or larger file, retain the canonical reference or use an approved derived file.
 
 Review reported issues in context. A repeated name may belong to multiple records, and an identifier-shaped value may be valid for the field. Compare source labels and values with the project's accepted data rules before recommending corrections, exclusions, or use as a deliberately invalid fixture. Keep positive fixtures and deliberate invalid or boundary cases in clearly identified datasets.
+
+If a source arrives before its intended use is known, keep a private candidate note. Supply `{ "reference": "nonsecret canonical source reference" }` and, if an authorized local file can be inspected, the optional `source` selection used in the preview example. Run `npm run qa -- data intake-note --input .local/candidate-source.json`. The note retains the reference and any inspection summary. **Test data and datasets** lists candidates separately from registered revisions. Revisit the candidate against a later task and check the current source before using it.
 
 ## Preview the proposed dataset
 
@@ -44,6 +50,12 @@ Example request for a synthetic two-column source. Field positions follow the CS
   "mode": "curate",
   "visibility": "private",
   "source": { "file": "path/to/profiles.csv" },
+  "use": {
+    "task": "QA-101",
+    "checks": ["Create a profile with a supported handle"],
+    "basis": ["QA-101 acceptance criteria and project handle rules"],
+    "openQuestions": []
+  },
   "fields": [
     { "from": 1, "to": "name", "required": true },
     { "from": 2, "to": "handle" }
@@ -56,7 +68,7 @@ Example request for a synthetic two-column source. Field positions follow the CS
 npm run qa -- data intake-preview --input .local/intake-request.json
 ```
 
-Brief the reviewer on the use, exact selection, destination, permitted environments, exclusions and open questions. For shared files, review the exact proposed values in an authorized context. Use the digest printed by the reviewed preview and a reference to the actual review decision. Registering records the supplied decision and checks that the source and plan still match it.
+Brief the reviewer on the use, exact selection, destination, permitted environments, exclusions and open questions. Include the proposed use for new guided requests. Use nonsecret task and basis references, especially for shared receipts. Resolve the open questions or narrow the use before registration. For shared files, review the exact proposed values in an authorized context. Use the digest printed by the reviewed preview and a reference to the actual review decision. Registering records the supplied decision and checks that the source and plan still match it. The status view shows purpose, permitted environments and source type for registered revisions.
 
 ```shell
 npm run qa -- data intake-register --input .local/intake-request.json --preview-sha256 <preview-digest> --review-source <actual-decision-reference>

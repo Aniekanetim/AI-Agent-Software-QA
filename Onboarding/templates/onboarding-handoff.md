@@ -65,6 +65,8 @@ Record the actual harness/profile/context, reused executable/connection selectio
 
 <Actual tool/visibility constraints, available methods and optional capability gaps; no compulsory project browser. Describe relevant standing data-preparation authority, rules/state gaps, verified accounts/datasets, exact reuse and retention/cleanup bounds. Identify what the agent can prepare and the precise remaining assistance needed. Onboarding completion is not authorization or readiness for every future task.>
 
+<If data will arrive later, record the user's choice or the observed inventory state. When an assignment needs data, check Settings → Test data and datasets or run `data status`. Identify the affected checks and any required owner decision in that assignment.>
+
 ## Optional Chrome DevTools/WebMCP preparation
 
 If relevant, identify actual selected MCP/CLI/native-host routes, browser version/visibility, source-bound settings and operation evidence. Separate package installation, fixture rehearsal, native host connection and current-application tool support. Link remaining access/context gaps and exact next actions; use Not assessed or Not applicable with reasons when appropriate. Do not invent a catalogue or product execution during onboarding.

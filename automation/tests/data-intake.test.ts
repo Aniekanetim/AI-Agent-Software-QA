@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { datasetDirectory, inspectDatasets, type DatasetIndex } from '../data/datasets.js';
-import { listIntake, previewIntake, registerIntake, type IntakeRequest } from '../data/intake.js';
+import { dataStatus, listIntake, noteCandidate, previewIntake, registerIntake, type IntakeRequest } from '../data/intake.js';
 import { inspectSource } from '../data/source-inspection.js';
 import { evidence } from '../shared/store.js';
 
@@ -109,4 +109,27 @@ test('intake defaults to private reference and keeps copies private', () => {
   const artifact = approved.filesToWrite.find(path => path.endsWith('/source.csv'))!;
   assert.deepEqual(readFileSync(resolve(root, artifact)), readFileSync(file));
   assert.throws(() => previewIntake(root, { ...copy, dataset: { ...copy.dataset, revision: '../escape' } }), /portable/);
+});
+
+test('candidate notes retain provenance and the reviewed preview binds the proposed use', () => {
+  const { root, file, request } = fixture();
+  const first = noteCandidate(root, { reference: request.reference, source: { file } });
+  assert.equal(noteCandidate(root, { reference: request.reference, source: { file } }).id, first.id);
+  const pending = dataStatus(root);
+  assert.equal(pending.state, 'candidates');
+  assert.equal(pending.datasets.length, 0);
+  assert.equal(pending.candidates[0]?.sourceSha256, first.inspection?.sha256);
+  assert(!JSON.stringify(pending).includes('Missing name'));
+  request.use = { task: 'QA-001', checks: ['Profile entry'], basis: ['Accepted profile rules'], openQuestions: ['Confirm intended profile field'] };
+  const unresolved = previewIntake(root, request);
+  assert.deepEqual(unresolved.use?.checks, ['Profile entry']);
+  assert.throws(() => registerIntake(root, request, unresolved.previewSha256, 'Synthetic review'), /open questions/);
+  request.use.openQuestions = [];
+  assert.throws(() => registerIntake(root, request, unresolved.previewSha256, 'Synthetic review'), /changed/);
+  const ready = previewIntake(root, request);
+  registerIntake(root, request, ready.previewSha256, 'Synthetic review');
+  const result = dataStatus(root).datasets[0]!;
+  assert.equal(result.purpose, request.dataset.purpose);
+  assert.deepEqual(result.environments, ['staging']);
+  assert.equal(result.sourceKind, 'private');
 });

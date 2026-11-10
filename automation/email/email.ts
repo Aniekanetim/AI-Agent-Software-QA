@@ -45,6 +45,8 @@ export function selectBinding(root: string, binding: Binding, inventory: Invento
 export async function verifyBinding(root: string, id: string, adapter: MailAdapter, context: 'interactive' | 'scheduled', evidence: Evidence[], messageId?: string): Promise<Binding> {
   if (!evidence.length) throw new Error('Retain actual access-check evidence.');
   for (const ref of evidence) verifyEvidence(root, ref);
+  const harness = readHarness(root);
+  if (harness) currentHarness(root, context);
   const current = readConnections(root), binding = current.value.bindings.find(b => b.id === id); if (!binding) throw new Error('Select a mailbox first.');
   const account = await adapter.account();
   if (account.authentication !== 'connected' || account.mailboxId !== binding.mailboxId || account.address.toLowerCase() !== binding.address.toLowerCase() || account.provider !== binding.provider || account.accountId !== binding.accountId || account.connectionReference !== binding.connectionReference) throw new Error('The authenticated mailbox does not match the selection.');
@@ -55,8 +57,7 @@ export async function verifyBinding(root: string, id: string, adapter: MailAdapt
   }
   binding.authentication = 'connected'; binding.verification = { context, listedAt: new Date().toISOString(), bodyReadAt, evidence };
   withLock(root, 'email-connections', () => save(root, connectionsPath, current.value, current.revision));
-  if (readHarness(root)) {
-    currentHarness(root, context);
+  if (harness) {
     recordHost(root, { tool: `email:${binding.id}`, source: binding.choiceSource, version: 'provider-managed', available: true, accessible: true, compatible: true, authentication: 'connected', account: binding.address, connectionReference: binding.connectionReference,
       capabilities: { account: { status: 'verified', evidence }, listMessages: { status: 'verified', evidence }, readMessage: { status: bodyReadAt ? 'verified' : 'unverified', evidence: bodyReadAt ? evidence : [] } } });
   }
