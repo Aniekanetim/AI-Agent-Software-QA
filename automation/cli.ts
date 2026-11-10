@@ -28,6 +28,7 @@ import { assessCoverage, type CoverageSnapshot } from './coverage/coverage.js';
 import { validateFlowMap, traceFlowMap, type FlowMapSnapshot, type Direction } from './flow-map/flow-map.js';
 import { assessTaskTools, assessLiveTaskTools, type TaskToolPlan } from './tools/task.js';
 import { assessData, type DataPreparation } from './data/preparation.js';
+import { datasetDirectory, inspectDatasets, type DatasetIndex } from './data/datasets.js';
 import * as chromeConfig from './chrome-devtools/config.js';
 import * as chromeTransport from './chrome-devtools/transport.js';
 import * as webmcp from './chrome-devtools/webmcp.js';
@@ -62,7 +63,7 @@ const help = {
   'flow-map': 'validate --input | trace --input --features id,id [--direction upstream/downstream/both] [--max-depth 8] : read-only candidate impact; no test execution or approval',
   coverage: 'assess --input : read-only consistency/count check of a canonical-record snapshot; no execution, approval or product verdict',
   tools: 'bind --input | scan --source [--tool] | select --input | status --tool [--requires operation,operation] | import-host --input | assess-task --input [--claim ID] : read-only assessment of agent-selected capabilities',
-  data: 'assess --input : read-only preparation/state assessment; no generation, application mutations or approval',
+  data: 'inventory [--input] | assess --input : read-only dataset and preparation assessment',
   chrome: 'check --source | mcp-config | rehearse --provider cli/mcpServer [--headless] [--executable path] | session-start --input | page --input | inventory --input | import-host-inventory --input | execute --input | confirm --input | session-stop --id : explicit scoped WebMCP operations; no implicit product authorization',
   postman: 'check --source | login-instructions | run --input | run-status --id : detects/reuses the CLI; local runs need no login; cloud operations need selected account/reporting scope',
   onboarding: 'start | roadmap-shown --source | status | next | queue --input | shown/not-shown --id --source | reply --input | recover | reconcile --input | retire-tool-questions --input | pause/resume --source | clarify/defer --input | check/domains --input | finish --input',
@@ -135,6 +136,13 @@ async function main() {
     return;
   }
   if (area === 'data') {
+    if (action === 'inventory') {
+      const privateIndex = options.has('input');
+      const index = privateIndex ? input<DatasetIndex>() : store.load<DatasetIndex>(root, `${datasetDirectory}/index.json`, () => ({ schemaVersion: 1, datasets: [] })).value;
+      const report = inspectDatasets(root, index, privateIndex); output(report);
+      if (report.datasets.some(dataset => dataset.status === 'needsReview')) process.exitCode = 1;
+      return;
+    }
     if (action !== 'assess') throw new Error('Use data assess --input.');
     const report = assessData(root, input<DataPreparation>()); output(report);
     if (report.status === 'needsPreparation') process.exitCode = 1; return;
