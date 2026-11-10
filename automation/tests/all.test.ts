@@ -6,6 +6,7 @@ import './flow-map.test.js';
 import './adaptive-tools.test.js';
 import './browser-access.test.js';
 import './data-preparation.test.js';
+import './data-intake.test.js';
 import './chrome-devtools.test.js';
 import './chrome-fixture-browser.test.js';
 import './board.test.js';
