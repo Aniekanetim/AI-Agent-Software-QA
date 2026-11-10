@@ -2,7 +2,7 @@
 
 Email setup selects the actual mailbox used by an authorized application account and environment. A provider being available does not establish authentication, selection or access to message content.
 
-Apply the [global test-mailbox policy](mailbox-policy.md) across projects. When provider/application support is established, the agent prepares purpose/run aliases on a selected test inbox, records their context and reuses exact original aliases for retests. Users select their inbox/access; they do not need to author this procedure. `email policy`, `email account --input ...` and `email accounts` expose the reusable policy and private account register. Preparing an identity does not create an application account.
+Apply the [global test-mailbox policy](mailbox-policy.md) across projects. When provider/application support is established, the agent prepares short aliases with a maximum 10-character email local part, records readable purpose/run details in the private account register, and reuses exact original aliases for retests. Existing longer aliases remain valid for their recorded accounts. Users select their inbox/access; they do not need to author this procedure. `email policy`, `email account --input ...` and `email accounts` expose the reusable policy and private account register. Preparing an identity does not create an application account.
 
 ## Discover, then select
 

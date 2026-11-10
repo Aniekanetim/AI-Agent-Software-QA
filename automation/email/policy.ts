@@ -3,13 +3,16 @@ import { requireText } from '../shared/store.js';
 /** Shared procedure, not a grant of mailbox access or proof of alias delivery. */
 export const mailboxPolicy = {
   id: 'shared-test-mailbox-v1',
-  preferredAccountStrategy: 'Use purpose/run plus aliases on a selected test inbox when the provider and application support them.',
-  freshState: 'Prepare a distinct full alias for a fresh application account.',
+  preferredAccountStrategy: 'Use compact plus aliases on a selected test inbox when the provider and application support them; keep purpose and run details in the private account register.',
+  maxEmailLocalPartCharacters: 10,
+  freshState: 'Prepare a distinct plus alias whose full email local part, including the base address and plus sign, is no longer than ten characters.',
   continuation: 'Reuse the exact recorded alias for continuation and retesting.',
   accountFields: ['address', 'creatorProfile', 'objective', 'startingState', 'runId', 'environment'],
   verification: 'Match the exact full recipient, expected sender/purpose and time anchored before the request. Reject stale or ambiguous matches; never choose arbitrary latest content.',
   secrets: 'Keep passwords, OTPs, reusable links and tokens outside shared records.',
 } as const;
+
+export const MAX_ALIAS_LOCAL_PART_LENGTH = mailboxPolicy.maxEmailLocalPartCharacters;
 
 export interface RecipientPolicy { mode: 'plusAliases'; source: string }
 export const isAddress = (value: string) => typeof value === 'string' && /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(value);

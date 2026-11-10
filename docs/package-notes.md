@@ -1,6 +1,14 @@
 # Package notes
 
-**Version:** 1.11.0. **Created:** 22 October 2026. **Updated:** 6 November 2026. **State:** reusable workflow package; no configured product, live discovery or QA execution history.
+**Version:** 1.12.0. **Created:** 22 October 2026. **Updated:** 10 November 2026. **State:** reusable workflow package; no configured product, live discovery or QA execution history.
+
+## Version 1.12.0 — compact test-account email aliases
+
+Fresh aliases now keep the entire email local part at 10 characters or fewer. The generated tag uses a compact profile marker and random suffix; readable creator, purpose and run details stay in the private register. Generation checks saved identities and retries collisions. Existing recorded aliases remain unchanged and reusable, including aliases longer than the new limit. Mailbox bases that cannot fit a useful unique tag within the limit fail with a clear message.
+
+Validation adds synthetic checks for the exact limit, collision retry, insufficient mailbox space and reuse of a legacy longer alias. These checks prepare local identities only; they do not establish live provider delivery or register application accounts.
+
+Local validation: `npm run check` passed; `npm test` passed all 273 helper tests. The documentation-link check resolved 575 targets and anchors. CI results are recorded with the pull request after the hosted checks complete.
 
 ## Version 1.11.0 — bounded blocker reminders
 
@@ -80,7 +88,7 @@ Local validation passed TypeScript and all 67 package tests (54 retained checks,
 
 ## Version 1.5.0: global mailbox policy and tagged test identities
 
-The [global mailbox policy](../automation/email/mailbox-policy.md) now supplies the standard procedure across adopting projects. The agent establishes the selected inbox, permissions and provider/application alias support, then uses distinct identity/purpose/run aliases for fresh accounts and exact saved aliases for continuation/retests. Users no longer need to devise that policy. `email policy` displays the defaults; `email account` fresh/reuse commands prepare and record identities in the private test-account register. Preparation retains creator/profile, objective and declared starting state while explicitly leaving actual application state unverified.
+The [global mailbox policy](../automation/email/mailbox-policy.md) now supplies the standard procedure across adopting projects. The agent establishes the selected inbox, permissions and provider/application alias support, then prepares fresh aliases with a maximum 10-character email local part. Readable identity/purpose/run details stay in the private register, and exact saved aliases are reused for continuation/retests, including legacy longer aliases. Users no longer need to devise that policy. `email policy` displays the defaults; `email account` fresh/reuse commands prepare and record identities in the private test-account register. Preparation retains creator/profile, objective and declared starting state while explicitly leaving actual application state unverified.
 
 Corrected the helper's physical-inbox-only recipient restriction. A selected binding can explicitly enable supported plus aliases with an actual authorization/support source. Verification continues to authenticate the physical inbox while matching the full tagged recipient, sender/purpose and request window. Old bindings retain base-address-only behavior. Policy changes invalidate affected attempts. Full-message identity is also checked against the listed message, and redacted receipts identify both physical inbox and recipient.
 

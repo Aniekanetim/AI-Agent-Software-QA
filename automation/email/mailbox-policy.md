@@ -2,19 +2,21 @@
 
 This is the standard email procedure for every adopting project, across onboarding, discovery, testing and retesting. The agent applies it; users do not need to write a project-specific policy. Actual inboxes, access permissions and application accounts remain project-specific.
 
-## One inbox, distinct application identities
+## One inbox, short distinct application identities
 
-Select an authorized test inbox and confirm that its provider and the application accept plus-addressing. When supported, prepare separate application email identities on that inbox. For example, a physical inbox `qa@example.test` can receive mail for `qa+creator-signup-run01@example.test`.
+Select an authorized test inbox and confirm that its provider and the application accept plus-addressing. When supported, prepare separate application email identities on that inbox. Keep the **entire email local part** (everything before `@`, including the physical mailbox name and `+`) at **10 ASCII characters or fewer**. For example, `uat+c4m2qx@agentmail.to` has a 10-character local part.
 
-The physical inbox is the email connection's identity. The full tagged address is the application's account identity. Never replace the physical inbox address with a tag or remove the tag when matching verification emails. Plus-address support is not universal: preserve the source of confirmation and verify actual delivery during the first authorized flow. If the provider/application does not support it, record the limitation and arrange an authorized alternative through the agent.
+The physical inbox is the email connection's identity. The full tagged address is the application's account identity. A short tag uses a compact profile marker and random characters; its creator, purpose, run, environment and source remain in the private account register. Never replace the physical inbox address with a tag or remove the tag when matching verification emails. Plus-address support is not universal: preserve the source of confirmation and verify actual delivery during the first authorized flow. If the provider/application does not support it, record the limitation and arrange an authorized alternative through the agent.
+
+If the physical mailbox name leaves fewer than four random tag characters plus a profile marker within the limit, stop and choose an authorized mailbox/identity route with enough space. Do not exceed the limit silently. Check new tags against the private register and regenerate on a collision. The application may still report an alias already in use outside that register; preserve that failed attempt and prepare another fresh alias rather than changing a registered account.
 
 ## Fresh state and continued state
 
-For fresh account state, the agent uses `email account` in fresh mode to generate a distinct alias containing creator/profile, objective and run, plus a short uniqueness suffix. This prepares an identity; it does not register an application account. Application registration follows the authorized onboarding or task flow.
+For fresh account state, the agent uses `email account` in fresh mode to generate a distinct short alias within the local-part limit. Creator/profile, objective, run and purpose details are stored in the private register rather than encoded in the address. This prepares an identity; it does not register an application account. Application registration follows the authorized onboarding or task flow.
 
 The private `.local/test-accounts.json` register retains the full alias, physical inbox/binding, environment, creator/profile, objective, declared starting state, run and source. The starting state is supplied planning context; actual account creation/access must be observed and linked in the task. The helper labels application state unverified. A [shared register template](templates/test-account-register.md) can link redacted task evidence without exposing secrets.
 
-For continuation or retesting, the agent uses reuse mode with the original account reference. It returns the exact original alias and records the new run reference without replacing the original context. An absent original, a changed mailbox or a revoked alias route requires reconciliation; never silently create a new account for that retest. Read the saved register after interruption rather than generating a replacement alias.
+For continuation or retesting, the agent uses reuse mode with the original account reference. It returns the exact original alias and records the new run reference without replacing the original context. This also preserves aliases created before the 10-character policy; do not change an existing account's email to meet the new limit. An absent original, a changed mailbox or a revoked alias route requires reconciliation; never silently create a new account for that retest. Read the saved register after interruption rather than generating a replacement alias.
 
 ## Verification belongs to one attempt
 
@@ -72,6 +74,6 @@ The agent handles these steps during [onboarding](../../Onboarding/onboarding-wo
    }
    ```
 
-5. Pass the returned full alias as `recipient` to `email begin` immediately before the authorized email-triggering action. Keep the physical binding unchanged and follow [verification](README.md#verify-an-application-attempt).
+5. Pass the returned full alias as `recipient` to `email begin` immediately before the authorized email-triggering action. Keep the physical binding unchanged and follow [verification](README.md#verify-an-application-attempt). The private register retains readable identity and run details; the email alias remains short.
 
 `email policy` displays this procedure's built-in defaults. The agent offers these defaults during onboarding rather than asking users to invent them. They do not grant inbox read access, account creation, sending or cleanup by themselves; use the actual project's permissions. Full-mailbox read permission, when granted, does not relax per-attempt verification matching. The reusable repository contains no selected live inbox, account or credentials.

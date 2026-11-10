@@ -42,7 +42,7 @@ This process is tailored from [the process references](standards-and-rationale.m
 
 Activities can overlap and repeat. For example, a failed readiness check returns to preparation, and a new requirement can require analysis and design changes. **Test implementation means preparing tests and their environment; it does not mean implementing the product fix.**
 
-For email-backed test accounts, apply the [global mailbox policy](../../automation/email/mailbox-policy.md). Prepare and record a distinct purpose/run alias for fresh-state checks where supported; reuse the original exact alias when retesting the same account. The helper's declared starting state and identity preparation are separate from the application's observed state. Verification must match the full alias, expected sender/purpose and trigger time in the selected physical inbox.
+For email-backed test accounts, apply the [global mailbox policy](../../automation/email/mailbox-policy.md). Prepare and record a distinct alias with a maximum 10-character email local part for fresh-state checks where supported; keep readable identity/purpose/run details in the private register. Reuse the original exact alias when retesting the same account, even when it predates the length limit. The helper's declared starting state and identity preparation are separate from the application's observed state. Verification must match the full alias, expected sender/purpose and trigger time in the selected physical inbox.
 
 ## Start with the testing request
 

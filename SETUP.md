@@ -63,7 +63,7 @@ The optional [Chrome DevTools/WebMCP integration](automation/chrome-devtools/REA
 
 Discover browser/testing capabilities and establish visibility/operating constraints using [task-based selection](automation/tools/task-selection.md). The agent chooses suitable tools per task. Discover email providers and explicitly select the actual account/mailbox using the [email guide](automation/email/README.md). Prepare selected GitHub repositories through the [GitHub guide](automation/github/README.md). Verify actual required capabilities; configuration, authentication and a successful task-specific run are distinct states. Store operational metadata under ignored `.local/`; never commit credentials, full OTPs or reusable links.
 
-The agent applies the [global mailbox policy](automation/email/mailbox-policy.md) during setup: use purpose/run aliases where supported, prepare/register their context with `email account`, and reuse the exact original identity for retests. Inbox permissions, alias support and application registration scope are established once and reused; no bespoke policy-writing is required from the adopter.
+The agent applies the [global mailbox policy](automation/email/mailbox-policy.md) during setup: use aliases with a maximum 10-character email local part where supported, keep account purpose/run details in the private register, and reuse the exact original identity for retests. Previously registered longer aliases remain unchanged. Inbox permissions, alias support and application registration scope are established once and reused; no bespoke policy-writing is required from the adopter.
 
 ## 4. Create the appropriate request
 
