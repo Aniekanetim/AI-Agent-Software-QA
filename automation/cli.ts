@@ -29,6 +29,7 @@ import { validateFlowMap, traceFlowMap, type FlowMapSnapshot, type Direction } f
 import { assessTaskTools, assessLiveTaskTools, type TaskToolPlan } from './tools/task.js';
 import { assessData, type DataPreparation } from './data/preparation.js';
 import { datasetDirectory, inspectDatasets, type DatasetIndex } from './data/datasets.js';
+import { preflightLocalData } from './data/local.js';
 import * as chromeConfig from './chrome-devtools/config.js';
 import * as chromeTransport from './chrome-devtools/transport.js';
 import * as webmcp from './chrome-devtools/webmcp.js';
@@ -63,7 +64,7 @@ const help = {
   'flow-map': 'validate --input | trace --input --features id,id [--direction upstream/downstream/both] [--max-depth 8] : read-only candidate impact; no test execution or approval',
   coverage: 'assess --input : read-only consistency/count check of a canonical-record snapshot; no execution, approval or product verdict',
   tools: 'bind --input | scan --source [--tool] | select --input | status --tool [--requires operation,operation] | import-host --input | assess-task --input [--claim ID] : read-only assessment of agent-selected capabilities',
-  data: 'inventory [--input] | assess --input : read-only dataset and preparation assessment',
+  data: 'inventory [--input] | assess --input | preflight --input : read-only data assessment and local execution readiness',
   chrome: 'check --source | mcp-config | rehearse --provider cli/mcpServer [--headless] [--executable path] | session-start --input | page --input | inventory --input | import-host-inventory --input | execute --input | confirm --input | session-stop --id : explicit scoped WebMCP operations; no implicit product authorization',
   postman: 'check --source | login-instructions | run --input | run-status --id : detects/reuses the CLI; local runs need no login; cloud operations need selected account/reporting scope',
   onboarding: 'start | roadmap-shown --source | status | next | queue --input | shown/not-shown --id --source | reply --input | recover | reconcile --input | retire-tool-questions --input | pause/resume --source | clarify/defer --input | check/domains --input | finish --input',
@@ -71,7 +72,7 @@ const help = {
   browser: 'versions | install | mcp-config | check --provider library/cli/mcpServer [--headless] [--context interactive/scheduled/ci] | import-report --input | fixture',
   'browser-access': 'targets | status | ensure-standard --input | prepare --input | apply --input | native-plan --input | native-apply --input | record --input : prepare the project browser and verify target access',
   email: 'policy | account --input | accounts | options --input | discover --provider gmailApi/agentmail --source | create-inbox --input | select --input | verify --input | begin --input | outcome --input',
-  github: 'pending-comments | reconcile-comment --input | reconcile-legacy --input --repository --number --policy --target --source | install --source | check --repository | check-in --source | event --repository --number --source | policy-digest --policy | run/dispatch --policy --target --repository --number --source | comment --policy --target --repository --number --body --source',
+  github: 'pending-comments | reconcile-comment --input | reconcile-legacy --input --repository --number --policy --target --source | install --source | check --repository | check-in --source | event --repository --number --source | policy-digest --policy | run/dispatch --policy --target --repository --number --source [--data-observations] [--data-scope-digest] | comment --policy --target --repository --number --body --source',
   evidence: '--path [--pointer] : calculate an evidence reference; no product verdict is inferred',
   note: 'Use project-private JSON under .local/ for inputs. The agent presents questions and performs authorized host connections. CLI output is a model, not an actual human conversation or approval. See Onboarding/README.md.',
 };
@@ -143,7 +144,8 @@ async function main() {
       if (report.datasets.some(dataset => dataset.status === 'needsReview')) process.exitCode = 1;
       return;
     }
-    if (action !== 'assess') throw new Error('Use data assess --input.');
+    if (action === 'preflight') { output(preflightLocalData(root, input())); return; }
+    if (action !== 'assess') throw new Error('Use data inventory, assess or preflight.');
     const report = assessData(root, input<DataPreparation>()); output(report);
     if (report.status === 'needsPreparation') process.exitCode = 1; return;
   }
@@ -332,8 +334,13 @@ async function main() {
     const pr = await currentPr(repository, Number(option('number'))), policy = fromFile<github.RegressionPolicy>(option('policy')), target = fromFile<github.ObservedTarget>(option('target'));
     const access = await github.inspectConnection(repository); if (access.account !== configuration.account) throw new Error('GitHub is authenticated as a different account.');
     if (action === 'reconcile-legacy') output(github.reconcileLegacy(root, policy, pr, target, input<Parameters<typeof github.reconcileLegacy>[4]>()));
-    else if (action === 'run') output(await github.executeRegression(root, policy, pr, target, source));
-    else if (action === 'dispatch') output(await github.dispatchRegression(root, policy, pr, target));
+    else if (action === 'run' || action === 'dispatch') {
+      const data = {
+        observations: options.has('data-observations') ? store.readInput<store.Evidence[]>(root, option('data-observations')) : undefined,
+        expectedDigest: options.get('data-scope-digest'),
+      };
+      output(action === 'run' ? await github.executeRegression(root, policy, pr, target, source, undefined, data) : await github.dispatchRegression(root, policy, pr, target, undefined, data));
+    }
     else if (action === 'comment') output(await github.publishComment(root, policy, pr, target, option('body')));
     else throw new Error('Unknown GitHub command.');
     return;

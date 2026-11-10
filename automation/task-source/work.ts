@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { assertDataReady, dataScopeDigest, type DataReceipt, type DataScope } from '../data/readiness.js';
 import { assertNonsecret, digest, load, requireText, save, verifyEvidence, withLock, type Evidence } from '../shared/store.js';
 import { pendingCommentPublications } from '../github/github.js';
 import { pendingPresentation } from '../attention/notifications.js';
@@ -16,7 +17,7 @@ interface Publication {
   startedAt: string; source: string; decision: Evidence; writerPid?: number; reconciliation?: { source: string; evidence: Evidence[] };
 }
 interface Execution {
-  id: string; claimId: string; buildId: string; target: Evidence; gates: Partial<Record<Gate['gate'], Evidence>>;
+  id: string; claimId: string; buildId: string; target: Evidence; gates: Partial<Record<Gate['gate'], Evidence>>; data?: DataReceipt;
   startedAt: string; terminal?: { state: 'completed' | 'stopped' | 'notStarted'; source: string; evidence: Evidence[] };
 }
 interface Journal { schemaVersion: 1; claims: Claim[]; publications: Publication[]; executions: Execution[] }
@@ -223,19 +224,21 @@ export async function recheck(root: string, claimId: string, reader: BoardReader
 export interface Gate {
   claimId: string; ticketRevision: string; gate: 'G1' | 'G2' | 'G3' | 'G4' | 'G5';
   decision: 'Approved' | 'Approved with limits'; reviewer: string; source: string; packet: Evidence;
-  target?: { buildId: string; environment: string }; publicationDigest?: string; publicationDigests?: string[];
+  target?: { buildId: string; environment: string }; dataScope?: DataScope; publicationDigest?: string; publicationDigests?: string[];
 }
 export function approvedGate(root: string, claim: Claim, ref: Evidence, gate: Gate['gate']) {
   if (ref?.pointer || !ref?.path.startsWith('.local/')) throw new Error('Use the full private reviewed decision record.');
   verifyEvidence(root, ref);
-  const decision = load<Gate>(root, ref.path, () => { throw new Error('Missing decision record.'); }).value;
+  const record = load<Gate>(root, ref.path, () => { throw new Error('Missing decision record.'); });
+  if (record.revision !== ref.sha256) throw new Error('The reviewed decision changed while loading.');
+  const decision = record.value;
   assertNonsecret(decision);
   if (decision?.claimId !== claim.id || decision.ticketRevision !== claim.ticket.revision || decision.gate !== gate || !['Approved', 'Approved with limits'].includes(decision.decision)) throw new Error(`Record the actual ${gate} approval for this ticket revision.`);
   requireText(decision.reviewer, 'Actual reviewer'); requireText(decision.source, 'Actual decision source');
   verifyEvidence(root, decision.packet);
   return decision;
 }
-export async function preflight(root: string, request: { claimId: string; gates: Partial<Record<Gate['gate'], Evidence>>; target: Evidence; buildId: string }, reader: BoardReader = readBoard) {
+async function checkExecution(root: string, request: { claimId: string; gates: Partial<Record<Gate['gate'], Evidence>>; target: Evidence; buildId: string; dataObservations?: Evidence[] }, reader: BoardReader) {
   const { claim } = await recheck(root, request.claimId, reader);
   const required = claim.queue === 'retest' ? ['G1', 'G2', 'G4'] as const : ['G1', 'G2'] as const;
   const decisions = required.map(gate => {
@@ -250,7 +253,17 @@ export async function preflight(root: string, request: { claimId: string; gates:
   if (observation?.claimId !== claim.id || observation.ticketRevision !== claim.ticket.revision || observation.buildId !== request.buildId || !Number.isFinite(Date.parse(observation.observedAt))) throw new Error('Observe the actual target build for this claim and ticket revision.');
   requireText(observation.environment, 'Target environment'); requireText(observation.source, 'Build observation source');
   if (decisions.some(decision => ['G2', 'G4'].includes(decision.gate) && (decision.target?.buildId !== request.buildId || decision.target.environment !== observation.environment))) throw new Error('The actual build and environment must match the reviewed execution target.');
-  return { claim, buildId: request.buildId, target: request.target, gates: request.gates, checkedAt: new Date().toISOString() };
+  const executionGates = decisions.filter(decision => ['G2', 'G4'].includes(decision.gate));
+  const scope = executionGates.find(decision => decision.dataScope !== undefined)?.dataScope;
+  if (scope !== undefined && (!scope || executionGates.some(decision => !decision.dataScope || dataScopeDigest(decision.dataScope) !== dataScopeDigest(scope)))) {
+    throw new Error('The G2 and G4 decisions must agree on the execution data scope.');
+  }
+  if (scope === undefined && request.dataObservations !== undefined) throw new Error('Data observations require a reviewed data scope.');
+  const data = scope === undefined ? undefined : assertDataReady(root, scope, observation, request.dataObservations);
+  return { result: { claim, buildId: request.buildId, target: request.target, gates: request.gates, checkedAt: new Date().toISOString(), ...(data ? { data } : {}) }, scope, observation };
+}
+export async function preflight(root: string, request: Parameters<typeof checkExecution>[1], reader: BoardReader = readBoard) {
+  return (await checkExecution(root, request, reader)).result;
 }
 export function closeClaim(root: string, request: { claimId: string; source: string; evidence: Evidence[] }) {
   requireText(request.source, 'Actual claim disposition and reason');
@@ -377,16 +390,17 @@ export function reconcilePublication(root: string, request: { id: string; state:
 
 export async function beginExecution(root: string, request: Parameters<typeof preflight>[1] & { id: string }, reader: BoardReader = readBoard) {
   id(request.id);
-  const { claim, buildId, target, gates, checkedAt } = await preflight(root, request, reader);
+  const { result: { claim, buildId, target, gates, checkedAt }, scope, observation } = await checkExecution(root, request, reader);
   return withLock(root, 'qa-board', () => {
     if (activeSource(root).revision !== claim.sourceRevision) throw new Error('The task source changed before execution.');
     openClaim(root, claim.id);
     verifyEvidence(root, target);
     for (const gate of Object.values(gates)) if (gate) verifyEvidence(root, gate);
+    const data = scope === undefined ? undefined : assertDataReady(root, scope, observation, request.dataObservations);
     const current = journal(root);
     if (current.value.publications.some(p => p.claimId === claim.id && p.state === 'pending') || current.value.executions.some(run => run.id === request.id || run.claimId === claim.id && !run.terminal)) throw new Error('A pending write or execution already controls this claim.');
     if (current.value.executions.some(run => run.claimId === claim.id && run.buildId === buildId && run.gates.G2?.sha256 === gates.G2?.sha256 && run.gates.G4?.sha256 === gates.G4?.sha256 && run.terminal?.state !== 'notStarted')) throw new Error('The same reviewed build and scope already ran. Retain its result or record a separately reviewed retry.');
-    const execution: Execution = { id: request.id, claimId: claim.id, buildId, target, gates, startedAt: checkedAt };
+    const execution: Execution = { id: request.id, claimId: claim.id, buildId, target, gates, startedAt: checkedAt, ...(data ? { data } : {}) };
     current.value.executions.push(execution);
     save(root, journalPath, current.value, current.revision);
     return execution;
