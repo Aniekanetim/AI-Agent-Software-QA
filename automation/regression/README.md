@@ -1,0 +1,59 @@
+# Post-fix verification and regression
+
+Every product fix follows the Retest workflow. Confirm the original defect on the fixed build and account for the required regression checks before closing the defect. Use the existing QA queues, reviews and test runners.
+
+## Register the fix and review coverage
+
+At Retest pickup, read the developer's response, the original defect and the relevant product context. Observe the actual served build and establish which revision it includes. Record a version 1 intake with `defect: { source, ticketId }`, optional `parent` in the same format, `fixRevision`, `target: { buildId, environment }`, and evidence references for `defectReport`, `developerResponse`, and `targetObservation`. The target observation JSON contains the target fields, fix revision, zoned `observedAt`, and actual `source`. Use `source: "local"` for folder tickets and the live claim's `sourceKey` for native tickets.
+
+```shell
+npm run qa -- regression register --input .local/fix-intake-input.json
+npm run qa -- regression status --fix <fix-key>
+npm run qa -- regression approve-plan --input .local/fix-plan-input.json
+```
+
+`register` takes `{ intake, supersedes? }`. Repeated check-ins resume the same fix. Supply the previous fix key as `supersedes` when the fix revision or build changes in the same environment. The prior assessment remains readable and its evidence can be considered for explicit reuse where the actual target and case context still match.
+
+Prepare the version 1 plan with `fix`, the pinned module `library`, `policy` and `impact` references, `coverage` (`targeted` or `full`), a selection `rationale`, and `batches`. Each batch has a stable `id`, `phase` (`confirmation` or `regression`), and `checks` with distinct `checkId`, `conditionId`, and `context` evidence. Context describes the relevant role, configuration, test data and starting state. Include any applicable method or environment constraints.
+
+When the original reproduction is already in the baseline suite, count it once under confirmation. Include separate regression checks for other behavior.
+
+- The reviewed policy JSON identifies the pinned `library`, the `critical` cross-module baseline, and the `full` suite when broader regression is required. Lists contain check and condition pairs.
+- The impact JSON identifies the `fix`, `affected` check and condition pairs, and whether `broaderRequired` applies. Use the [change-impact briefing](../../QA%20Process%20Context/Regression%20Management/impact-analysis.md) for sources, dependencies and uncertainty.
+- At G4, brief the reviewer on the confirmation and regression batches and record the actual scope and authorization. The JSON includes `gate`, `decision`, `reviewer`, `source`, `packet`, `assignment` (the defect), `target`, `fixPlan`, and `defectReport`. For a live claim, include the existing `claimId` and `ticketRevision`. Pass `{ fix, plan, approval, previousPlan? }` to `approve-plan` with the actual G4 reference.
+
+## Run the checks and retain observations
+
+Execute confirmation against the actual fixed target. For live execution use the existing `task-source preflight` and `begin` inputs with `fixBatch: { fix, batchId }`. The two phases can use one matching G4 decision. If confirmation fails, retain the evidence and follow the existing reviewed Rework route. If confirmation passes, continue the approved regression batches. `regression status`, local `board status`, and live `task-source check-in` show pending evidence.
+
+Use the applicable approved manual, scripted, or CI runner. A project can capture the results in a scoped [release run](../release/README.md#retain-runs-and-assess-the-round), with a separate round for standalone fix work or the parent round when it already includes the checks. Each reusable observation includes its actual `context` evidence. Register the source once with `release retain-run`, then use:
+
+```shell
+npm run qa -- regression retain-results --input .local/fix-results-input.json
+```
+
+The input is `{ fix, plan, batchId, round, run }`, with pinned references for the plan, source round and retained run. Match the observed build, environment, library check definition, condition basis and test context. Several fixes can link the same observed CI result. The fix assessment reads matching attempts from each linked round, so a later compatible failure can reopen review. Revised plans reuse compatible linked evidence. Reconcile uncertain execution before retry. For a deliberate rerun, record the batch's `retryReason` in a renewed G4 plan and link the resulting observation to the earlier attempt with `previousRunId`.
+
+## Review and close the defect
+
+After confirmation passes and the regression outcomes are accounted for, prepare the scoped G5 decision. Include `gate: "G5"`, `decision`, `reviewer`, `source`, `packet`, `fix`, `ticketRevision`, `assessmentDigest` from `regression status`, the reobserved `targetObservation`, and `findings`. For each regression failure, record its check and condition IDs, the separate `ticket`, reviewed `impact` (`blocking` or `nonblocking`), and `evidence`. The evidence JSON identifies the originating `fix`, separate `ticket`, observed `destination: "Dev Todo"`, and actual `source`. Keep the original fix outcome and the parent release decision distinct.
+
+```shell
+npm run qa -- regression record-review --input .local/fix-review-input.json
+```
+
+`record-review` takes `{ fix, review }`. A local Tested-Ok move includes `defect: { fix }`. A live preview and move use the existing G4 `defect` reference and `completion: { fix }`. The publication's G5 decision links the recorded scoped decision as `fixReview`. For a human-managed board, use the same `defect` and `completion` with `task-source observe-completion` after readback. The actual move and QA verification have separate evidence.
+
+For a refutation that genuinely requires no product change, retain the requirements owner's decision and reviewed QA disposition. The local move uses `defect: { refutation }`; the native move uses `completion: { refutation }` and binds the same reference as `fixReview`. The pinned refutation includes G5 Approved, assignment, ticket revision, reviewer, source, original defect report, and `ownerDecision`. The pinned owner decision identifies the assignment, `decision: "noProductChange"`, and actual source.
+
+## Carry regression into release sign-off
+
+At G1, pin the independent `changeManifest` from the actual release change record and reconcile it with included board fixes. Its JSON contains `assignment`, `target`, the round's `changes` reference, `fixes` as defect/fix-revision pairs, `policy`, `coverage`, and `affected` check and condition pairs. Use an empty fixes list only when the reviewed change record has no included fixes. Include critical and affected checks in the parent round for feature and PR assignments too.
+
+Link previously blocking regression tickets to their included verified fix or add `findingDispositions` evidence to the manifest. Each disposition records the `ticket`, release `target`, actual `owner` and `source`, `evidence` of the review, and the `decision` (`resolved` or `acceptedNonblocking`). An accepted nonblocking disposition is a release limit.
+
+Use `regression release --input` with the assignment object to prepare the current evidence for G5. The helper checks the parent round's required coverage, cross-checks known linked fixes, verifies each included fix on the exact target, and reports unresolved blocking findings. For a release with included fixes, record the returned digest as `handoff.regressionDigest` in G5. Review accepted nonblocking findings under Approved with limits. Release notes link to the actual verified results and any limits.
+
+## Upgrade open work
+
+Apply this procedure to open fixes at their next review. Reuse traceable prior outcomes and inspect interrupted work before retry. Preserve completed historical tickets and approvals. Update the current check-in instructions through the existing adoption process so agents can surface the new checkpoints. Product-specific scope and approvals belong to each project.

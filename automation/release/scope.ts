@@ -10,6 +10,7 @@ interface Review {
 }
 interface CoverageReview extends Review {
   library: Evidence; modules: string[];
+  changeManifest?: Evidence;
   obligations: {
     id: string; moduleId: string; testTypeId: string; conditionId: string;
     state: 'required' | 'excluded' | 'unresolved'; checkIds?: string[]; exceptionAllowed?: boolean;
@@ -75,13 +76,14 @@ function matchCoverage(root: string, assignment: Assignment, round: Evidence, ap
       (basis.checkIds !== undefined && (!Array.isArray(basis.checkIds) ||
         new Set(basis.checkIds).size !== basis.checkIds.length || !basis.checkIds.every(id => row.checkIds.includes(id))));
   })) throw new Error('The round must account for every G1 coverage obligation and its required checks.');
-  return plan;
+  if (coverage.changeManifest) verifyEvidence(root, coverage.changeManifest);
+  return { target: plan.target, plan, changeManifest: coverage.changeManifest };
 }
 
 export function requireCurrentScope(root: string, assignment: Assignment) {
   const { current } = releaseScope(root, assignment);
   if (!current || !('round' in current)) throw new Error('Bind the assignment to its current reviewed release round at G1/G2.');
-  return { ...current, target: matchCoverage(root, assignment, current.round, current.approval).target };
+  return { ...current, ...matchCoverage(root, assignment, current.round, current.approval) };
 }
 
 export function bindReleaseScope(root: string, request: { assignment: Assignment; expectedRevision: string | null; round: Evidence; approval: Evidence }) {

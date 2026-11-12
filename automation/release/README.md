@@ -29,6 +29,8 @@ The input is the evidence reference itself. The result shows module, test type, 
 
 At G1, record the expected coverage before observing results. Identify the affected modules, shared journeys, applicable test types, required conditions, and exclusions or open questions. At G2, link the checks and bind the reviewed round to its assignment and exact target. Bring these details into the existing human briefings.
 
+In the G1 record, pin the [release change manifest](../regression/README.md#carry-regression-into-release-sign-off) as `changeManifest`. It independently accounts for included fixes and the regression baseline and affected checks. G5 compares it with known linked fixes and checks their current evidence for the exact release target.
+
 | Version 1 round field | Contents |
 | --- | --- |
 | `schemaVersion`, `id` | `1` and the round ID |

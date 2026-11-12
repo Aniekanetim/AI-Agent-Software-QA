@@ -28,8 +28,9 @@ import * as postman from './postman/postman.js';
 import { assessCoverage, type CoverageSnapshot } from './coverage/coverage.js';
 import { browseLibrary } from './release/library.js';
 import { assessRound, recordAssessment, retainRun, retainedRuns, verifyAssessment } from './release/round.js';
-import { handoffRoute, reportingPreference } from './release/handoff.js';
+import { currentReleaseRegression, handoffRoute, reportingPreference } from './release/handoff.js';
 import { bindReleaseScope, invalidateReleaseScope, releaseScope } from './release/scope.js';
+import { approveFixPlan, fixStatus, recordFixReview, registerFix, retainFixResults } from './regression/fix.js';
 import { validateFlowMap, traceFlowMap, type FlowMapSnapshot, type Direction } from './flow-map/flow-map.js';
 import { assessTaskTools, assessLiveTaskTools, type TaskToolPlan } from './tools/task.js';
 import { assessData, type DataPreparation } from './data/preparation.js';
@@ -65,6 +66,7 @@ async function currentPr(repository: string, number: number) {
   const raw = JSON.parse(await github.runGh(['api', `repos/${repository}/pulls/${number}`])); return github.normalizePr(repository, raw);
 }
 const help = {
+  regression: 'register --input | approve-plan --input | status --fix | retain-results --input | record-review --input | release --input',
   release: 'library --input | scope --input | bind-scope --input | invalidate-scope --input | retain-run --input | runs --input | assess --input | record-assessment --input | verify-assessment --input | route [--ticket-url]',
   attention: 'status | proposal/configure --input | record --input | list --recipient [--offset N --limit N --snapshot hash --all] | index | update-index --input | preview --recipient --notifier [--at ISO] | reserve --input | preflight --id --notifier | receipt --input | respond --input : optional blocker reminders; no task execution, lifecycle move or approval',
   'task-source': 'status | providers | inspect --input | preview --input | save --input | check-in | details --ticket | claim --input | history --claim | recheck --claim | preflight --input | begin --input | settle --input | publication-preview --input | publish --input | reconcile-publication --input | observe-completion --input | close --input',
@@ -136,10 +138,13 @@ async function main() {
       const missing = board.missingFolders(root), pending = board.pendingTransitions(root);
       if (missing.length || pending.length) output({ missing, pending, next: missing.length ? 'Run board upgrade with the actual instruction.' : 'Recover the original transition ID; do not reset its journal.' });
       else {
-        const tickets = board.tickets(root).filter(t => !options.has('ticket') || t.id === option('ticket')).map(({ text, ...ticket }) => ({
-          ...ticket, issues: [...ticket.issues, ...(ticket.releaseReviewRequired ? [ticket.releaseReviewRequired] : []),
-            ...(board.inactive(ticket.status) && !ticket.lifecycle ? ['Actual lifecycle decision is missing; execution remains blocked.'] : [])],
-        }));
+        const tickets = board.tickets(root).filter(t => !options.has('ticket') || t.id === option('ticket')).map(ticket => {
+          const fixVerification = board.defectRetestStatus(root, ticket);
+          const { text, ...summary } = ticket;
+          return { ...summary, ...(fixVerification ? { fixVerification } : {}),
+            issues: [...ticket.issues, ...(ticket.releaseReviewRequired ? [ticket.releaseReviewRequired] : []),
+              ...(board.inactive(ticket.status) && !ticket.lifecycle ? ['Actual lifecycle decision is missing; execution remains blocked.'] : [])] };
+        });
         const next = options.has('ticket') && !tickets.length ? 'Check the ticket ID or run board status to list all tickets.'
           : tickets.some(ticket => ticket.releaseReviewRequired) ? 'Review the flagged release before claiming QA completion. Independent eligible tickets can proceed.'
           : tickets.some(ticket => ['Ready for QA', 'Retest'].includes(ticket.status))
@@ -206,6 +211,16 @@ async function main() {
     if (action !== 'assess') throw new Error('Use coverage assess --input.');
     const assessment = assessCoverage(root, input<CoverageSnapshot>()); output(assessment);
     if (assessment.status === 'needsReview') process.exitCode = 1;
+    return;
+  }
+  if (area === 'regression') {
+    if (action === 'register') output(registerFix(root, input()));
+    else if (action === 'approve-plan') output(approveFixPlan(root, input()));
+    else if (action === 'status') output(fixStatus(root, option('fix')));
+    else if (action === 'retain-results') output(retainFixResults(root, input()));
+    else if (action === 'record-review') output(recordFixReview(root, input()));
+    else if (action === 'release') output(currentReleaseRegression(root, input()));
+    else throw new Error('Run regression help to see the available commands.');
     return;
   }
   if (area === 'release') {

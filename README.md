@@ -2,7 +2,7 @@
 
 A portable workflow for an AI QA agent to join a project, build product understanding and perform assigned QA work with human review. Guided onboarding prepares context, tools and access. Product Discovery learns how an application behaves. QA evaluates assigned work against an agreed test basis, investigates findings and proposes readiness. Humans maintain the product baseline and own scoped decisions; developers fix or refute reported defects.
 
-**Package version:** 1.13.0 — updated 12 November 2026. **Project state:** unconfigured. **Live tickets/discovery requests:** none. **Product schedules/PR regression/notifications:** not activated. Start with [SETUP.md](SETUP.md) and [guided onboarding](Onboarding/README.md).
+**Package version:** 1.14.0 — updated 12 November 2026. **Project state:** unconfigured. **Live tickets/discovery requests:** none. **Product schedules/PR regression/notifications:** not activated. Start with [SETUP.md](SETUP.md) and [guided onboarding](Onboarding/README.md).
 
 Choose a [task source](automation/task-source/README.md) during onboarding or in Settings. The local QA folders are available by default. Jira, ClickUp, Linear and Asana adapters are available for sandbox verification.
 
@@ -90,6 +90,8 @@ For QA, the agent consults both product-context stores and [QA Process Context](
 The board supplies work; it does not authorize testing. A scheduled check-in also does not authorize product fixes or substitute for human decisions.
 
 Parent QA assignment completion requires the current [module-by-module assessment](automation/release/README.md), release notes, a scoped human G5 decision, and confirmed handoff. The assessment links the reviewed scope to retained runs on the exact build. Reporting preferences supply delivery details. The packet identifies applicable rollout, monitoring, and recovery items for the separate production decision. Discovery completes against its own learning criteria and any review or receipt its request requires.
+
+Each fix in Retest needs [confirmation and required regression evidence](automation/regression/README.md) on the observed build. The parent release verifies its included fixes against the reviewed change manifest. Projects can reuse matching CI, scripted, or manual observations.
 
 ## Maintain testing knowledge and coverage
 

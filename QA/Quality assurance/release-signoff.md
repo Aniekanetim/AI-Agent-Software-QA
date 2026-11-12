@@ -17,7 +17,7 @@ Release notes explain what changes for the reader. A test-completion assessment 
 
 ## One canonical packet
 
-Every parent release sign-off uses [the current module assessment](../../automation/release/README.md) for the assignment's G1/G2 binding and verified target. Bring the reviewed scope, actual coverage by module and test type, open gaps, and approved exceptions into the human review. Use the change record for release-note content and the assessment for verification claims. Record zero execution or missing required evidence as an open completion issue. Use the authorized destination and observed delivery when completing the assignment.
+Every parent release sign-off uses [the current module assessment](../../automation/release/README.md) for the reviewed G1/G2 scope and verified target. Pin the [independent change manifest and required regression evidence](../../automation/regression/README.md#carry-regression-into-release-sign-off) for included fixes. Bring the actual coverage, failures, gaps and accepted limits into review. Use the change record for release-note content and the assessments for verification claims. Keep missing required evidence and blocking regressions open until resolved. Use the authorized destination and observed delivery when completing the assignment.
 
 Use the [completion/handoff template](templates/completion-handoff.md) for one versioned record, normally `QA/Quality assurance/releases/<run-id>-release-handoff.md`. Link suites, results, defects and readiness records instead of duplicating their full tables. Link this packet from the parent assignment, shared progress and project entry point. An individual bug can link its scoped retest and parent packet; it does not need an entire release report of its own.
 

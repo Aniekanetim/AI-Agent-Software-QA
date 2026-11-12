@@ -11,6 +11,7 @@
 | Audience / handoff recipient | <named person or responsible role; acceptance required or not> |
 | Target version / served build / source revision | <exact identities> |
 | Current round / module assessment | <pinned G1/G2 scope, assessment and G5 target observation> |
+| Change manifest / included fix regression | <approved manifest, same-build evidence, regression digest and open findings> |
 | Test basis / design revision / criterion IDs | <actual applicable sources> |
 | Discovery references / versions | <relevant OBS IDs/versions or None used; learning coverage is not test execution> |
 | Environment / intended use | <local, staging, production; scope and limits> |
