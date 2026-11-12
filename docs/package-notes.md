@@ -1,6 +1,10 @@
 # Package notes
 
-**Version:** 1.14.2. **Created:** 22 October 2026. **Updated:** 12 November 2026. **State:** reusable workflow package.
+**Version:** 1.14.3. **Created:** 22 October 2026. **Updated:** 12 November 2026. **State:** reusable workflow package.
+
+## Version 1.14.3 — G5 binding and fresh inventory checks
+
+Every parent G5 decision binds the exact scope and manifest, including releases with no linked fixes. Connected-board publication, recovery and closure require an authoritative inventory recheck for the specific action. An unchanged recheck uses the existing approval. Recovery retains an already-observed write and flags missing or stale review evidence. [Release handoff](../automation/release/README.md#recheck-a-connected-board-at-publication-and-closure)
 
 ## Version 1.14.2 — scope reconciliation and reactivation
 

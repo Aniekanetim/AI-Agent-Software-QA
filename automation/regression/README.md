@@ -67,7 +67,7 @@ Link previously blocking regression tickets to their included verified fix or ad
 
 Use `regression release --input` with the assignment object to prepare the current evidence for G5. For a connected board, add `boardInventory` with a fresh authoritative inventory and any required readbacks. Its observation must be later than the scope inventory and at or after the G5 target observation. If the linked IDs changed, review the affected scope again. The helper verifies each included fix on the exact target and reports unresolved blocking findings.
 
-Record the returned digest as `handoff.regressionDigest` when the report contains a live inventory, relationships, fixes, or dispositions. For connected boards, also set `handoff.boardInventory` to the same reference used for reconciliation and publication previews. Recheck the board and current evidence before handoff or closure. Review accepted nonblocking findings under Approved with limits. Release notes link to the actual verified results and any limits.
+Record the returned digest as `handoff.regressionDigest` for every parent release, including a local release with no linked fixes. The digest binds the current G1/G2 scope, exact change manifest and reconciliation. If that evidence changes, renew the affected G5 review. For connected boards, also set `handoff.boardInventory` to the reference used for the reviewed reconciliation and publication previews. A connected-board action needs a separate [current inventory recheck](../release/README.md#recheck-a-connected-board-at-publication-and-closure). Review accepted nonblocking findings under Approved with limits. Release notes link to actual results and any limits.
 
 ## Upgrade open work
 

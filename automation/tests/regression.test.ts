@@ -82,9 +82,9 @@ test('scope preview and binding catch an omitted fix through the canonical board
   const run = base.put('parent-pass.json', base.run('parent-pass', 'Pass'));
   const { assessment } = recordAssessment(root, retainRun(root, { round: base.roundRef, run }));
   const route: Route = { channel: 'recorded', destination: 'Fixture QA discussion', recipient: 'Fixture owner', acknowledgementRequired: false };
-  const decision = { gate: 'G5', decision: 'Approved', reviewer: 'Fixture reviewer', source: 'Synthetic decision', packet: base.round.scope, target: base.target,
-    handoff: { assessment, route, targetObservation: base.g5Target } };
   base.bind();
+  const decision = { gate: 'G5', decision: 'Approved', reviewer: 'Fixture reviewer', source: 'Synthetic decision', packet: base.round.scope, target: base.target,
+    handoff: { assessment, route, targetObservation: base.g5Target, regressionDigest: currentReleaseRegression(root, parent).digest } };
   assert.equal(reviewHandoff(root, decision, assessment, route, parent).state, 'evidenceReady');
   appendFileSync(child, parentLink);
   const current = releaseScope(root, parent);

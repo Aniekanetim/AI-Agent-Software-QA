@@ -7,6 +7,9 @@ import * as b from '../board/board.js';
 import * as s from '../shared/store.js';
 import * as gh from '../github/github.js';
 import { recordAssessment, retainRun } from '../release/round.js';
+import { currentReleaseRegression } from '../release/handoff.js';
+import { bindReleaseScope } from '../release/scope.js';
+import { pinned } from '../release/library.js';
 import { releaseFixture } from './release-fixture.js';
 import { regressionFixture } from './regression-fixture.js';
 
@@ -33,16 +36,18 @@ function releaseTransition() {
   const run = pilot.put('run.json', pilot.run('pass', 'Pass'));
   const { assessment } = recordAssessment(f.root, retainRun(f.root, { round: pilot.roundRef, run }));
   const route = { channel: 'recorded', destination: 'Synthetic review conversation', recipient: 'Release owner', acknowledgementRequired: false };
-  const g5 = put(f.root, '.local/g5.json', {
+  const assignment = { source: 'local', ticketId: ticket.id };
+  const approval = {
     gate: 'G5', decision: 'Approved', ticketId: ticket.id, ticketRevision: ticket.revision,
     reviewer: 'Synthetic reviewer', source: 'Synthetic G5 decision', packet: f.d.evidence[0],
-    target: pilot.target, handoff: { assessment, route, targetObservation: pilot.g5Target },
-  });
+    target: pilot.target, handoff: { assessment, route, targetObservation: pilot.g5Target, regressionDigest: currentReleaseRegression(f.root, assignment).digest },
+  };
+  const g5 = put(f.root, '.local/g5.json', approval);
   const request: b.Transition = { id: 'g5-transition', ticketId: ticket.id, expectedRevision: ticket.revision, to: 'Tested-Ok', decision: f.d };
   const delivery = put(f.root, 'delivery.json', {
     state: 'delivered', decisionSha256: g5.sha256, recipient: route.recipient, destination: route.destination, source: 'Synthetic delivery observation',
   });
-  return { ...f, request, route, g5, delivery };
+  return { ...f, request, route, g5, delivery, pilot, assignment, approval };
 }
 test('local assignment completion always requires G5 and delivery, including with unset or removed settings', () => {
   const f = releaseTransition();
@@ -55,6 +60,26 @@ test('local assignment completion always requires G5 and delivery, including wit
   const completed = b.findTicket(f.root, f.request.ticketId);
   assert.equal(completed.status, 'Tested-Ok');
   assert(completed.lifecycle?.evidence.some(ref => ref.sha256 === f.delivery.sha256));
+});
+test('an empty local release requires a current digest and a manifest change invalidates its G5 approval', () => {
+  const f = releaseTransition();
+  const legacy = put(f.root, '.local/legacy-g5.json', { ...f.approval, handoff: { ...f.approval.handoff, regressionDigest: undefined } });
+  assert.throws(() => b.transitionTicket(f.root, { ...f.request, release: { decision: legacy } }), /G5 must review the current regression/);
+  const draft = f.pilot.scopeRequest('local', f.pilot.round, f.pilot.roundRef, 'full-regression');
+  const g2 = pinned<{ scopeReview: s.Evidence }>(f.root, draft.approval, 'G2 fixture');
+  const g1 = pinned<{ changeManifest: s.Evidence }>(f.root, g2.scopeReview, 'G1 fixture');
+  const manifest = pinned<{ policy: s.Evidence }>(f.root, g1.changeManifest, 'manifest fixture');
+  const policy = pinned<{ critical: unknown[] }>(f.root, manifest.policy, 'policy fixture');
+  const fullPolicy = f.pilot.put('full-policy.json', { ...policy, full: policy.critical });
+  const updated = f.pilot.put('full-manifest.json', { ...manifest, coverage: 'full', policy: fullPolicy });
+  const scopeReview = f.pilot.put('full-g1.json', { ...g1, changeManifest: updated });
+  bindReleaseScope(f.root, { ...draft, approval: f.pilot.put('full-g2.json', { ...g2, scopeReview }) });
+  assert.throws(() => b.transitionTicket(f.root, { ...f.request, release: { decision: f.g5, delivery: f.delivery } }), /G5 must review the current regression/);
+  assert.equal(b.findTicket(f.root, f.request.ticketId).status, 'Ready for QA');
+  const regressionDigest = currentReleaseRegression(f.root, f.assignment).digest;
+  const decision = f.pilot.put('.local/updated-g5.json', { ...f.approval, handoff: { ...f.approval.handoff, regressionDigest } });
+  const delivery = f.pilot.put('updated-delivery.json', { ...pinned<object>(f.root, f.delivery, 'delivery fixture'), decisionSha256: decision.sha256 });
+  assert.equal(b.transitionTicket(f.root, { ...f.request, release: { decision, delivery } }).state, 'completed');
 });
 test('a parent in Retest still needs G5 and a scoped fix waits for its separate regression', () => {
   const f = fixture();
