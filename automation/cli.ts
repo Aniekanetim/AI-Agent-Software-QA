@@ -26,6 +26,9 @@ import * as registry from './tools/registry.js';
 import { bindHarness, currentHarness, readHarness, harnessKey, type ExecutionContext } from './tools/runtime.js';
 import * as postman from './postman/postman.js';
 import { assessCoverage, type CoverageSnapshot } from './coverage/coverage.js';
+import { browseLibrary } from './release/library.js';
+import { assessRound, recordAssessment, retainRun, retainedRuns, verifyAssessment } from './release/round.js';
+import { handoffRoute, reportingPreference } from './release/handoff.js';
 import { validateFlowMap, traceFlowMap, type FlowMapSnapshot, type Direction } from './flow-map/flow-map.js';
 import { assessTaskTools, assessLiveTaskTools, type TaskToolPlan } from './tools/task.js';
 import { assessData, type DataPreparation } from './data/preparation.js';
@@ -61,6 +64,7 @@ async function currentPr(repository: string, number: number) {
   const raw = JSON.parse(await github.runGh(['api', `repos/${repository}/pulls/${number}`])); return github.normalizePr(repository, raw);
 }
 const help = {
+  release: 'library --input | retain-run --input | runs --input | assess --input | record-assessment --input | verify-assessment --input | route [--ticket-url]',
   attention: 'status | proposal/configure --input | record --input | list --recipient [--offset N --limit N --snapshot hash --all] | index | update-index --input | preview --recipient --notifier [--at ISO] | reserve --input | preflight --id --notifier | receipt --input | respond --input : optional blocker reminders; no task execution, lifecycle move or approval',
   'task-source': 'status | providers | inspect --input | preview --input | save --input | check-in | details --ticket | claim --input | history --claim | recheck --claim | preflight --input | begin --input | settle --input | publication-preview --input | publish --input | reconcile-publication --input | close --input',
   board: 'status [--ticket ID] | upgrade --source | transition --input | recover --id | reviews [--at ISO] [--trigger key] | acknowledge-review --input | assert-executable --ticket ID [--generation ID] | operations --ticket ID | settle-operation --input : lifecycle controls preserve actual human decisions; no test authorization',
@@ -197,6 +201,19 @@ async function main() {
     if (action !== 'assess') throw new Error('Use coverage assess --input.');
     const assessment = assessCoverage(root, input<CoverageSnapshot>()); output(assessment);
     if (assessment.status === 'needsReview') process.exitCode = 1;
+    return;
+  }
+  if (area === 'release') {
+    if (action === 'library') output(browseLibrary(root, input()));
+    else if (action === 'retain-run') output(retainRun(root, input()));
+    else if (action === 'runs') output(retainedRuns(root, input<{ round: store.Evidence }>().round));
+    else if (action === 'assess') output(assessRound(root, input()));
+    else if (action === 'record-assessment') output(recordAssessment(root, input()));
+    else if (action === 'verify-assessment') output(verifyAssessment(root, input()));
+    else if (action === 'route') {
+      const preference = reportingPreference(root);
+      output(preference ? handoffRoute(preference, options.get('ticket-url')) : { state: 'unconfigured' });
+    } else throw new Error('Run release help to see the available commands.');
     return;
   }
   if (area === 'tools') {

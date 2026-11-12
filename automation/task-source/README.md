@@ -79,6 +79,8 @@ For a [data-aware scope](../data/README.md#bind-readiness-to-execution), include
 
 Prepare `{ id, claimId, action, ... }` for `task-source publication-preview --input`. For `comment`, include the reviewed `body`. For `createDefect`, include `title` and `body`; the helper links the originating native ticket. For `move`, set `to` to `testedOk` after G5 or `rework` for a G3-confirmed failed retest. Review the exact preview with the human. Include its `publicationDigest` in the actual decision record. When one decision covers several exact previews, record their digests in `publicationDigests`.
 
+For an adopted [G5 release handoff](../release/README.md#route-a-reviewed-handoff), preview the handoff comment with `purpose: "releaseHandoff"` and its assessment. Preview the completion move with the same assessment. Confirm delivery and any required acknowledgement before completing the assignment.
+
 Run `task-source publish --input` with the same proposal, the authorization `source` and the `decision` evidence reference. Keep comments scoped to authorized readers and link only redacted evidence accessible to them. Some providers notify watchers when actions are published. A move or new defect needs readback in the mapped board queue. If a write is uncertain, inspect the native ticket, destination or `QA operation` marker first. Record the actual terminal outcome through `task-source reconcile-publication --input` with `id`, `state` (`confirmed` or `notApplied`), `remoteId` if confirmed, `source` and `evidence`.
 
 Use `task-source close --input` with `claimId`, the actual disposition `source` and `evidence` after execution and publishing are settled. Preserve the native ticket and historical records across source changes.

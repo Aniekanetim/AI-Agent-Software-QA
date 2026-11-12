@@ -6,6 +6,8 @@ Use applicable accepted [human sources](../../Project%20Context/README.md) for e
 
 ## Organize by target and testing type
 
+For a maintained module view, adopt the [test library and release evidence helpers](../../automation/release/README.md). The library links reusable checks under module, test type, and suite. A testing round pins its scope and library and links actual run evidence. Existing suite and result files can serve as canonical evidence references.
+
 Create only the directories needed by real work:
 
 ```text
