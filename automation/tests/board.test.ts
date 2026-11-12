@@ -6,6 +6,8 @@ import { randomUUID } from 'node:crypto';
 import * as b from '../board/board.js';
 import * as s from '../shared/store.js';
 import * as gh from '../github/github.js';
+import { recordAssessment, retainRun } from '../release/round.js';
+import { releaseFixture } from './release-fixture.js';
 
 function put(root: string, path: string, value: unknown) { const file = s.contained(root, path); mkdirSync(dirname(file), { recursive: true }); writeFileSync(file, typeof value === 'string' ? value : JSON.stringify(value)); return s.evidence(root, path); }
 const rule: gh.RepositoryRule = { repository: 'fixture/product', branches: ['main'], labels: [], includeDrafts: false, reporting: 'comment' };
@@ -24,6 +26,28 @@ function fixture() {
   policy.approval = put(root, '.local/approval.json', { decision: 'Approved', reviewer: 'Synthetic fixture', source: 'Synthetic-only policy', policyDigest: gh.policyDigest(policy) });
   return { root, ticket, d, move, policy, target };
 }
+test('adopted local assignment completion requires the reviewed destination and observed delivery', () => {
+  const f = fixture(), ticket = b.findTicket(f.root, 'QA-001'), pilot = releaseFixture(f.root, ticket.id);
+  const run = pilot.put('run.json', pilot.run('pass', 'Pass'));
+  const { assessment } = recordAssessment(f.root, retainRun(f.root, { round: pilot.roundRef, run }));
+  const route = { channel: 'recorded', destination: 'Synthetic review conversation', recipient: 'Release owner', acknowledgementRequired: false };
+  put(f.root, '.local/reporting-settings.json', { releaseHandoff: route });
+  const g5 = put(f.root, '.local/g5.json', {
+    gate: 'G5', decision: 'Approved', ticketId: ticket.id, ticketRevision: ticket.revision,
+    reviewer: 'Synthetic reviewer', source: 'Synthetic G5 decision', packet: f.d.evidence[0],
+    target: pilot.target, handoff: { assessment, route },
+  });
+  const request: b.Transition = { id: 'g5-transition', ticketId: ticket.id, expectedRevision: ticket.revision, to: 'Tested-Ok', decision: f.d };
+  assert.throws(() => b.transitionTicket(f.root, request), /reviewed G5 release and delivery/);
+  assert.throws(() => b.transitionTicket(f.root, { ...request, release: { decision: g5 } }), /handoff delivery/);
+  const delivery = put(f.root, 'delivery.json', {
+    state: 'delivered', decisionSha256: g5.sha256, recipient: route.recipient, destination: route.destination, source: 'Synthetic delivery observation',
+  });
+  b.transitionTicket(f.root, { ...request, release: { decision: g5, delivery } });
+  const completed = b.findTicket(f.root, ticket.id);
+  assert.equal(completed.status, 'Tested-Ok');
+  assert(completed.lifecycle?.evidence.some(ref => ref.sha256 === delivery.sha256));
+});
 test('five-folder upgrades add only the new queues and are idempotent', () => {
   const f = fixture();
   for (const status of ['Deferred', 'Canceled']) { const path = s.contained(f.root, `${b.boardRoot}/${status}/.gitkeep`); unlinkSync(path); rmdirSync(dirname(path)); }

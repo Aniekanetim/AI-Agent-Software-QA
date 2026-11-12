@@ -3,6 +3,7 @@ import { resolve, dirname, relative } from 'node:path';
 import { contained, digest, load, save, replace, revision, withLock, verifyEvidence, requireText, assertNonsecret, type Evidence } from '../shared/store.js';
 
 import { requireLocalSource } from '../task-source/config.js';
+import { handoffRoute, reportingPreference, verifyLocalHandoff, type LocalHandoff } from '../release/handoff.js';
 
 export const boardRoot = 'QA task management Board';
 export const statuses = ['Ready for QA', 'Dev Todo', 'Tested-Ok', 'Retest', 'Rework', 'Deferred', 'Canceled'] as const;
@@ -15,7 +16,7 @@ export interface Decision {
   checkpoint: string; nextOwner: string; nextAction: string; review?: Review;
   handoff: string; waitingOn?: string;
 }
-export interface Transition { id: string; ticketId: string; expectedRevision: string; to: Status; decision: Decision; navigation?: { path: string; expectedRevision: string; source: string }[] }
+export interface Transition { id: string; ticketId: string; expectedRevision: string; to: Status; decision: Decision; release?: LocalHandoff; navigation?: { path: string; expectedRevision: string; source: string }[] }
 export interface Lifecycle extends Decision { schemaVersion: 1; id: string; at: string; from: Status; to: Status; previousOwner: string; previousWaiting: string; previousCheckpoint: string }
 export interface Ticket { id: string; path: string; status: Status; text: string; revision: string; lifecycle: Lifecycle | null; generation: string; issues: string[] }
 interface Patch { path: string; before: string; content: string; original?: string; source?: string }
@@ -151,6 +152,13 @@ function decisionValid(root: string, request: Transition, ticket: Ticket) {
     if (ticket.id.startsWith('QA-') && request.to !== 'Ready for QA' || ticket.id.startsWith('BUG-') && !['Retest', 'Dev Todo', 'Rework'].includes(request.to)) throw new Error('Choose the working queue for this assignment or defect and its next owner.');
   }
   if (request.to === 'Tested-Ok' && operations(root, ticket.id).length) throw new Error('Unfinished work cannot be closed as Tested-Ok.');
+  if (request.to === 'Tested-Ok' && (ticket.status === 'Ready for QA' || request.release)) {
+    const preference = reportingPreference(root);
+    if (preference || request.release) {
+      if (!preference || !request.release) throw new Error('Record the reviewed G5 release and delivery for this assignment.');
+      verifyLocalHandoff(root, ticket.id, ticket.revision, handoffRoute(preference), request.release);
+    }
+  }
 }
 function markdownFiles(root: string, folder = ''): string[] {
   return readdirSync(contained(root, folder || '.'), { withFileTypes: true }).flatMap(e => {
@@ -198,6 +206,9 @@ function prepare(root: string, request: Transition): Journal {
   const destination = `${boardRoot}/${request.to}/${ticket.path.split('/').at(-1)}`;
   if (destination !== ticket.path && existsSync(contained(root, destination))) throw new Error('The destination already exists; never overwrite another ticket.');
   const event: Lifecycle = { ...request.decision, schemaVersion: 1, id: request.id, at: new Date().toISOString(), from: ticket.status, to: request.to, previousOwner: field(ticket.text, 'Owner / claimed at'), previousWaiting: field(ticket.text, 'Waiting on'), previousCheckpoint: field(ticket.text, 'Workflow checkpoint') };
+  if (request.to === 'Tested-Ok' && request.release) {
+    event.evidence = [...event.evidence, ...[request.release.decision, request.release.delivery, request.release.acknowledgement].filter((ref): ref is Evidence => !!ref)];
+  }
   let content = ticket.text;
   if (!operations(root, ticket.id).length) content = setField(content, 'Owner / claimed at', 'Unassigned');
   content = setField(setField(content, 'Workflow checkpoint', event.checkpoint), 'Next action', event.nextAction);

@@ -2,6 +2,7 @@ import test from 'node:test';
 import './toolchain.test.js';
 import './email-aliases.test.js';
 import './coverage.test.js';
+import './release.test.js';
 import './flow-map.test.js';
 import './adaptive-tools.test.js';
 import './browser-access.test.js';

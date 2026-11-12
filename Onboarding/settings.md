@@ -26,6 +26,10 @@ The agent uses `settings open`, `choose`, `edit`, `present`, `save`, `cancel`, `
 
 Show the active source and its board, queue mappings and permitted actions. Use [task source inspection, preview and save](../automation/task-source/README.md) for changes. Back, Cancel this edit and Close settings leave the active source in effect. A failed connection leaves other settings accessible. The project can switch after its active claims and pending operations are reconciled.
 
+## Release handoff
+
+For projects using the module test library, **Reporting and evidence preferences** can also record the release handoff recipient, delivery route, and whether acknowledgement is required. The G5 preview identifies the actual destination and the relevant publication permissions. [Release handoff setup](../automation/release/README.md#route-a-reviewed-handoff)
+
 ## Optional notification recovery
 
 Reporting and evidence preferences also offers optional [blocker reminders](../automation/attention/README.md). Its dedicated save path preserves completed onboarding. If that preference file becomes unreadable during an edit, the agent explains the issue and still offers Back, Cancel this edit and Close settings. Leaving retains the original data and a recovery reference; it does not pretend the notification answer was saved or canceled. Other settings and independent authorized QA remain available.
