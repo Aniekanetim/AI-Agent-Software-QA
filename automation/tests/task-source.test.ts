@@ -160,8 +160,24 @@ test('a reviewed G5 handoff uses the saved board route and gates completion afte
   live.reconcilePublication(f.root, { id: comment.id, state: 'confirmed', remoteId: 'comment-1', source: 'Synthetic provider observation', evidence: [packet] });
   f.board.tickets[0]!.updatedAt = '2026-01-01T00:05:00Z';
   await assert.rejects(live.publish(f.root, { ...move, ...args }, f.reader, writer), /recipient acknowledgement/);
-  const acknowledgement = f.put('ack.json', { state: 'accepted', decisionSha256: decision.sha256, recipient: preference.recipient, destination: claim.ticket.url, source: 'Synthetic recipient reply' });
-  const confirmed = await live.publish(f.root, { ...move, ...args, acknowledgement }, f.reader, writer);
+  const newRun = pilot.put('new-run.json', pilot.run('new-pass', 'Pass'));
+  const current = recordAssessment(f.root, retainRun(f.root, { round: pilot.roundRef, run: newRun })).assessment;
+  const newComment = { ...comment, id: 'g5-comment-current', assessment: current };
+  const newMove = { ...move, assessment: current };
+  const newPrepared = await live.publicationPreview(f.root, newComment, f.reader);
+  const newCompletion = await live.publicationPreview(f.root, newMove, f.reader);
+  const newDecision = f.put('.local/g5-current.json', {
+    claimId: claim.id, ticketRevision: claim.ticket.revision, gate: 'G5', decision: 'Approved',
+    reviewer: 'Synthetic reviewer', source: 'Synthetic review of newly retained evidence', packet, target: pilot.target,
+    handoff: { assessment: current, route: newPrepared.release!.route },
+    publicationDigests: [newPrepared.publicationDigest, newCompletion.publicationDigest],
+  });
+  const newArgs = { ...args, decision: newDecision };
+  await assert.rejects(live.publish(f.root, { ...newMove, ...newArgs }, f.reader, writer), /Confirm the reviewed G5 board handoff/);
+  const refreshed = await live.publish(f.root, { ...newComment, ...newArgs }, f.reader, async () => async () => ({ remoteId: 'comment-2' }));
+  assert.equal(refreshed.remoteId, 'comment-2');
+  const acknowledgement = f.put('ack.json', { state: 'accepted', decisionSha256: newDecision.sha256, recipient: preference.recipient, destination: claim.ticket.url, source: 'Synthetic recipient reply' });
+  const confirmed = await live.publish(f.root, { ...newMove, ...newArgs, acknowledgement }, f.reader, writer);
   assert.equal(confirmed.handoff?.kind, 'completion');
   const closed = live.closeClaim(f.root, { claimId: claim.id, source: 'Synthetic G5 closure', evidence: [packet], disposition: 'completed' });
   assert.equal(closed.terminal?.disposition, 'completed');

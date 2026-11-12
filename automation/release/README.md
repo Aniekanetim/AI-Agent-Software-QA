@@ -43,7 +43,7 @@ Use `required`, `excluded`, or `unresolved` for obligation state. An exclusion n
 
 A version 1 run contains `id`, `round` evidence, `target`, `observedAt` with timezone, `targetEvidence`, and `observations`. The target observation JSON records `buildId`, `environment`, `observedAt`, and the actual `source`. Each observation identifies `checkId`, `conditionId`, `outcome`, and `evidence`. Use Pass, Fail, Partial, Blocked, or Not run. Retain a `note` for Partial, Blocked, and Not run. Link actual observations for Pass, Fail, and Partial. Match the tested build and environment to the pinned round.
 
-Use `previousRunId` to link a retest to the earlier run for that check and condition in the same round. A conclusive linked retest can replace the earlier outcome in the current assessment. Both attempts remain visible. For a changed build or scope, pin a new round and link the earlier round and failure from its reviewed scope or change record. Reassess the obligations against the new build.
+Retain the original run before recording its retest. Use `previousRunId` to link to the earlier run for that check and condition in the same round. A conclusive linked retest can replace the earlier outcome in the current assessment. Both attempts remain visible. For a changed build or scope, pin a new round and link the earlier round and failure from its reviewed scope or change record. Reassess the obligations against the new build.
 
 ```shell
 npm run qa -- release retain-run --input .local/round-and-run.json

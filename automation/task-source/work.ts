@@ -376,7 +376,11 @@ export async function publish(root: string, request: PublicationRequest, reader:
   const { claim, choice, connection } = await recheck(root, request.claimId, reader);
   const approved = approvedPublication(root, request, claim, choice, connection);
   const { mutation, release } = approved;
-  const fingerprint = digest(JSON.stringify({ source: claim.sourceKey, ticket: claim.ticket.id, mutation, ...(mutation.action === 'move' || release ? { claimId: claim.id } : {}) }));
+  const fingerprint = digest(JSON.stringify({
+    source: claim.sourceKey, ticket: claim.ticket.id, mutation,
+    ...(mutation.action === 'move' || release ? { claimId: claim.id } : {}),
+    ...(release ? { release, decisionSha256: request.decision.sha256 } : {}),
+  }));
   const write = await writer(choice.board, claim.ticket, mutation.action === 'move' ? mutation : { ...mutation, body: `${mutation.body}\n\nQA operation: ${request.id}` });
   const fresh = await recheck(root, claim.id, reader);
   if (JSON.stringify(approvedPublication(root, request, fresh.claim, fresh.choice, fresh.connection)) !== JSON.stringify(approved)) throw new Error('The reviewed publication changed before submission.');

@@ -44,6 +44,9 @@ test('an explicit eligible retest resolves a failure while retaining historical 
   retainRun(f.root, { round: f.roundRef, run: failure });
   assert.throws(() => recordAssessment(f.root, { round: f.roundRef, runs: [] }), /every retained run/);
   const prior = recordAssessment(f.root, { round: f.roundRef, runs: [failure] });
+  const invalid = f.put('invalid-retest.json', f.run('invalid', 'Pass', 'missing'));
+  assert.throws(() => retainRun(f.root, { round: f.roundRef, run: invalid }), /Retain the earlier run/);
+  assert.equal(verifyAssessment(f.root, prior.assessment, true).state, 'gaps');
   const pass = f.put('retest.json', f.run('retest', 'Pass', 'failure'));
   const index = retainRun(f.root, { round: f.roundRef, run: pass });
   assert.equal(retainRun(f.root, { round: f.roundRef, run: pass }).runs.length, 2);

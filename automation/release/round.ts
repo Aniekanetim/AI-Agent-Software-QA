@@ -215,6 +215,16 @@ export function retainRun(root: string, input: { round: Evidence; run: Evidence 
     if (old) {
       if (old.ref.path !== input.run.path || old.ref.sha256 !== input.run.sha256) throw new Error('Retain the earlier run. Give the new attempt a distinct run ID.');
     } else {
+      for (const observation of run.observations) {
+        if (observation.previousRunId === undefined) continue;
+        const prior = index.value.runs.find(row => row.id === observation.previousRunId);
+        if (!prior) throw new Error('Retain the earlier run before recording its retest.');
+        const earlier = readRun(root, prior.ref, scope, input.round);
+        if (Date.parse(earlier.observedAt) >= Date.parse(run.observedAt) || !earlier.observations.some(item =>
+          item.checkId === observation.checkId && item.conditionId === observation.conditionId)) {
+          throw new Error('Link the retest to an earlier eligible observation for the same check and condition.');
+        }
+      }
       index.value.runs.push({ id: run.id, ref: input.run });
       save(root, index.path, index.value, index.revision);
     }
