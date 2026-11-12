@@ -42,7 +42,7 @@ For QA, prepare a concrete scope/design/readiness packet. Brief the human on eac
 
 Use the required tools for UI, API or non-functional work. Report observations separately from inference and human review. Investigate supported causes, report actionable defects, retain original failures, verify authorized corrections and run relevant regression. Keep developer work and product fixes separately authorized.
 
-At G5, prepare release notes, completion/exit-criteria evidence, a scoped sign-off proposal and next-owner/recovery instructions before review. After the actual decision, deliver the handoff through the authorized channel and record actual delivery/required acceptance. Do not close with a commit or status line alone.
+For every parent release assignment, use the [module library and round binding](../automation/release/README.md) from G1/G2 onward. Prepare release notes, the current assessment, exit criteria, and next-owner actions before G5. After the actual decision, use the authorized channel and retain evidence of delivery and any required acceptance.
 
 ## 5. Arrange optional check-ins
 

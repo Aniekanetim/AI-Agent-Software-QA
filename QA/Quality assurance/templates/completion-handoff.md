@@ -10,6 +10,7 @@
 | Assignment / release / run | <IDs and links> |
 | Audience / handoff recipient | <named person or responsible role; acceptance required or not> |
 | Target version / served build / source revision | <exact identities> |
+| Current round / module assessment | <pinned G1/G2 scope, assessment and G5 target observation> |
 | Test basis / design revision / criterion IDs | <actual applicable sources> |
 | Discovery references / versions | <relevant OBS IDs/versions or None used; learning coverage is not test execution> |
 | Environment / intended use | <local, staging, production; scope and limits> |
@@ -17,14 +18,14 @@
 
 ## 2. Release notes
 
-Explain the user-visible changes/fixes, their effect and relevant issue links. Identify known issues and limitations, compatibility/configuration changes, migration needs and required user/operator actions. If this verifies an existing reference implementation, state that rather than claiming new code was implemented.
+Use the pinned change record for user-visible changes, effects and issue links. Include known limitations, compatibility or migration needs, and any required operator actions. Link verification claims to the current module assessment.
 
 ## 3. Test-completion assessment
 
 | Approved criterion / scope | Observed evidence and result | Met, not met or blocked |
 | --- | --- | --- |
 
-| Testing type / target | Planned | Executed | Pass | Fail | Blocked / not run | Evidence |
+| Module / test type | Planned | Executed | Pass | Fail | Blocked / not run | Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
 
 Link the applicable [coverage matrix](../../../QA%20Process%20Context/Coverage%20and%20Traceability/README.md) and process/data/configuration revisions. Separate designed items, actually exercised conditions and case outcomes. Explain sampling, unresolved intent and exclusions; keep overlapping labels out of additive totals. Record actual executor/date, methods/configuration, original-versus-retest results, deviations, setup/harness issues, untested areas and retained regression links. Derive counts from actual result rows. A recognized expected-failure signature remains a failed product test.

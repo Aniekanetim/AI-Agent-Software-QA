@@ -29,6 +29,7 @@ import { assessCoverage, type CoverageSnapshot } from './coverage/coverage.js';
 import { browseLibrary } from './release/library.js';
 import { assessRound, recordAssessment, retainRun, retainedRuns, verifyAssessment } from './release/round.js';
 import { handoffRoute, reportingPreference } from './release/handoff.js';
+import { bindReleaseScope, invalidateReleaseScope, releaseScope } from './release/scope.js';
 import { validateFlowMap, traceFlowMap, type FlowMapSnapshot, type Direction } from './flow-map/flow-map.js';
 import { assessTaskTools, assessLiveTaskTools, type TaskToolPlan } from './tools/task.js';
 import { assessData, type DataPreparation } from './data/preparation.js';
@@ -64,9 +65,9 @@ async function currentPr(repository: string, number: number) {
   const raw = JSON.parse(await github.runGh(['api', `repos/${repository}/pulls/${number}`])); return github.normalizePr(repository, raw);
 }
 const help = {
-  release: 'library --input | retain-run --input | runs --input | assess --input | record-assessment --input | verify-assessment --input | route [--ticket-url]',
+  release: 'library --input | scope --input | bind-scope --input | invalidate-scope --input | retain-run --input | runs --input | assess --input | record-assessment --input | verify-assessment --input | route [--ticket-url]',
   attention: 'status | proposal/configure --input | record --input | list --recipient [--offset N --limit N --snapshot hash --all] | index | update-index --input | preview --recipient --notifier [--at ISO] | reserve --input | preflight --id --notifier | receipt --input | respond --input : optional blocker reminders; no task execution, lifecycle move or approval',
-  'task-source': 'status | providers | inspect --input | preview --input | save --input | check-in | details --ticket | claim --input | history --claim | recheck --claim | preflight --input | begin --input | settle --input | publication-preview --input | publish --input | reconcile-publication --input | close --input',
+  'task-source': 'status | providers | inspect --input | preview --input | save --input | check-in | details --ticket | claim --input | history --claim | recheck --claim | preflight --input | begin --input | settle --input | publication-preview --input | publish --input | reconcile-publication --input | observe-completion --input | close --input',
   board: 'status [--ticket ID] | upgrade --source | transition --input | recover --id | reviews [--at ISO] [--trigger key] | acknowledge-review --input | assert-executable --ticket ID [--generation ID] | operations --ticket ID | settle-operation --input : lifecycle controls preserve actual human decisions; no test authorization',
   'flow-map': 'validate --input | trace --input --features id,id [--direction upstream/downstream/both] [--max-depth 8] : read-only candidate impact; no test execution or approval',
   coverage: 'assess --input : read-only consistency/count check of a canonical-record snapshot; no execution, approval or product verdict',
@@ -123,6 +124,7 @@ async function main() {
     else if (action === 'publication-preview') output(await taskSource.publicationPreview(root, input()));
     else if (action === 'publish') output(await taskSource.publish(root, input()));
     else if (action === 'reconcile-publication') output(taskSource.reconcilePublication(root, input()));
+    else if (action === 'observe-completion') output(await taskSource.observeReleaseCompletion(root, input()));
     else if (action === 'close') output(taskSource.closeClaim(root, input()));
     else throw new Error('Unknown task-source operation; use help.');
     return;
@@ -135,9 +137,11 @@ async function main() {
       if (missing.length || pending.length) output({ missing, pending, next: missing.length ? 'Run board upgrade with the actual instruction.' : 'Recover the original transition ID; do not reset its journal.' });
       else {
         const tickets = board.tickets(root).filter(t => !options.has('ticket') || t.id === option('ticket')).map(({ text, ...ticket }) => ({
-          ...ticket, issues: [...ticket.issues, ...(board.inactive(ticket.status) && !ticket.lifecycle ? ['Actual lifecycle decision is missing; execution remains blocked.'] : [])],
+          ...ticket, issues: [...ticket.issues, ...(ticket.releaseReviewRequired ? [ticket.releaseReviewRequired] : []),
+            ...(board.inactive(ticket.status) && !ticket.lifecycle ? ['Actual lifecycle decision is missing; execution remains blocked.'] : [])],
         }));
         const next = options.has('ticket') && !tickets.length ? 'Check the ticket ID or run board status to list all tickets.'
+          : tickets.some(ticket => ticket.releaseReviewRequired) ? 'Review the flagged release before claiming QA completion. Independent eligible tickets can proceed.'
           : tickets.some(ticket => ['Ready for QA', 'Retest'].includes(ticket.status))
             ? 'Review Ready for QA and Retest tickets for eligible work and the next required decision.'
             : 'Share a testing objective to prepare a Ready for QA ticket, or wait for a defect to return for retest.';
@@ -145,7 +149,8 @@ async function main() {
       }
     } else if (action === 'transition' || action === 'recover') {
       const record = action === 'transition' ? board.transitionTicket(root, input<board.Transition>()) : board.recoverTransition(root, option('id'));
-      output({ id: record.id, ticketId: record.ticketId, state: record.state, recordedDestination: record.to, ownerUpdates: record.ownerUpdates, linkUpdates: record.linkUpdates ?? [] });
+      output({ id: record.id, ticketId: record.ticketId, state: record.state, recordedDestination: record.to, ownerUpdates: record.ownerUpdates, linkUpdates: record.linkUpdates ?? [],
+        ...(record.releaseReviewRequired ? { releaseReviewRequired: record.releaseReviewRequired } : {}) });
     }
     else if (action === 'assert-executable') { const t = board.assertExecutable(root, option('ticket'), options.get('generation')); output({ ticketId: t.id, status: t.status, generation: t.generation, authorization: 'Actual test scope/review still required.' }); }
     else if (action === 'operations') output(board.operations(root, option('ticket')));
@@ -205,6 +210,9 @@ async function main() {
   }
   if (area === 'release') {
     if (action === 'library') output(browseLibrary(root, input()));
+    else if (action === 'scope') output(releaseScope(root, input()));
+    else if (action === 'bind-scope') output(bindReleaseScope(root, input()));
+    else if (action === 'invalidate-scope') output(invalidateReleaseScope(root, input()));
     else if (action === 'retain-run') output(retainRun(root, input()));
     else if (action === 'runs') output(retainedRuns(root, input<{ round: store.Evidence }>().round));
     else if (action === 'assess') output(assessRound(root, input()));

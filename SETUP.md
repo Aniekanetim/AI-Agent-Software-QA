@@ -94,12 +94,14 @@ Provide the [onboarding handoff](Onboarding/templates/onboarding-handoff.md) wit
 - The learning/testing objective, applicable target/sources, reviewers and limits are known; necessary gaps are recorded.
 - Live requests/tickets are unique and separate from templates; links and checkpoints resolve.
 - Execution and completion await their required scoped human decisions.
-- For QA G5, use the [release sign-off procedure](QA/Quality%20assurance/release-signoff.md) and [packet template](QA/Quality%20assurance/templates/completion-handoff.md). Discovery has its own learning completion record; neither completion authorizes the other pipeline.
+- For each parent QA assignment, use the [module test library](automation/release/README.md) from scope review through the [G5 sign-off](QA/Quality%20assurance/release-signoff.md). Reuse existing suites and prepare the affected scope during the task. Resolve the handoff route before completing G5. Discovery uses its own learning completion record.
 - Any configured schedule points to this project and is recorded accurately.
 
 ## Upgrade older board copies
 
 After deliberately adopting the updated workflow files, follow [the lifecycle upgrade](automation/board/README.md#upgrade-an-existing-copy). Add Deferred/Canceled without changing current tickets, private onboarding state or schedules. Inspect any legacy running/uncertain regression before enabling automatic execution. Reconcile actual completed results for reuse without rerunning, and treat retry intent as a separate decision. Moves propose incoming navigation changes while preserving immutable evidence; older pending broad-repair journals need reviewed reconciliation. Existing policy approvals remain content-bound; copying an approval never grants authority to another project.
+
+When updating to 1.13.0, apply the [release upgrade guidance](automation/release/README.md#upgrade-open-assignments) to open parent assignments at their next G5. Keep existing onboarding, source records and historical approvals. Link traceable results for the current scope and build, and reconcile any interrupted release move before attempting another.
 
 ## Optional blocker notifications
 

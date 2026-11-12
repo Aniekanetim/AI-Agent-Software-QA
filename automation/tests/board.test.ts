@@ -26,27 +26,58 @@ function fixture() {
   policy.approval = put(root, '.local/approval.json', { decision: 'Approved', reviewer: 'Synthetic fixture', source: 'Synthetic-only policy', policyDigest: gh.policyDigest(policy) });
   return { root, ticket, d, move, policy, target };
 }
-test('adopted local assignment completion requires the reviewed destination and observed delivery', () => {
+function releaseTransition() {
   const f = fixture(), ticket = b.findTicket(f.root, 'QA-001'), pilot = releaseFixture(f.root, ticket.id);
+  pilot.bind();
   const run = pilot.put('run.json', pilot.run('pass', 'Pass'));
   const { assessment } = recordAssessment(f.root, retainRun(f.root, { round: pilot.roundRef, run }));
   const route = { channel: 'recorded', destination: 'Synthetic review conversation', recipient: 'Release owner', acknowledgementRequired: false };
-  put(f.root, '.local/reporting-settings.json', { releaseHandoff: route });
   const g5 = put(f.root, '.local/g5.json', {
     gate: 'G5', decision: 'Approved', ticketId: ticket.id, ticketRevision: ticket.revision,
     reviewer: 'Synthetic reviewer', source: 'Synthetic G5 decision', packet: f.d.evidence[0],
-    target: pilot.target, handoff: { assessment, route },
+    target: pilot.target, handoff: { assessment, route, targetObservation: pilot.g5Target },
   });
   const request: b.Transition = { id: 'g5-transition', ticketId: ticket.id, expectedRevision: ticket.revision, to: 'Tested-Ok', decision: f.d };
-  assert.throws(() => b.transitionTicket(f.root, request), /reviewed G5 release and delivery/);
-  assert.throws(() => b.transitionTicket(f.root, { ...request, release: { decision: g5 } }), /handoff delivery/);
   const delivery = put(f.root, 'delivery.json', {
     state: 'delivered', decisionSha256: g5.sha256, recipient: route.recipient, destination: route.destination, source: 'Synthetic delivery observation',
   });
-  b.transitionTicket(f.root, { ...request, release: { decision: g5, delivery } });
-  const completed = b.findTicket(f.root, ticket.id);
+  return { ...f, request, route, g5, delivery };
+}
+test('local assignment completion always requires G5 and delivery, including with unset or removed settings', () => {
+  const f = releaseTransition();
+  assert.throws(() => b.transitionTicket(f.root, f.request), /reviewed G5 release and delivery/);
+  put(f.root, '.local/reporting-settings.json', { releaseHandoff: f.route });
+  put(f.root, '.local/reporting-settings.json', {});
+  assert.throws(() => b.transitionTicket(f.root, f.request), /reviewed G5 release and delivery/);
+  assert.throws(() => b.transitionTicket(f.root, { ...f.request, release: { decision: f.g5 } }), /handoff delivery/);
+  b.transitionTicket(f.root, { ...f.request, release: { decision: f.g5, delivery: f.delivery } });
+  const completed = b.findTicket(f.root, f.request.ticketId);
   assert.equal(completed.status, 'Tested-Ok');
-  assert(completed.lifecycle?.evidence.some(ref => ref.sha256 === delivery.sha256));
+  assert(completed.lifecycle?.evidence.some(ref => ref.sha256 === f.delivery.sha256));
+});
+test('a parent in Retest still needs G5 while an individual bug keeps scoped closure', () => {
+  const f = fixture();
+  f.move('Retest');
+  assert.throws(() => f.move('Tested-Ok'), /reviewed G5 release and delivery/);
+  put(f.root, `${b.boardRoot}/Retest/BUG-001.md`, '# BUG-001: Synthetic scoped defect\n\n| Type | Bug |\n');
+  const bug = b.findTicket(f.root, 'BUG-001');
+  b.transitionTicket(f.root, { id: 'scoped-retest', ticketId: bug.id, expectedRevision: bug.revision, to: 'Tested-Ok', decision: f.d });
+  assert.equal(b.findTicket(f.root, bug.id).status, 'Tested-Ok');
+});
+test('recovery supersedes an unapplied legacy release move and flags one already applied', () => {
+  for (const applied of [false, true]) {
+    const f = releaseTransition();
+    const journal = b.prepareTransition(f.root, { ...f.request, release: { decision: f.g5, delivery: f.delivery } });
+    delete journal.release;
+    put(f.root, `.local/board-transitions/${journal.id}.json`, journal);
+    if (applied) put(f.root, journal.to, journal.content);
+    const recovered = b.recoverTransition(f.root, journal.id);
+    const ticket = b.findTicket(f.root, f.request.ticketId);
+    assert.equal(b.pendingTransitions(f.root).length, 0);
+    assert.equal(recovered.state, applied ? 'completed' : 'superseded');
+    assert.equal(ticket.status, applied ? 'Tested-Ok' : 'Ready for QA');
+    assert.equal(Boolean(ticket.releaseReviewRequired), applied);
+  }
 });
 test('five-folder upgrades add only the new queues and are idempotent', () => {
   const f = fixture();

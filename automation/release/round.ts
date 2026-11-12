@@ -31,7 +31,7 @@ function checkTarget(target: Target) {
   requireText(target.environment, 'Target environment');
 }
 
-function readRound(root: string, ref: Evidence) {
+export function readRound(root: string, ref: Evidence) {
   const round = pinned<Round>(root, ref, 'testing round');
   if (round?.schemaVersion !== 1) throw new Error('Use a version 1 testing round.');
   identifier(round.id, 'round');
@@ -100,7 +100,7 @@ function readRun(root: string, ref: Evidence, scope: ReturnType<typeof readRound
   return run;
 }
 
-export function assessRound(root: string, input: AssessmentInput) {
+export function assessRound(root: string, input: AssessmentInput, reportVersion: 1 | 2 = 2) {
   const scope = readRound(root, input.round), { round, catalogue } = scope;
   if (!Array.isArray(input.runs)) throw new Error('Supply the run references for this round.');
   const eligible: { ref: Evidence; run: Run }[] = [];
@@ -152,6 +152,7 @@ export function assessRound(root: string, input: AssessmentInput) {
     for (const id of module.conditionIds) if (!scoped.some(item => item.conditionId === id)) gaps.push({ id: `${moduleId}/condition/${id}`, outcome: 'Missing scope decision', exceptionAllowed: false });
     for (const id of module.testTypeIds) if (!scoped.some(item => item.testTypeId === id)) gaps.push({ id: `${moduleId}/type/${id}`, outcome: 'Missing scope decision', exceptionAllowed: false });
   }
+  if (reportVersion === 2 && !executions.size) gaps.push({ id: 'round/execution', outcome: 'No checks executed', exceptionAllowed: false });
   return {
     roundId: round.id, projectId: catalogue.library.projectId, target: round.target, library: round.library,
     scope: round.scope, changes: round.changes, assignmentIds: round.assignmentIds, runs: eligible.map(({ ref, run }) => ({ id: run.id, ref })),
@@ -189,7 +190,7 @@ export function recordAssessment(root: string, input: AssessmentInput) {
     const report = assessRound(root, input);
     verifyRunSet(root, input);
     if (report.ineligible.length) throw new Error('Reconcile unavailable or changed retained run evidence before recording the assessment.');
-    const record = { schemaVersion: 1, input, report };
+    const record = { schemaVersion: 2, input, report };
     const path = `.local/qa-release/assessment-${digest(JSON.stringify(record))}.json`;
     const existing = load<unknown>(root, path, () => null);
     if (existing.revision === null) save(root, path, record, null);
@@ -245,11 +246,15 @@ function verifyRunSet(root: string, input: AssessmentInput) {
   }
 }
 
-export function verifyAssessment(root: string, ref: Evidence, currentRunSet = false) {
-  const record = pinned<{ schemaVersion: 1; input: AssessmentInput; report: ReturnType<typeof assessRound> }>(root, ref, 'release assessment');
-  if (record?.schemaVersion !== 1) throw new Error('Use a version 1 release assessment.');
+export function verifyAssessment(root: string, ref: Evidence, currentRunSet = false, expectedRound?: Evidence) {
+  const record = pinned<{ schemaVersion: 1 | 2; input: AssessmentInput; report: ReturnType<typeof assessRound> }>(root, ref, 'release assessment');
+  if (record?.schemaVersion !== 1 && record?.schemaVersion !== 2) throw new Error('Use a supported release assessment.');
+  if (expectedRound && (record.input.round.path !== expectedRound.path || record.input.round.sha256 !== expectedRound.sha256)) {
+    throw new Error('Use the assessment for this assignment’s current reviewed release round.');
+  }
   if (currentRunSet) verifyRunSet(root, record.input);
-  const actual = assessRound(root, record.input);
+  const actual = assessRound(root, record.input, record.schemaVersion);
   if (JSON.stringify(record.report) !== JSON.stringify(actual)) throw new Error('The release evidence changed. Review the assessment again.');
+  if (currentRunSet && actual.ineligible.length) throw new Error('Reconcile the ineligible retained run evidence before sign-off.');
   return actual;
 }

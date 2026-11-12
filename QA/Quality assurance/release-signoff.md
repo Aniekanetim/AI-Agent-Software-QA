@@ -17,7 +17,7 @@ Release notes explain what changes for the reader. A test-completion assessment 
 
 ## One canonical packet
 
-For projects adopting module-based release assessment, use [the retained library and run evidence](../../automation/release/README.md) to support this packet. Bring the pinned scope, actual module coverage, open gaps, and approved exceptions into the human review. Use the reviewed destination and observed delivery when completing the assignment.
+Every parent release sign-off uses [the current module assessment](../../automation/release/README.md) for the assignment's G1/G2 binding and verified target. Bring the reviewed scope, actual coverage by module and test type, open gaps, and approved exceptions into the human review. Use the change record for release-note content and the assessment for verification claims. Record zero execution or missing required evidence as an open completion issue. Use the authorized destination and observed delivery when completing the assignment.
 
 Use the [completion/handoff template](templates/completion-handoff.md) for one versioned record, normally `QA/Quality assurance/releases/<run-id>-release-handoff.md`. Link suites, results, defects and readiness records instead of duplicating their full tables. Link this packet from the parent assignment, shared progress and project entry point. An individual bug can link its scoped retest and parent packet; it does not need an entire release report of its own.
 
