@@ -3,7 +3,8 @@ import { resolve, dirname, relative } from 'node:path';
 import { contained, digest, load, save, replace, revision, withLock, verifyEvidence, requireText, assertNonsecret, type Evidence } from '../shared/store.js';
 
 import { requireLocalSource } from '../task-source/config.js';
-import { handoffRoute, reportingPreference, verifyLocalHandoff, type LocalHandoff } from '../release/handoff.js';
+import { verifyLocalHandoff, type LocalHandoff } from '../release/handoff.js';
+import { sameEvidence } from '../release/scope.js';
 
 export const boardRoot = 'QA task management Board';
 export const statuses = ['Ready for QA', 'Dev Todo', 'Tested-Ok', 'Retest', 'Rework', 'Deferred', 'Canceled'] as const;
@@ -18,9 +19,9 @@ export interface Decision {
 }
 export interface Transition { id: string; ticketId: string; expectedRevision: string; to: Status; decision: Decision; release?: LocalHandoff; navigation?: { path: string; expectedRevision: string; source: string }[] }
 export interface Lifecycle extends Decision { schemaVersion: 1; id: string; at: string; from: Status; to: Status; previousOwner: string; previousWaiting: string; previousCheckpoint: string }
-export interface Ticket { id: string; path: string; status: Status; text: string; revision: string; lifecycle: Lifecycle | null; generation: string; issues: string[] }
+export interface Ticket { id: string; path: string; status: Status; text: string; revision: string; lifecycle: Lifecycle | null; generation: string; issues: string[]; releaseReviewRequired?: string }
 interface Patch { path: string; before: string; content: string; original?: string; source?: string }
-interface Journal { schemaVersion: 1 | 2; id: string; requestHash: string; ticketId: string; from: string; to: string; before: string; content: string; patches: Patch[]; ownerUpdates: { path: string; destination: string }[]; linkUpdates?: { path: string; destination: string; expectedRevision: string }[]; state: 'prepared' | 'completed' }
+interface Journal { schemaVersion: 1 | 2; id: string; requestHash: string; ticketId: string; from: string; to: string; before: string; content: string; patches: Patch[]; ownerUpdates: { path: string; destination: string }[]; linkUpdates?: { path: string; destination: string; expectedRevision: string }[]; state: 'prepared' | 'completed' | 'superseded'; release?: LocalHandoff; releaseReviewRequired?: string }
 const validId = (id: string) => /^[A-Z][A-Z0-9]{0,15}-\d{1,9}$/.test(id);
 function safeKey(id: string) { if (!/^[A-Za-z0-9_-]{1,100}$/.test(id)) throw new Error('Use a unique safe lifecycle operation ID.'); return id; }
 function entries(root: string, folder: string) { const path = contained(root, folder); return existsSync(path) ? readdirSync(path).filter(n => n.endsWith('.json')).map(n => `${folder}/${n}`) : []; }
@@ -40,12 +41,13 @@ export function upgradeBoard(root: string, source: string) {
     return { added, source, existingTickets: 'Preserved; no classification, approval or schedule was changed.' };
   });
 }
-export function pendingTransitions(root: string) { return entries(root, '.local/board-transitions').filter(p => load<Journal>(root, p, () => { throw new Error('Missing transition.'); }).value.state !== 'completed'); }
+export function pendingTransitions(root: string) { return entries(root, '.local/board-transitions').filter(p => !['completed', 'superseded'].includes(load<Journal>(root, p, () => { throw new Error('Missing transition.'); }).value.state)); }
 export function assertBoardStable(root: string) {
   if (missingFolders(root).length) throw new Error('Upgrade the QA board to all seven status folders with board upgrade; existing tickets must be preserved.');
   if (pendingTransitions(root).length) throw new Error('A board transition is incomplete; recover its recorded operation before selecting or executing work.');
 }
 function field(text: string, name: string) { const prefix = `| ${name} |`, line = text.split(/\r?\n/).find(l => l.startsWith(prefix)); return line ? line.slice(prefix.length).replace(/\|\s*$/, '').trim().replace(/\\\|/g, '|') : 'Not recorded'; }
+const requiresRelease = (ticketId: string, text: string) => !ticketId.startsWith('BUG-') || field(text, 'Type').toLowerCase() !== 'bug';
 function zonedTime(value: string) { return /^\d{4}-\d{2}-\d{2}T.+(?:Z|[+-]\d{2}:\d{2})$/.test(value) && Number.isFinite(Date.parse(value)); }
 function setField(text: string, name: string, value: string) { return text.replace(new RegExp(`^\\| ${name} \\|[^\\r\\n]*`, 'm'), `| ${name} | ${value.replaceAll('|', '\\|').replace(/[\r\n]/g, ' ')} |`); }
 function lifecycle(text: string): Lifecycle | null {
@@ -79,7 +81,10 @@ export function tickets(root: string): Ticket[] {
     let entry: Lifecycle | null = null; const issues: string[] = [];
     try { entry = lifecycle(text); if (entry && entry.to !== status) issues.push('The ticket folder and lifecycle history disagree.'); }
     catch (error) { issues.push(error instanceof Error ? error.message : 'Unreadable lifecycle history.'); }
-    return { id, status, path, text, revision: digest(text), lifecycle: entry, generation: entry?.id ?? (issues.length ? `invalid-${digest(text)}` : 'legacy'), issues };
+    const recovery = status === 'Tested-Ok' && entry && /^[A-Za-z0-9_-]{1,100}$/.test(entry.id)
+      ? load<Journal | null>(root, `.local/board-transitions/${entry.id}.json`, () => null).value : null;
+    return { id, status, path, text, revision: digest(text), lifecycle: entry, generation: entry?.id ?? (issues.length ? `invalid-${digest(text)}` : 'legacy'), issues,
+      ...(recovery?.state === 'completed' && recovery.ticketId === id && recovery.releaseReviewRequired ? { releaseReviewRequired: recovery.releaseReviewRequired } : {}) };
   }));
   if (new Set(found.map(t => t.id)).size !== found.length) throw new Error('Duplicate ticket IDs across the board; reconcile without overwriting history.');
   return found;
@@ -152,12 +157,9 @@ function decisionValid(root: string, request: Transition, ticket: Ticket) {
     if (ticket.id.startsWith('QA-') && request.to !== 'Ready for QA' || ticket.id.startsWith('BUG-') && !['Retest', 'Dev Todo', 'Rework'].includes(request.to)) throw new Error('Choose the working queue for this assignment or defect and its next owner.');
   }
   if (request.to === 'Tested-Ok' && operations(root, ticket.id).length) throw new Error('Unfinished work cannot be closed as Tested-Ok.');
-  if (request.to === 'Tested-Ok' && (ticket.status === 'Ready for QA' || request.release)) {
-    const preference = reportingPreference(root);
-    if (preference || request.release) {
-      if (!preference || !request.release) throw new Error('Record the reviewed G5 release and delivery for this assignment.');
-      verifyLocalHandoff(root, ticket.id, ticket.revision, handoffRoute(preference), request.release);
-    }
+  if (request.to === 'Tested-Ok' && (requiresRelease(ticket.id, ticket.text) || request.release)) {
+    if (!request.release) throw new Error('Record the reviewed G5 release and delivery for this assignment.');
+    verifyLocalHandoff(root, ticket.id, ticket.revision, request.release);
   }
 }
 function markdownFiles(root: string, folder = ''): string[] {
@@ -238,7 +240,8 @@ function prepare(root: string, request: Transition): Journal {
       if (mutable !== after) linkUpdates.push({ path: file, destination, expectedRevision: digest(mutable) });
     }
   }
-  const journal: Journal = { schemaVersion: 2, id: request.id, requestHash: hash, ticketId: ticket.id, from: ticket.path, to: destination, before: ticket.revision, content, patches, ownerUpdates, linkUpdates, state: 'prepared' };
+  const journal: Journal = { schemaVersion: 2, id: request.id, requestHash: hash, ticketId: ticket.id, from: ticket.path, to: destination, before: ticket.revision, content, patches, ownerUpdates, linkUpdates, state: 'prepared',
+    ...(request.to === 'Tested-Ok' && request.release ? { release: request.release } : {}) };
   save(root, path, journal, null); return journal;
 }
 function complete(root: string, journal: Journal) {
@@ -251,9 +254,9 @@ function complete(root: string, journal: Journal) {
   };
   regularDirectory(root, boardRoot);
   for (const status of statuses) regularDirectory(root, `${boardRoot}/${status}`);
-  if (![1, 2].includes(journal.schemaVersion) || !validId(journal.ticketId) || !validTicketPath(journal.from) || !validTicketPath(journal.to) || journal.from.split('/').at(-1) !== journal.to.split('/').at(-1) || !Array.isArray(journal.patches) || journal.patches.some(p => forbiddenPatch(p.path) || !p.path.endsWith('.md')) || !['prepared', 'completed'].includes(journal.state)) throw new Error('Unsupported or out-of-scope transition journal; preserve it for reconciliation.');
+  if (![1, 2].includes(journal.schemaVersion) || !validId(journal.ticketId) || !validTicketPath(journal.from) || !validTicketPath(journal.to) || journal.from.split('/').at(-1) !== journal.to.split('/').at(-1) || !Array.isArray(journal.patches) || journal.patches.some(p => forbiddenPatch(p.path) || !p.path.endsWith('.md')) || !['prepared', 'completed', 'superseded'].includes(journal.state)) throw new Error('Unsupported or out-of-scope transition journal; preserve it for reconciliation.');
   safeKey(journal.id);
-  if (journal.state === 'completed') return journal;
+  if (journal.state !== 'prepared') return journal;
   if (journal.schemaVersion !== 2) throw new Error('This pending journal uses the old broad link-repair rules. Preserve it and obtain a reviewed reconciliation before any recovery writes.');
   const entry = lifecycle(journal.content);
   if (entry?.id !== journal.id || entry.to !== journal.to.split('/')[1]) throw new Error('The journal lifecycle does not match its recorded destination.');
@@ -261,6 +264,24 @@ function complete(root: string, journal: Journal) {
     if (patch.path !== navigationPath || !patch.source?.trim() || typeof patch.original !== 'string' || digest(patch.original) !== patch.before || entry.evidence.some(e => resolve(root, e.path).toLowerCase() === resolve(root, patch.path).toLowerCase()) || navigationContent(root, patch.original, patch.path, journal.from, journal.to) !== patch.content) throw new Error('An out-of-scope navigation patch cannot be replayed; preserve evidence and reconcile.');
   }
   const after = digest(journal.content), fromHash = revision(root, journal.from), toHash = revision(root, journal.to);
+  const path = `.local/board-transitions/${journal.id}.json`;
+  if (entry.to === 'Tested-Ok' && (requiresRelease(journal.ticketId, journal.content) || journal.release)) {
+    try {
+      if (!journal.release || [journal.release.decision, journal.release.delivery, journal.release.acknowledgement]
+        .some(ref => ref && !entry.evidence.some(e => sameEvidence(e, ref)))) throw new Error('Record the reviewed G5 release and delivery for this assignment.');
+      verifyLocalHandoff(root, journal.ticketId, journal.before, journal.release);
+    } catch (error) {
+      journal.releaseReviewRequired = error instanceof Error ? error.message : 'Review the G5 release evidence.';
+      const unapplied = fromHash === journal.before && (journal.from === journal.to || toHash === null);
+      if (unapplied) {
+        journal.state = 'superseded';
+        save(root, path, journal, revision(root, path));
+        return journal;
+      }
+      if (toHash !== after) throw error;
+      // Keep the observed move recoverable. Its board status carries no verified release disposition.
+    }
+  }
   if (journal.from === journal.to) {
     if (fromHash !== after) replace(root, journal.from, journal.content, journal.before);
   } else {
@@ -273,11 +294,15 @@ function complete(root: string, journal: Journal) {
     if (fromHash !== null) { if (revision(root, journal.from) !== journal.before) throw new Error('The source changed during the move.'); unlinkSync(contained(root, journal.from)); }
   }
   for (const patch of journal.patches) if (revision(root, patch.path) !== digest(patch.content)) replace(root, patch.path, patch.content, patch.before);
-  journal.state = 'completed'; const path = `.local/board-transitions/${journal.id}.json`; save(root, path, journal, revision(root, path)); return journal;
+  journal.state = 'completed'; save(root, path, journal, revision(root, path)); return journal;
+}
+function finish(root: string, journal: Journal) {
+  return journal.state === 'prepared' && journal.to.startsWith(`${boardRoot}/Tested-Ok/`)
+    ? withLock(root, 'release-records', () => complete(root, journal)) : complete(root, journal);
 }
 export function prepareTransition(root: string, request: Transition) { return withLock(root, 'qa-board', () => prepare(root, request)); }
-export function recoverTransition(root: string, id: string) { return withLock(root, 'qa-board', () => complete(root, load<Journal>(root, `.local/board-transitions/${safeKey(id)}.json`, () => { throw new Error('Unknown transition journal.'); }).value)); }
-export function transitionTicket(root: string, request: Transition) { return withLock(root, 'qa-board', () => complete(root, prepare(root, request))); }
+export function recoverTransition(root: string, id: string) { return withLock(root, 'qa-board', () => finish(root, load<Journal>(root, `.local/board-transitions/${safeKey(id)}.json`, () => { throw new Error('Unknown transition journal.'); }).value)); }
+export function transitionTicket(root: string, request: Transition) { return withLock(root, 'qa-board', () => finish(root, prepare(root, request))); }
 export function reviews(root: string, now = new Date().toISOString(), trigger?: string) {
   if (!zonedTime(now)) throw new Error('Use the actual review-check time with timezone.');
   return tickets(root).filter(t => t.status === 'Deferred' && t.lifecycle?.to === 'Deferred' && t.lifecycle.review).flatMap(t => {

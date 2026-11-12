@@ -28,7 +28,7 @@ Show the active source and its board, queue mappings and permitted actions. Use 
 
 ## Release handoff
 
-For projects using the module test library, **Reporting and evidence preferences** can also record the release handoff recipient, delivery route, and whether acknowledgement is required. The G5 preview identifies the actual destination and the relevant publication permissions. [Release handoff setup](../automation/release/README.md#route-a-reviewed-handoff)
+**Reporting and evidence preferences** can save the release handoff recipient, delivery route, and acknowledgement requirement. The agent can also establish those details for a specific release. Every parent release uses the same G5 evidence and delivery checks. [Release handoff setup](../automation/release/README.md#route-a-reviewed-handoff)
 
 ## Optional notification recovery
 

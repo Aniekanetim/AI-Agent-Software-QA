@@ -164,7 +164,7 @@ Read [QA Process Context](../../QA%20Process%20Context/README.md) before prepari
 
 The [design guide](../../QA%20Process%20Context/Test%20Design%20and%20Exploration/README.md) separates targets, quality objectives, scenario perspectives and techniques. Select relevant challenges without a case quota. Creative thinking supports both scripts and bounded exploratory charters; QA exploration uses this workflow, while Product Discovery retains its independent learning procedure.
 
-Use the [coverage definitions](../../QA%20Process%20Context/Coverage%20and%20Traceability/README.md): designed is not exercised, a failure can exercise a condition, overlapping labels do not multiply counts, and sampling/unknown inventory limit claims. Scope/source/build changes trigger impact review of affected records. The optional snapshot helper checks structure/counts, not accepted intent, actual behavior or human decisions. Preserve historical evidence; reuse applicable approvals and return only material changes to the affected gate.
+Use the [coverage definitions](../../QA%20Process%20Context/Coverage%20and%20Traceability/README.md). Distinguish designed and exercised conditions, retain failures as observations, and count shared checks once. For every parent assignment, use the [module test library](../../automation/release/README.md) to record expected coverage at G1 and bind the reviewed round at G2. Invalidate the binding on a material change and retain previous evidence. The read-only coverage snapshot remains available for structural/count checks.
 
 ## Application-map impact reasoning
 
@@ -178,7 +178,7 @@ Use the templates for a [test plan](templates/test-plan.md), [human review recor
 
 ## Release sign-off and operational handoff
 
-Follow the [release sign-off procedure](release-signoff.md). Prepare the packet before G5 review; it must identify changes, intended use/target, actual coverage and exit criteria, open risks, the proposed decision and who does what next. After the actual decision, finalize its reply/scope/limits and deliver a self-contained action handoff through the authorized channel. Record actual delivery/receipt; publication does not prove another owner received or accepted it. Do not mark a parent assignment complete while a required closure item is pending. An individual bug links its scoped disposition and parent packet without claiming full release approval.
+Follow the [release sign-off procedure](release-signoff.md). Before G5, prepare the packet from the change record and current module assessment for the verified build. Identify the intended use, exit criteria, open risks, proposed decision and next owners. After the actual decision, record its scope and limits, deliver the handoff through the authorized channel, and retain delivery and any required acceptance. Keep a parent assignment open while any required closure item is pending, including when it returns through Retest. An individual bug links its scoped disposition and applicable parent packet.
 
 The final response must include the target/verdict, changes, evidence, remaining limits, direct packet link and next-owner actions. A commit link or test totals alone cannot close the workflow. Local-only work marks production rollout/rollback/monitoring Not applicable with reasons. A later material change returns to the affected gate; a documentation supplement does not erase or invent the original decision.
 

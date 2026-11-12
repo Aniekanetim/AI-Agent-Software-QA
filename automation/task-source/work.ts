@@ -6,18 +6,21 @@ import { pendingPresentation } from '../attention/notifications.js';
 import { pendingTransitions, pendingOperations, tickets as localTickets } from '../board/board.js';
 import { activeSource, sourcePath, validateBoard, validateChoice, id, type Active, type BoardSelection, type Choice, type Identity, type LiveChoice, type Queue } from './config.js';
 import { readBoard, prepareWrite, type BoardReader, type BoardWriter, type Connection, type Mutation, type Ticket } from './provider.js';
-import { handoffRoute, reportingPreference, reviewHandoff, verifyDelivery, type DeliveryEvidence, type HandoffApproval } from '../release/handoff.js';
-import { verifyAssessment } from '../release/round.js';
+import { currentAssessment, resolveHandoffRoute, reviewHandoff, verifyDelivery, type DeliveryEvidence, type HandoffApproval, type Route } from '../release/handoff.js';
+import { pinned } from '../release/library.js';
+import { releaseScope, sameEvidence } from '../release/scope.js';
 
 interface Claim {
   id: string; sourceKey: string; sourceRevision: string; identity: Identity; ticket: Ticket; queue: 'ready' | 'retest'; source: string;
+  descriptionRevision?: string;
   state: 'open' | 'closed'; startedAt: string; terminal?: { source: string; evidence: Evidence[]; at: string; disposition?: 'completed' | 'released' };
 }
 interface Publication {
   id: string; claimId: string; ticketId: string; fingerprint: string; action: Mutation['action'];
   state: 'pending' | 'confirmed' | 'notApplied'; remoteId?: string;
   startedAt: string; source: string; decision: Evidence; writerPid?: number; reconciliation?: { source: string; evidence: Evidence[] };
-  handoff?: { kind: 'delivery' | 'completion'; assessment: Evidence; delivery?: DeliveryEvidence };
+  destination?: { queue: 'testedOk' | 'rework'; id: string };
+  handoff?: { kind: 'delivery' | 'completion'; assessment: Evidence; route?: Route; delivery?: DeliveryEvidence; observed?: boolean };
 }
 interface Execution {
   id: string; claimId: string; buildId: string; target: Evidence; gates: Partial<Record<Gate['gate'], Evidence>>; data?: DataReceipt;
@@ -119,6 +122,7 @@ function alreadyClaimed(work: Journal, key: string, ticket: Ticket, queue: Queue
   return work.claims.some(claim => {
     if (claim.sourceKey !== key || claim.ticket.id !== ticket.id) return false;
     if (claim.state === 'open') return true;
+    if (claim.terminal?.disposition === 'released') return false;
     if (claim.ticket.revision !== ticket.revision) return false;
     if (queue !== 'retest') return true;
 
@@ -141,7 +145,7 @@ const resumeActions = {
   revisionChanged: 'Refresh the native ticket evidence and review the affected scope.',
   pendingPublication: 'Inspect the original board publication and reconcile its outcome before another write.',
   executionUnresolved: 'Inspect the original execution and record its observed terminal outcome.',
-  handoffCompleted: 'Close the existing claim with the confirmed handoff before taking another retest.',
+  handoffCompleted: 'Review the confirmed board move and verify the applicable disposition before closing the existing claim.',
   eligible: 'Review the applicable scope and approval evidence before resuming.',
 };
 type ResumeReason = keyof typeof resumeActions;
@@ -208,7 +212,8 @@ export async function claim(root: string, request: { ticketId: string; ticketRev
     if (activeSource(root).revision !== revision) throw new Error('The active task source changed.');
     const current = journal(root);
     if (alreadyClaimed(current.value, key, ticket, queue)) throw new Error('A claim already exists for this ticket or revision. Inspect its history before taking more work.');
-    const record: Claim = { id: randomUUID(), sourceKey: key, sourceRevision: revision, identity: connection.identity, ticket, queue, source: request.source, state: 'open', startedAt: new Date().toISOString() };
+    const record: Claim = { id: randomUUID(), sourceKey: key, sourceRevision: revision, identity: connection.identity, ticket, queue, source: request.source, state: 'open', startedAt: new Date().toISOString(),
+      descriptionRevision: digest(JSON.stringify(connection.descriptions?.[ticket.id] ?? null)) };
     current.value.claims.push(record);
     save(root, journalPath, current.value, current.revision);
     return record;
@@ -234,6 +239,7 @@ export interface Gate {
   decision: 'Approved' | 'Approved with limits'; reviewer: string; source: string; packet: Evidence;
   target?: { buildId: string; environment: string }; dataScope?: DataScope; publicationDigest?: string; publicationDigests?: string[];
   handoff?: HandoffApproval;
+  defectReport?: Evidence;
 }
 export function approvedGate(root: string, claim: Claim, ref: Evidence, gate: Gate['gate']) {
   if (ref?.pointer || !ref?.path.startsWith('.local/')) throw new Error('Use the full private reviewed decision record.');
@@ -274,31 +280,62 @@ async function checkExecution(root: string, request: { claimId: string; gates: P
 export async function preflight(root: string, request: Parameters<typeof checkExecution>[1], reader: BoardReader = readBoard) {
   return (await checkExecution(root, request, reader)).result;
 }
-export function closeClaim(root: string, request: { claimId: string; source: string; evidence: Evidence[]; disposition?: 'completed' | 'released' }) {
+const assignmentFor = (claim: Claim) => ({ source: claim.sourceKey, ticketId: claim.ticket.id });
+
+function scopedDefect(root: string, claim: Claim, ref: Evidence | undefined) {
+  if (!ref) return false;
+  const assignment = assignmentFor(claim);
+  if (claim.queue !== 'retest' || releaseScope(root, assignment).revision ||
+      journal(root).value.claims.some(item => item.sourceKey === assignment.source && item.ticket.id === assignment.ticketId && item.queue === 'ready')) {
+    throw new Error('A parent assignment still requires release sign-off after returning through Retest.');
+  }
+  const reviewed = approvedGate(root, claim, ref, 'G4');
+  if (!reviewed.defectReport) throw new Error('Link the original defect report in the reviewed G4 scope.');
+  verifyEvidence(root, reviewed.defectReport);
+  return true;
+}
+
+function confirmRelease(root: string, claim: Claim, completion: Publication, publications: Publication[]) {
+  const handoff = completion.handoff!;
+  const decision = approvedGate(root, claim, completion.decision, 'G5');
+  const route = handoff.route ?? decision.handoff?.route;
+  if (!route || completion.remoteId !== claim.ticket.id || completion.destination?.queue !== 'testedOk') {
+    throw new Error('Verify the actual reviewed release completion at its native destination.');
+  }
+  reviewHandoff(root, decision, handoff.assessment, route, assignmentFor(claim));
+  const confirmed = publications.some(item => item.handoff?.kind === 'delivery' &&
+    sameEvidence(item.decision, completion.decision) && sameEvidence(item.handoff.assessment, handoff.assessment));
+  verifyDelivery(root, completion.decision, route, handoff.delivery ?? {}, handoff.observed ? 'observed' : confirmed ? 'publication' : undefined);
+}
+
+export function closeClaim(root: string, request: { claimId: string; source: string; evidence: Evidence[]; disposition?: 'completed' | 'released'; defect?: Evidence }) {
   requireText(request.source, 'Actual claim disposition and reason');
   if (!request.evidence?.length) throw new Error('Link the actual disposition evidence before closing the claim.');
   for (const evidence of request.evidence) verifyEvidence(root, evidence);
-  return withLock(root, 'qa-board', () => {
+  return withLock(root, 'qa-board', () => withLock(root, 'release-records', () => {
     openClaim(root, request.claimId);
     const current = journal(root), claim = current.value.claims.find(c => c.id === request.claimId)!;
     if (current.value.publications.some(p => p.claimId === claim.id && p.state === 'pending')) throw new Error('Reconcile the pending board write before closing the claim.');
     if (current.value.executions.some(run => run.claimId === claim.id && !run.terminal)) throw new Error('Record the execution outcome before closing the claim.');
     const publications = current.value.publications.filter(item => item.claimId === claim.id && item.state === 'confirmed');
-    const completion = publications.find(item => item.handoff?.kind === 'completion');
-    if (completion || publications.some(item => item.handoff) || claim.queue === 'ready' && reportingPreference(root)) {
-      if (completion ? request.disposition !== 'completed' : request.disposition !== 'released') {
-        throw new Error('Use completed after the confirmed G5 move, or record a released claim without marking the assignment complete.');
-      }
+    const completion = publications.filter(item => item.handoff?.kind === 'completion').at(-1);
+    if (request.disposition === 'completed' && completion) {
+      confirmRelease(root, claim, completion, publications);
+    } else if (request.disposition !== 'released' && !scopedDefect(root, claim, request.defect) &&
+        !publications.some(item => item.destination?.queue === 'rework' && request.disposition === undefined)) {
+      throw new Error('Use completed after the confirmed G5 move, or record a released claim without marking the assignment complete.');
+    } else if (request.disposition === 'completed' && !publications.some(item => item.destination?.queue === 'testedOk')) {
+      throw new Error('Verify the actual scoped defect completion before closing as completed.');
     }
     claim.state = 'closed';
     claim.terminal = { source: request.source, evidence: request.evidence, at: new Date().toISOString(), ...(request.disposition ? { disposition: request.disposition } : {}) };
     save(root, journalPath, current.value, current.revision);
     return claim;
-  });
+  }));
 }
 
 
-type Proposal = { id: string; claimId: string; assessment?: Evidence } & (
+type Proposal = { id: string; claimId: string; assessment?: Evidence; route?: Route; defect?: Evidence } & (
   | { action: 'comment'; body: string; purpose?: 'releaseHandoff' }
   | { action: 'move'; to: 'testedOk' | 'rework' }
   | { action: 'createDefect'; title: string; body: string }
@@ -325,48 +362,47 @@ function releasePublication(root: string, request: Proposal, claim: Claim, choic
   const comment = request.action === 'comment' && request.purpose === 'releaseHandoff';
   const completion = request.action === 'move' && request.to === 'testedOk';
   if (!comment && !completion) {
-    if (request.assessment) throw new Error('Use a release assessment for a G5 handoff or completion.');
+    if (request.assessment || request.route || request.defect) throw new Error('Use the reviewed release or scoped defect evidence for its own completion.');
     return undefined;
   }
-  const started = completion && journal(root).value.publications.some(item => item.claimId === claim.id && item.handoff);
-  if (!comment && !request.assessment && !started && claim.queue !== 'ready') return undefined;
-  const preference = reportingPreference(root);
-  if (!comment && !request.assessment && !started && !preference) return undefined;
-  if (!preference) throw new Error('Set the release handoff destination in Reporting and evidence preferences.');
-  const route = handoffRoute(preference, claim.ticket.url);
+  if (request.defect) {
+    if (comment || request.assessment || request.route) throw new Error('Use the reviewed scoped defect disposition for its own completion.');
+    if (scopedDefect(root, claim, request.defect)) return undefined;
+  }
+  if (!request.assessment) throw new Error('Select the reviewed release assessment for this G5 publication.');
+  const route = resolveHandoffRoute(root, request.route, claim.ticket.url);
   if (comment && route.channel !== 'taskBoard') throw new Error('The selected G5 handoff uses a recorded delivery channel.');
   if (route.channel === 'taskBoard' && !choice.actions.includes('comment')) {
     throw new Error('The selected task source must permit comments for the board handoff route.');
   }
-  if (!request.assessment) throw new Error('Select the reviewed release assessment for this G5 publication.');
   const kind: 'delivery' | 'completion' = comment ? 'delivery' : 'completion';
   return { kind, assessment: request.assessment, route };
 }
 
-const proposalDigest = (claim: Claim, mutation: Mutation, release?: ReturnType<typeof releasePublication>) =>
-  digest(JSON.stringify({ claimId: claim.id, revision: claim.ticket.revision, mutation, ...(release ? { release } : {}) }));
+const proposalDigest = (claim: Claim, mutation: Mutation, release?: ReturnType<typeof releasePublication>, defect?: Evidence) =>
+  digest(JSON.stringify({ claimId: claim.id, revision: claim.ticket.revision, mutation, ...(release ? { release } : {}), ...(defect ? { defect } : {}) }));
 export async function publicationPreview(root: string, request: Proposal, reader: BoardReader = readBoard) {
   assertNonsecret(request); id(request.id);
   const { claim, choice, connection } = await recheck(root, request.claimId, reader);
   const mutation = publicationMutation(request, claim, choice, connection);
   const release = releasePublication(root, request, claim, choice);
-  if (release) verifyAssessment(root, release.assessment, true);
-  return { ticket: claim.ticket.url, mutation, ...(release ? { release } : {}), publicationDigest: proposalDigest(claim, mutation, release) };
+  if (release) currentAssessment(root, release.assessment, assignmentFor(claim));
+  return { ticket: claim.ticket.url, mutation, ...(release ? { release } : {}), publicationDigest: proposalDigest(claim, mutation, release, request.defect) };
 }
 function approvedPublication(root: string, request: PublicationRequest, claim: Claim, choice: LiveChoice, connection: Connection) {
   const mutation = publicationMutation(request, claim, choice, connection);
   const release = releasePublication(root, request, claim, choice);
   const gate = release || request.action === 'move' && request.to === 'testedOk' ? 'G5' : 'G3';
   const decision = approvedGate(root, claim, request.decision, gate);
-  const reviewed = proposalDigest(claim, mutation, release);
+  const reviewed = proposalDigest(claim, mutation, release, request.defect);
   if (decision.publicationDigest !== reviewed && !(Array.isArray(decision.publicationDigests) && decision.publicationDigests.includes(reviewed))) throw new Error('The actual review must cover this exact board publication.');
   if (release) {
-    reviewHandoff(root, decision, release.assessment, release.route, claim.ticket.id);
+    reviewHandoff(root, decision, release.assessment, release.route, assignmentFor(claim));
     if (release.kind === 'completion') {
       const confirmed = journal(root).value.publications.some(item =>
         item.claimId === claim.id && item.state === 'confirmed' && item.handoff?.kind === 'delivery' &&
-        item.decision.sha256 === request.decision.sha256 && item.handoff.assessment.sha256 === release.assessment.sha256);
-      verifyDelivery(root, request.decision, release.route, request, confirmed);
+        sameEvidence(item.decision, request.decision) && sameEvidence(item.handoff.assessment, release.assessment));
+      verifyDelivery(root, request.decision, release.route, request, confirmed ? 'publication' : undefined);
     }
   }
   return { mutation, release };
@@ -384,7 +420,7 @@ export async function publish(root: string, request: PublicationRequest, reader:
   const write = await writer(choice.board, claim.ticket, mutation.action === 'move' ? mutation : { ...mutation, body: `${mutation.body}\n\nQA operation: ${request.id}` });
   const fresh = await recheck(root, claim.id, reader);
   if (JSON.stringify(approvedPublication(root, request, fresh.claim, fresh.choice, fresh.connection)) !== JSON.stringify(approved)) throw new Error('The reviewed publication changed before submission.');
-  const pending = withLock(root, 'qa-board', () => {
+  const pending = withLock(root, 'qa-board', () => withLock(root, 'release-records', () => {
     if (activeSource(root).revision !== claim.sourceRevision) throw new Error('The task source changed before publication.');
     if (release && JSON.stringify(approvedPublication(root, request, fresh.claim, fresh.choice, fresh.connection)) !== JSON.stringify(approved)) {
       throw new Error('The reviewed release or handoff destination changed before publication.');
@@ -397,14 +433,15 @@ export async function publish(root: string, request: PublicationRequest, reader:
     const record: Publication = {
       id: request.id, claimId: claim.id, ticketId: claim.ticket.id, fingerprint, action: mutation.action,
       state: 'pending', startedAt: new Date().toISOString(), source: request.source, decision: request.decision, writerPid: process.pid,
-      ...(release ? { handoff: { kind: release.kind, assessment: release.assessment,
+      ...(request.action === 'move' && mutation.action === 'move' ? { destination: { queue: request.to, id: mutation.destination.id } } : {}),
+      ...(release ? { handoff: { kind: release.kind, assessment: release.assessment, route: release.route,
         ...(release.kind === 'completion' ? { delivery: { delivery: request.delivery, acknowledgement: request.acknowledgement } } : {}),
       } } : {}),
     };
     current.value.publications.push(record);
     save(root, journalPath, current.value, current.revision);
     return record;
-  });
+  }));
   try {
     const { remoteId } = await write();
     id(remoteId);
@@ -431,7 +468,7 @@ function updatePublication(root: string, publicationId: string, update: (item: P
     return item;
   });
 }
-export function reconcilePublication(root: string, request: { id: string; state: 'confirmed' | 'notApplied'; remoteId?: string; source: string; evidence: Evidence[] }) {
+export function reconcilePublication(root: string, request: { id: string; state: 'confirmed' | 'notApplied'; remoteId?: string; source: string; evidence: Evidence[]; moveObservation?: Evidence }) {
   requireText(request.source, 'Actual reconciliation observation');
   if (!['confirmed', 'notApplied'].includes(request.state) || !request.evidence?.length) throw new Error('Record the independently observed terminal outcome with evidence.');
   if (request.state === 'confirmed') id(request.remoteId);
@@ -440,6 +477,13 @@ export function reconcilePublication(root: string, request: { id: string; state:
     if (item.handoff?.kind === 'completion' && request.state === 'confirmed' && request.remoteId !== item.ticketId) {
       throw new Error('Confirm the actual assignment at its reviewed destination.');
     }
+    if (item.handoff?.kind === 'completion' && request.state === 'confirmed' && item.destination) {
+      const observed = pinned<{ ticketId: string; destinationId: string; publicationId: string; source: string }>(root, request.moveObservation!, 'native move observation');
+      if (observed?.ticketId !== item.ticketId || observed.destinationId !== item.destination.id || observed.publicationId !== item.id) {
+        throw new Error('Record the actual assignment, destination and publication in the native move observation.');
+      }
+      requireText(observed.source, 'Actual native move source');
+    }
     if (item.writerPid !== undefined) {
       try { process.kill(item.writerPid, 0); }
       catch (error) { if ((error as NodeJS.ErrnoException).code === 'ESRCH') delete item.writerPid; }
@@ -447,9 +491,58 @@ export function reconcilePublication(root: string, request: { id: string; state:
     }
     if (item.remoteId && (request.state !== 'confirmed' || request.remoteId !== item.remoteId)) throw new Error('The provider already returned an ID. Reconcile that actual record before another write.');
     if (request.remoteId) item.remoteId = request.remoteId;
-    item.reconciliation = { source: request.source, evidence: request.evidence };
+    item.reconciliation = { source: request.source, evidence: [...request.evidence, ...(request.moveObservation ? [request.moveObservation] : [])] };
     item.state = request.state;
   });
+}
+
+export async function observeReleaseCompletion(root: string, request: { id: string; claimId: string; decision: Evidence; source: string } & DeliveryEvidence, reader: BoardReader = readBoard) {
+  assertNonsecret(request);
+  id(request.id);
+  requireText(request.source, 'Actual handoff and native board observation');
+  const claim = openClaim(root, request.claimId);
+  const { choice, revision, connection } = await liveBoard(root, reader);
+  const mapped = choice.queues.testedOk;
+  const observed = connection.tickets.find(ticket => ticket.id === claim.ticket.id && ticket.url === claim.ticket.url);
+  if (claim.sourceRevision !== revision || sourceKey(choice, connection.identity) !== claim.sourceKey ||
+      mapped?.length !== 1 || !observed || observed.state !== mapped[0]) {
+    throw new Error('Observe the exact claimed assignment at the configured Tested-Ok destination.');
+  }
+  if (observed.title !== claim.ticket.title || claim.descriptionRevision &&
+      claim.descriptionRevision !== digest(JSON.stringify(connection.descriptions?.[observed.id] ?? null))) {
+    throw new Error('The native assignment scope changed. Reconcile the actual ticket revision and release decision.');
+  }
+  const destinationId = mapped[0]!;
+  return withLock(root, 'qa-board', () => withLock(root, 'release-records', () => {
+    if (activeSource(root).revision !== revision) throw new Error('The task source changed while observing completion.');
+    openClaim(root, claim.id);
+    const current = journal(root);
+    if (current.value.publications.some(item => item.claimId === claim.id && item.state === 'pending') ||
+        current.value.executions.some(run => run.claimId === claim.id && !run.terminal)) {
+      throw new Error('Reconcile any pending publication or execution before recording release completion.');
+    }
+    const decision = approvedGate(root, claim, request.decision, 'G5');
+    if (!decision.handoff) throw new Error('Record the actual G5 release decision and handoff.');
+    const route = resolveHandoffRoute(root, decision.handoff.route, claim.ticket.url);
+    reviewHandoff(root, decision, decision.handoff.assessment, route, assignmentFor(claim));
+    verifyDelivery(root, request.decision, route, request, 'observed');
+    const fingerprint = digest(JSON.stringify([claim.id, request.decision.sha256, destinationId, request.delivery, request.acknowledgement]));
+    const existing = current.value.publications.find(item => item.id === request.id || item.fingerprint === fingerprint);
+    if (existing) {
+      if (existing.fingerprint === fingerprint && existing.state === 'confirmed') return existing;
+      throw new Error('Use a unique ID for this release completion observation.');
+    }
+    const publication: Publication = {
+      id: request.id, claimId: claim.id, ticketId: claim.ticket.id, fingerprint, action: 'move', state: 'confirmed',
+      startedAt: new Date().toISOString(), source: request.source, decision: request.decision, remoteId: observed.id,
+      destination: { queue: 'testedOk', id: destinationId },
+      handoff: { kind: 'completion', assessment: decision.handoff.assessment, route, observed: true,
+        delivery: { delivery: request.delivery, acknowledgement: request.acknowledgement } },
+    };
+    current.value.publications.push(publication);
+    save(root, journalPath, current.value, current.revision);
+    return publication;
+  }));
 }
 
 
@@ -487,5 +580,7 @@ export function claimHistory(root: string, claimId: string) {
   const current = journal(root).value;
   const claim = current.claims.find(c => c.id === claimId);
   if (!claim) throw new Error('Unknown claim.');
-  return { claim, executions: current.executions.filter(run => run.claimId === claimId), publications: current.publications.filter(p => p.claimId === claimId) };
+  const related = current.claims.filter(item => item.id !== claimId && item.sourceKey === claim.sourceKey && item.ticket.id === claim.ticket.id);
+  return { claim, executions: current.executions.filter(run => run.claimId === claimId), publications: current.publications.filter(p => p.claimId === claimId),
+    relatedClaims: related.map(item => ({ id: item.id, ticketRevision: item.ticket.revision, queue: item.queue, terminal: item.terminal })) };
 }

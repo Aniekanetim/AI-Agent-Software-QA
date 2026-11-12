@@ -1,6 +1,12 @@
 # Package notes
 
-**Version:** 1.12.0. **Created:** 22 October 2026. **Updated:** 10 November 2026. **State:** reusable workflow package; no configured product, live discovery or QA execution history.
+**Version:** 1.13.0. **Created:** 22 October 2026. **Updated:** 12 November 2026. **State:** reusable workflow package.
+
+## Version 1.13.0 — mandatory release evidence
+
+Every parent release uses a [current module assessment](../automation/release/README.md) bound to the reviewed G1/G2 scope and exact build. G5 requires retained execution evidence, the actual human decision, and confirmed delivery with acknowledgement where required. Settings stores routing details. Local, live and human-managed board paths apply the rule, and recovery distinguishes unapplied moves from observed moves that still need release review. Open work can reuse traceable results and completed historical records retain their original scope.
+
+This version also includes the [guided data intake](../automation/data/README.md), dataset-use context, onboarding recovery improvements, and reuse of an already connected mailbox from the updates since 1.12.0.
 
 ## Version 1.12.0 — compact test-account email aliases
 

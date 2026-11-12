@@ -4,7 +4,8 @@ import { mkdtempSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { browseLibrary } from '../release/library.js';
 import { assessRound, recordAssessment, retainRun, verifyAssessment } from '../release/round.js';
-import { reviewHandoff, type Route } from '../release/handoff.js';
+import { currentAssessment, reviewHandoff, type Route } from '../release/handoff.js';
+import { bindReleaseScope, invalidateReleaseScope, releaseScope } from '../release/scope.js';
 import { releaseFixture } from './release-fixture.js';
 
 function fixture() {
@@ -63,14 +64,71 @@ test('an explicit eligible retest resolves a failure while retaining historical 
 
 test('G5 can accept only scope-permitted gaps with evidence for every owner decision', () => {
   const f = fixture();
+  const assignment = { source: 'local', ticketId: 'QA-001' };
+  f.bind();
   const route: Route = { channel: 'recorded', destination: 'Fixture QA conversation', recipient: 'Release owner', acknowledgementRequired: false };
   const packet = f.put('packet.json', { source: 'Synthetic review packet' });
   const decision = { gate: 'G5', decision: 'Approved with limits', reviewer: 'Fixture reviewer', source: 'Synthetic reviewer decision', packet, target: f.target };
-  const blocked = recordAssessment(f.root, { round: f.roundRef, runs: [] });
-  assert.throws(() => reviewHandoff(f.root, { ...decision, handoff: { assessment: blocked.assessment, route } }, blocked.assessment, route, 'QA-001'), /blocking coverage gap/);
-  const limitedRound = f.put('round-limited.json', { ...f.round, obligations: f.round.obligations.map(item => ({ ...item, exceptionAllowed: true })) });
-  const { assessment, report } = recordAssessment(f.root, { round: limitedRound, runs: [] });
-  const handoff = { assessment, route, exceptions: report.gaps.map(gap => ({ gapId: gap.id, owner: 'Fixture risk owner', reason: 'Synthetic accepted limit', decision: packet })) };
-  assert.throws(() => reviewHandoff(f.root, { ...decision, decision: 'Approved', handoff }, assessment, route, 'QA-001'), /Approved with limits/);
-  assert.equal(reviewHandoff(f.root, { ...decision, handoff }, assessment, route, 'QA-001').state, 'gaps');
+  const run = f.put('failure.json', f.run('failure', 'Fail'));
+  const blocked = recordAssessment(f.root, retainRun(f.root, { round: f.roundRef, run }));
+  const targetObservation = f.g5Target;
+  assert.throws(() => reviewHandoff(f.root, { ...decision, handoff: { assessment: blocked.assessment, route, targetObservation } }, blocked.assessment, route, assignment), /blocking coverage gap/);
+  const limited = { ...f.round, obligations: f.round.obligations.map(item => ({ ...item, exceptionAllowed: true })) };
+  const limitedRound = f.put('round-limited.json', limited);
+  f.bind('local', limited, limitedRound, 'limited');
+  const failure = f.put('limited-failure.json', { ...f.run('limited-failure', 'Fail'), round: limitedRound });
+  const { assessment, report } = recordAssessment(f.root, retainRun(f.root, { round: limitedRound, run: failure }));
+  const handoff = { assessment, route, targetObservation, exceptions: report.gaps.map(gap => ({ gapId: gap.id, owner: 'Fixture risk owner', reason: 'Synthetic accepted limit', decision: packet })) };
+  assert.throws(() => reviewHandoff(f.root, { ...decision, decision: 'Approved', handoff }, assessment, route, assignment), /Approved with limits/);
+  assert.equal(reviewHandoff(f.root, { ...decision, handoff }, assessment, route, assignment).state, 'gaps');
+});
+
+test('release scope binds the independently approved coverage and rejects omitted checks', () => {
+  const f = fixture(), assignment = { source: 'local', ticketId: 'QA-001' };
+  const omitted = f.put('round-omitted.json', { ...f.round, obligations: f.round.obligations.slice(0, 1) });
+  const approval = f.approvalFor('local', f.round, omitted, 'omitted');
+  assert.throws(() => bindReleaseScope(f.root, { assignment, expectedRevision: null, round: omitted, approval }), /every G1 coverage obligation/);
+  const omittedCheck = f.put('round-missing-check.json', {
+    ...f.round, obligations: f.round.obligations.map((row, index) => index ? row : { ...row, checkIds: [] }),
+  });
+  const approvalWithoutCheck = f.approvalFor('local', f.round, omittedCheck, 'omitted-check');
+  assert.throws(() => bindReleaseScope(f.root, { assignment, expectedRevision: null, round: omittedCheck, approval: approvalWithoutCheck }), /every G1 coverage obligation/);
+  assert.equal(releaseScope(f.root, assignment).revision, null);
+});
+
+test('G5 rejects an earlier or invalidated round while retaining historical assessment evidence', () => {
+  const f = fixture(), assignment = { source: 'local', ticketId: 'QA-001' };
+  f.bind();
+  const run = f.put('run.json', f.run('run', 'Pass'));
+  const { assessment } = recordAssessment(f.root, retainRun(f.root, { round: f.roundRef, run }));
+  assert.equal(currentAssessment(f.root, assessment, assignment).state, 'evidenceReady');
+  const original = releaseScope(f.root, assignment);
+  const observation = f.put('material-change.json', { assignment, round: f.roundRef, reason: 'New build served', source: 'Synthetic observation' });
+  invalidateReleaseScope(f.root, { assignment, expectedRevision: original.revision!, observation });
+  assert.throws(() => currentAssessment(f.root, assessment, assignment), /current reviewed release round/);
+  const next = { ...f.round, id: 'round-2', target: { ...f.target, buildId: 'build-2' } };
+  const ref = f.put('round-2.json', next);
+  f.bind('local', next, ref, 'next');
+  assert.throws(() => currentAssessment(f.root, assessment, assignment), /current reviewed release round/);
+  assert.equal(verifyAssessment(f.root, assessment).target.buildId, 'build-1');
+  assert.throws(() => bindReleaseScope(f.root, { assignment, expectedRevision: releaseScope(f.root, assignment).revision,
+    round: f.roundRef, approval: f.approvalFor('local', f.round, f.roundRef, 'initial') }), /renewed G2/);
+});
+
+test('zero executions cannot support G5 even when every applicability decision is an exclusion', () => {
+  const f = fixture(), assignment = { source: 'local', ticketId: 'QA-001' };
+  const plan = { ...f.round, obligations: f.round.obligations.map(item => ({
+    ...item, state: 'excluded' as const, checkIds: [], reason: 'Synthetic exclusion', decision: f.round.scope,
+  })) };
+  const round = f.put('excluded-round.json', plan);
+  f.bind('local', plan, round);
+  const input = { round, runs: [] };
+  const { report } = recordAssessment(f.root, input);
+  assert.deepEqual(report.gaps.map(gap => gap.outcome), ['No checks executed']);
+  const legacy = f.put('legacy-assessment.json', { schemaVersion: 1, input, report: assessRound(f.root, input, 1) });
+  assert.equal(verifyAssessment(f.root, legacy).state, 'evidenceReady');
+  const route: Route = { channel: 'recorded', destination: 'Fixture QA conversation', recipient: 'Release owner', acknowledgementRequired: false };
+  const decision = { gate: 'G5', decision: 'Approved', reviewer: 'Fixture reviewer', source: 'Synthetic reviewer decision',
+    packet: f.round.scope, target: f.target, handoff: { assessment: legacy, route, targetObservation: f.g5Target } };
+  assert.throws(() => reviewHandoff(f.root, decision, legacy, route, assignment), /Zero executed checks/);
 });

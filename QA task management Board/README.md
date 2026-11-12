@@ -64,7 +64,7 @@ Ticket references include stable IDs. When a file moves, keep its ID, contents a
 2. Execute only the work covered by the recorded human authorization. Keep actual outcomes, inferences and human decisions distinct.
 3. Open a new Dev Todo ticket for each distinct defect. Record reproduction, expected/actual behavior, evidence, severity, supported cause or hypothesis, proposed correction and release impact. Link its parent and relevant test case.
 4. Keep the parent assignment in Ready for QA while blocking findings or required decisions remain. Record its linked blockers and next action; do not repeatedly run the same tests against an unchanged build.
-5. Before closing a parent assignment, follow [G5 release sign-off and handoff](../QA/Quality%20assurance/release-signoff.md). Prepare its packet before review and record the actual scoped decision, next-owner actions and delivery/receipt state afterward. Move it to Tested-Ok only when its criteria, required sign-off, handoff delivery and any required recipient acceptance are met. Keep pending closure work in the current folder with a waiting reason. Explicitly accepted nonblocking limitations remain recorded.
+5. Before closing a parent assignment, including one in Retest, prepare the [G5 packet](../QA/Quality%20assurance/release-signoff.md) from its current [module assessment](../automation/release/README.md). Record the actual scoped decision, next-owner actions, delivery and any required acceptance before moving to Tested-Ok. Keep pending closure work in its current folder with the waiting reason and retain accepted limitations.
 
 ## Developer response, retesting and regression
 

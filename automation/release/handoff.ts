@@ -1,13 +1,14 @@
 import { assertNonsecret, load, requireText, verifyEvidence, type Evidence } from '../shared/store.js';
 import { pinned } from './library.js';
 import { sameTarget, verifyAssessment, type Target } from './round.js';
+import { requireCurrentScope, sameEvidence, type Assignment } from './scope.js';
 
 type Preferences =
   | { channel: 'taskBoard'; recipient: string; acknowledgementRequired: boolean }
   | { channel: 'recorded'; destination: string; recipient: string; acknowledgementRequired: boolean };
 export interface Route { channel: Preferences['channel']; destination: string; recipient: string; acknowledgementRequired: boolean }
 export interface HandoffApproval {
-  assessment: Evidence; route: Route;
+  assessment: Evidence; route: Route; targetObservation: Evidence;
   exceptions?: { gapId: string; owner: string; reason: string; decision: Evidence }[];
 }
 interface ReleaseDecision {
@@ -35,18 +36,55 @@ export function handoffRoute(preference: Preferences, ticketUrl?: string): Route
   return { channel: preference.channel, destination, recipient: preference.recipient, acknowledgementRequired: preference.acknowledgementRequired };
 }
 
-export function reviewHandoff(root: string, decision: ReleaseDecision, assessment: Evidence, route: Route, assignmentId: string) {
+function sameRoute(a: Route | undefined, b: Route | undefined) {
+  return !!a && !!b && a.channel === b.channel && a.destination === b.destination &&
+    a.recipient === b.recipient && a.acknowledgementRequired === b.acknowledgementRequired;
+}
+
+export function resolveHandoffRoute(root: string, requested?: Route, ticketUrl?: string) {
+  const preference = reportingPreference(root);
+  const route = preference && (preference.channel === 'recorded' || ticketUrl) ? handoffRoute(preference, ticketUrl) : requested;
+  if (!route) throw new Error('Identify the authorized release handoff route and recipient for G5.');
+  if (requested && !sameRoute(requested, route)) throw new Error('Review the actual handoff route against Reporting and evidence preferences; the exact board publication may have changed.');
+  requireText(route.destination, 'Authorized handoff destination');
+  requireText(route.recipient, 'Handoff recipient');
+  if (typeof route.acknowledgementRequired !== 'boolean' || !['taskBoard', 'recorded'].includes(route.channel) ||
+      route.channel === 'taskBoard' && route.destination !== ticketUrl) throw new Error('Use the actual live ticket or a recorded delivery route.');
+  assertNonsecret(route);
+  return route;
+}
+
+export function currentAssessment(root: string, assessment: Evidence, assignment: Assignment) {
+  const scope = requireCurrentScope(root, assignment);
+  const report = verifyAssessment(root, assessment, true, scope.round);
+  if (!report.assignmentIds.includes(assignment.ticketId) || !sameTarget(report.target, scope.target)) {
+    throw new Error('The release assessment must cover this assignment and its reviewed build and environment.');
+  }
+  return report;
+}
+
+export function reviewHandoff(root: string, decision: ReleaseDecision, assessment: Evidence, route: Route, assignment: Assignment) {
   if (decision.gate !== 'G5' || !['Approved', 'Approved with limits'].includes(decision.decision)) throw new Error('Record the actual G5 decision for this handoff.');
   requireText(decision.reviewer, 'Actual reviewer');
   requireText(decision.source, 'Actual G5 decision source');
   verifyEvidence(root, decision.packet);
   const reviewed = decision.handoff;
-  if (!reviewed || reviewed.assessment.path !== assessment.path || reviewed.assessment.sha256 !== assessment.sha256 ||
-      reviewed.route.channel !== route.channel || reviewed.route.destination !== route.destination || reviewed.route.recipient !== route.recipient ||
-      reviewed.route.acknowledgementRequired !== route.acknowledgementRequired) throw new Error('G5 must review this release assessment and handoff destination.');
-  const report = verifyAssessment(root, assessment, true);
+  if (!reviewed || !sameEvidence(reviewed.assessment, assessment) || !sameRoute(reviewed.route, route)) {
+    throw new Error('G5 must review this release assessment and handoff destination.');
+  }
+  const report = currentAssessment(root, assessment, assignment);
   if (!sameTarget(decision.target, report.target)) throw new Error('G5 must match the assessed release build and environment.');
-  if (!report.assignmentIds.includes(assignmentId)) throw new Error('The release assessment must include this assignment.');
+  const observed = pinned<Target & { observedAt: string; source: string }>(root, reviewed.targetObservation, 'G5 target observation');
+  if (!sameTarget(observed, report.target) || !Number.isFinite(Date.parse(observed.observedAt)) || !/(Z|[+-]\d\d:\d\d)$/.test(observed.observedAt)) {
+    throw new Error('Observe the exact build and environment again for G5.');
+  }
+  requireText(observed.source, 'Actual G5 target observation source');
+  for (const module of report.modules) for (const type of module.testTypes) for (const obligation of type.obligations) {
+    if (obligation.checks.some(check => check.attempts.some(attempt => Date.parse(attempt.observedAt) > Date.parse(observed.observedAt)))) {
+      throw new Error('Observe the G5 target on or after the retained run observations.');
+    }
+  }
+  if (!report.uniqueCheckExecutions) throw new Error('Zero executed checks cannot support a positive QA sign-off.');
   if (report.gaps.some(gap => !gap.exceptionAllowed)) throw new Error('The release has a blocking coverage gap. Resolve it within the reviewed scope before handoff.');
   const exceptions = reviewed.exceptions ?? [];
   if (!Array.isArray(exceptions) || new Set(exceptions.map(item => item.gapId)).size !== exceptions.length ||
@@ -73,19 +111,20 @@ function deliveryObservation(root: string, ref: Evidence | undefined, label: str
   requireText(observed.source, `Actual ${label} source`);
 }
 
-export function verifyDelivery(root: string, decision: Evidence, route: Route, refs: DeliveryEvidence, boardPublicationConfirmed = false) {
-  if (route.channel === 'taskBoard') {
-    if (!boardPublicationConfirmed) throw new Error('Confirm the reviewed G5 board handoff comment before completing the ticket.');
+export function verifyDelivery(root: string, decision: Evidence, route: Route, refs: DeliveryEvidence, confirmation?: 'publication' | 'observed') {
+  if (route.channel === 'taskBoard' && confirmation !== 'observed') {
+    if (confirmation !== 'publication') throw new Error('Confirm the reviewed G5 board handoff comment before completing the ticket.');
   } else deliveryObservation(root, refs.delivery, 'handoff delivery', 'delivered', decision, route);
   if (route.acknowledgementRequired) deliveryObservation(root, refs.acknowledgement, 'recipient acknowledgement', 'accepted', decision, route);
 }
 
-export function verifyLocalHandoff(root: string, ticketId: string, ticketRevision: string, route: Route, request: LocalHandoff) {
+export function verifyLocalHandoff(root: string, ticketId: string, ticketRevision: string, request: LocalHandoff) {
   const decision = pinned<ReleaseDecision & { ticketId: string; ticketRevision: string }>(root, request.decision, 'G5 decision');
   if (decision?.ticketId !== ticketId || decision.ticketRevision !== ticketRevision || !decision.handoff) {
     throw new Error('Record G5 for this local ticket revision and its release assessment.');
   }
-  const report = reviewHandoff(root, decision, decision.handoff.assessment, route, ticketId);
+  const route = resolveHandoffRoute(root, decision.handoff.route);
+  const report = reviewHandoff(root, decision, decision.handoff.assessment, route, { source: 'local', ticketId });
   verifyDelivery(root, request.decision, route, request);
   return report;
 }

@@ -121,6 +121,7 @@ test('a reviewed G5 handoff uses the saved board route and gates completion afte
   const f = fixture();
   await f.select();
   const claim = await f.claim(), pilot = releaseFixture(f.root, claim.ticket.id);
+  pilot.bind(claim.sourceKey);
   const run = pilot.put('run.json', pilot.run('pass', 'Pass'));
   const { assessment } = recordAssessment(f.root, retainRun(f.root, { round: pilot.roundRef, run }));
   const preference = { channel: 'taskBoard', recipient: 'Release owner', acknowledgementRequired: true };
@@ -135,7 +136,7 @@ test('a reviewed G5 handoff uses the saved board route and gates completion afte
   const decision = f.put('.local/g5.json', {
     claimId: claim.id, ticketRevision: claim.ticket.revision, gate: 'G5', decision: 'Approved',
     reviewer: 'Synthetic reviewer', source: 'Synthetic actual decision', packet, target: pilot.target,
-    handoff: { assessment, route: prepared.release!.route }, publicationDigests: [prepared.publicationDigest, completion.publicationDigest],
+    handoff: { assessment, route: prepared.release!.route, targetObservation: pilot.g5Target }, publicationDigests: [prepared.publicationDigest, completion.publicationDigest],
   });
   const args = { decision, source: 'Synthetic reviewed publication' };
   const writer = async () => async () => {
@@ -169,7 +170,7 @@ test('a reviewed G5 handoff uses the saved board route and gates completion afte
   const newDecision = f.put('.local/g5-current.json', {
     claimId: claim.id, ticketRevision: claim.ticket.revision, gate: 'G5', decision: 'Approved',
     reviewer: 'Synthetic reviewer', source: 'Synthetic review of newly retained evidence', packet, target: pilot.target,
-    handoff: { assessment: current, route: newPrepared.release!.route },
+    handoff: { assessment: current, route: newPrepared.release!.route, targetObservation: pilot.g5Target },
     publicationDigests: [newPrepared.publicationDigest, newCompletion.publicationDigest],
   });
   const newArgs = { ...args, decision: newDecision };
@@ -177,9 +178,81 @@ test('a reviewed G5 handoff uses the saved board route and gates completion afte
   const refreshed = await live.publish(f.root, { ...newComment, ...newArgs }, f.reader, async () => async () => ({ remoteId: 'comment-2' }));
   assert.equal(refreshed.remoteId, 'comment-2');
   const acknowledgement = f.put('ack.json', { state: 'accepted', decisionSha256: newDecision.sha256, recipient: preference.recipient, destination: claim.ticket.url, source: 'Synthetic recipient reply' });
-  const confirmed = await live.publish(f.root, { ...newMove, ...newArgs, acknowledgement }, f.reader, writer);
+  await assert.rejects(live.publish(f.root, { ...newMove, ...newArgs, acknowledgement }, f.reader, async () => async () => {
+    await (await writer())();
+    throw new Error('Synthetic response interruption after the move');
+  }), /uncertain outcome/);
+  const confirmation = { id: newMove.id, state: 'confirmed', remoteId: claim.ticket.id, source: 'Synthetic provider observation', evidence: [packet] } as const;
+  assert.throws(() => live.reconcilePublication(f.root, { ...confirmation, evidence: [packet] }), /native move observation/);
+  const moveObservation = f.put('actual-move.json', { ticketId: claim.ticket.id, destinationId: 'done', publicationId: newMove.id, source: 'Synthetic actual board view' });
+  const confirmed = live.reconcilePublication(f.root, { ...confirmation, evidence: [packet], moveObservation });
   assert.equal(confirmed.handoff?.kind, 'completion');
   const closed = live.closeClaim(f.root, { claimId: claim.id, source: 'Synthetic G5 closure', evidence: [packet], disposition: 'completed' });
+  assert.equal(closed.terminal?.disposition, 'completed');
+});
+test('unset and removed settings cannot bypass a live parent release, including a return through Retest', async () => {
+  const f = fixture();
+  await f.select();
+  const claim = await f.claim();
+  const move = { id: 'generic-move', claimId: claim.id, action: 'move', to: 'testedOk' } as const;
+  const packet = f.put('release-packet.json', { checked: true });
+  await assert.rejects(live.publicationPreview(f.root, move, f.reader), /reviewed release assessment/);
+  f.put('.local/reporting-settings.json', { releaseHandoff: { channel: 'taskBoard', recipient: 'Release owner', acknowledgementRequired: false } });
+  f.put('.local/reporting-settings.json', {});
+  await assert.rejects(live.publicationPreview(f.root, move, f.reader), /reviewed release assessment/);
+  assert.throws(() => live.closeClaim(f.root, { claimId: claim.id, source: 'Synthetic premature close', evidence: [packet] }), /confirmed G5 move/);
+  live.closeClaim(f.root, { claimId: claim.id, source: 'Synthetic claim release', evidence: [packet], disposition: 'released' });
+  f.board.tickets[0]!.state = 'retest';
+  const retest = await f.claim();
+  const defect = f.put('.local/incorrect-defect-scope.json', { claimId: retest.id, ticketRevision: retest.ticket.revision, gate: 'G4',
+    decision: 'Approved', reviewer: 'Synthetic reviewer', source: 'Synthetic scoped review', packet, defectReport: packet });
+  await assert.rejects(live.publicationPreview(f.root, { ...move, claimId: retest.id, defect }, f.reader), /parent assignment/);
+});
+
+test('a read-only board records actual G5 delivery and native status before closing the release', async () => {
+  const f = fixture();
+  f.choice.actions = [];
+  await f.select();
+  const claim = await f.claim(), pilot = releaseFixture(f.root, claim.ticket.id);
+  pilot.bind(claim.sourceKey);
+  const run = pilot.put('run.json', pilot.run('pass', 'Pass'));
+  const { assessment } = recordAssessment(f.root, retainRun(f.root, { round: pilot.roundRef, run }));
+  const route = { channel: 'taskBoard', destination: claim.ticket.url, recipient: 'Release owner', acknowledgementRequired: true };
+  const decision = f.put('.local/observed-g5.json', { claimId: claim.id, ticketRevision: claim.ticket.revision, gate: 'G5',
+    decision: 'Approved', reviewer: 'Fixture reviewer', source: 'Synthetic G5 decision', packet: pilot.round.scope, target: pilot.target,
+    handoff: { route, assessment, targetObservation: pilot.g5Target } });
+  const request = { id: 'observed-move', claimId: claim.id, source: 'Synthetic board observation', decision };
+  await assert.rejects(live.observeReleaseCompletion(f.root, request, f.reader), /configured Tested-Ok destination/);
+  f.board.tickets[0]!.state = 'done';
+  assert.throws(() => live.closeClaim(f.root, { ...request, evidence: [pilot.round.scope], disposition: 'completed' }), /confirmed G5 move/);
+  await assert.rejects(live.observeReleaseCompletion(f.root, request, f.reader), /handoff delivery/);
+  const base = { decisionSha256: decision.sha256, destination: route.destination, recipient: route.recipient, source: 'Synthetic actual record' };
+  const delivery = f.put('delivered.json', { ...base, state: 'delivered' });
+  await assert.rejects(live.observeReleaseCompletion(f.root, { ...request, delivery }, f.reader), /recipient acknowledgement/);
+  const acknowledgement = f.put('accepted.json', { ...base, state: 'accepted' });
+  const verified = await live.observeReleaseCompletion(f.root, { ...request, delivery, acknowledgement }, f.reader);
+  assert.equal(verified.handoff?.observed, true);
+  assert.equal(live.closeClaim(f.root, { ...request, evidence: [pilot.round.scope], disposition: 'completed' }).terminal?.disposition, 'completed');
+});
+
+test('a live individual defect can close with reviewed scoped evidence and a verified move', async () => {
+  const f = fixture();
+  f.board.tickets[0]!.state = 'retest';
+  await f.select();
+  const claim = await f.claim();
+  const packet = f.put('defect-report.json', { observation: 'Synthetic scoped retest result' });
+  const review = { claimId: claim.id, ticketRevision: claim.ticket.revision, decision: 'Approved',
+    reviewer: 'Fixture reviewer', source: 'Synthetic scoped decision', packet };
+  const defect = f.put('.local/defect-g4.json', { ...review, gate: 'G4', defectReport: packet });
+  const move = { id: 'scoped-defect-move', claimId: claim.id, action: 'move', to: 'testedOk', defect } as const;
+  const preview = await live.publicationPreview(f.root, move, f.reader);
+  assert.equal(preview.release, undefined);
+  const decision = f.put('.local/defect-g5.json', { ...review, gate: 'G5', publicationDigest: preview.publicationDigest });
+  await live.publish(f.root, { ...move, decision, source: 'Synthetic scoped publication' }, f.reader, async () => async () => {
+    f.board.tickets[0]!.state = 'done';
+    return { remoteId: claim.ticket.id };
+  });
+  const closed = live.closeClaim(f.root, { claimId: claim.id, source: 'Synthetic scoped closure', evidence: [packet], disposition: 'completed', defect });
   assert.equal(closed.terminal?.disposition, 'completed');
 });
 test('Preview leaves the old source active; save binds the reviewed account and never falls back', async () => {
@@ -232,9 +305,9 @@ test('Claims are exclusive and status, assignment and pending work control conti
   f.board.tickets = [];
   assert.equal((await resume())?.reasonCode, 'ticketMissing');
   f.board.tickets = [ticket];
-  live.closeClaim(f.root, { claimId: claim.id, source: 'Synthetic verified disposition', evidence: [f.put('.local/disposition.json', { checked: true })] });
+  live.closeClaim(f.root, { claimId: claim.id, source: 'Synthetic verified disposition', evidence: [f.put('.local/disposition.json', { checked: true })], disposition: 'released' });
   f.board.tickets[0]!.state = 'qa';
-  assert.deepEqual((await live.checkIn(f.root, f.reader)).candidates, []);
+  assert.equal((await live.checkIn(f.root, f.reader)).candidates?.[0]?.ticket.id, claim.ticket.id);
 });
 
 test('live execution holds a required data dependency before reservation and records an approved independent run', async () => {
@@ -492,12 +565,15 @@ test('a newer native update reopens a manually handed off Retest without duplica
   ticket.state = 'retest'; ticket.updatedAt = time;
   await f.select();
   const first = await f.claim();
-  live.closeClaim(f.root, { claimId: first.id, source: 'Synthetic manual retest disposition', evidence: [f.put('.local/manual-handoff.json', { state: 'Rework' })] });
+  const packet = f.put('.local/manual-handoff.json', { state: 'Rework' });
+  const reviewedDefect = (claimId: string) => f.put(`.local/${claimId}-g4.json`, { claimId, ticketRevision: ticket.revision, gate: 'G4',
+    decision: 'Approved', reviewer: 'Synthetic reviewer', source: 'Synthetic scope', packet, defectReport: packet });
+  live.closeClaim(f.root, { claimId: first.id, source: 'Synthetic manual retest disposition', evidence: [packet], defect: reviewedDefect(first.id) });
   assert.deepEqual((await live.checkIn(f.root, f.reader)).candidates, []);
   ticket.updatedAt = '2026-01-01T00:01:00Z';
   assert.equal((await live.checkIn(f.root, f.reader)).candidates?.[0]?.ticket.id, ticket.id);
   const second = await f.claim();
   assert.notEqual(second.id, first.id);
-  live.closeClaim(f.root, { claimId: second.id, source: 'Synthetic second disposition', evidence: [f.put('.local/second-handoff.json', { state: 'Tested-Ok' })] });
+  live.closeClaim(f.root, { claimId: second.id, source: 'Synthetic second disposition', evidence: [f.put('.local/second-handoff.json', { state: 'Tested-Ok' })], defect: reviewedDefect(second.id) });
   assert.deepEqual((await live.checkIn(f.root, f.reader)).candidates, []);
 });

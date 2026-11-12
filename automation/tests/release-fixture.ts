@@ -3,6 +3,7 @@ import { dirname } from 'node:path';
 import { contained, evidence } from '../shared/store.js';
 import type { Library } from '../release/library.js';
 import type { Round, Run } from '../release/round.js';
+import { bindReleaseScope, releaseScope } from '../release/scope.js';
 
 export function releaseFixture(root: string, assignmentId: string) {
   const put = (path: string, value: unknown) => {
@@ -29,6 +30,7 @@ export function releaseFixture(root: string, assignmentId: string) {
   };
   const target = { buildId: 'build-1', environment: 'staging' };
   const targetEvidence = put('target.json', { ...target, observedAt: '2026-01-01T00:00:00Z', source: 'Synthetic target observation' });
+  const g5Target = put('target-g5.json', { ...target, observedAt: '2026-01-01T00:10:00Z', source: 'Synthetic handoff target observation' });
   const round: Round = {
     schemaVersion: 1, id: 'round-1', library: put('library-v1.json', library), target, assignmentIds: [assignmentId],
     scope: put('scope.json', { source: 'Synthetic reviewed scope' }),
@@ -45,5 +47,18 @@ export function releaseFixture(root: string, assignmentId: string) {
     observedAt: previousRunId ? '2026-01-01T00:04:00Z' : '2026-01-01T00:02:00Z',
     targetEvidence, observations: [{ checkId: 'shared', conditionId: 'route', outcome, previousRunId, evidence: [put(`${id}-result.json`, { actual: outcome })] }],
   });
-  return { put, library, round, roundRef, run, target };
+  const approvalFor = (source: string, plan: Round, ref: ReturnType<typeof put>, suffix: string) => {
+    const assignment = { source, ticketId: assignmentId };
+    const review = { assignment, decision: 'Approved', reviewer: 'Fixture reviewer', source: 'Synthetic actual decision', packet: plan.scope };
+    const scopeReview = put(`g1-${suffix}.json`, {
+      ...review, gate: 'G1', library: plan.library, modules: plan.moduleIds, obligations: plan.obligations,
+    });
+    return put(`g2-${suffix}.json`, { ...review, gate: 'G2', round: ref, scopeReview });
+  };
+  const bind = (source = 'local', plan = round, ref = roundRef, suffix = 'initial') => {
+    const assignment = { source, ticketId: assignmentId };
+    return bindReleaseScope(root, { assignment, expectedRevision: releaseScope(root, assignment).revision, round: ref,
+      approval: approvalFor(source, plan, ref, suffix) });
+  };
+  return { put, library, round, roundRef, run, target, targetEvidence, g5Target, approvalFor, bind };
 }
