@@ -74,13 +74,13 @@ The AI QA reads the developer response and uses [post-fix verification](../autom
 
 | Verification outcome | Action |
 | --- | --- |
-| Original failure persists | Append the failed retest and evidence; move the same bug ticket to Rework after the required findings review |
+| Original failure persists | Retain the failed original confirmation and current G3 decision. Use the [reviewed Rework move](../automation/regression/README.md#return-the-original-failure-to-rework) for the same bug ticket. |
 | Original failure is resolved and required regression is accounted for | Record the scoped QA decision and any separate regression finding, then move the bug ticket to Tested-Ok |
 | Regression discovers a separate defect | Create a new bug ticket in Dev Todo and classify it as Regression where supported |
 
 A regression ticket identifies the affected behavior, reproduction, expected/actual results, new build, originating fix/ticket and previous passing baseline. If a prior pass or causal link is not established, state that uncertainty instead of inventing it. Avoid duplicate tickets for the same existing finding; append new observations to that ticket.
 
-An original bug can reach Tested-Ok while a separate reviewed regression remains open. Link the regression to its parent assignment and originating fix. Reconcile all included fixes with the parent change manifest. Blocking findings and missing required regression evidence hold parent G5.
+An original bug can reach Tested-Ok while a separate reviewed regression remains open. Link the regression to its parent assignment and originating fix. Before parent G5, reconcile the canonical board links, fix ledger and change manifest for the exact target. Blocking findings and missing required regression evidence hold parent G5.
 
 ## AI check-in procedure
 

@@ -29,6 +29,8 @@ Record exactly what is now authorized and what remains unapproved. Findings acce
 
 For G5, link the prepared [release-notes/sign-off/handoff packet](completion-handoff.md). Identify the target, exit-criteria evidence, accepted conditions, next-owner actions, authorized delivery and any required receipt. Record the actual decision first, then update delivery/receipt from observations. Do not claim that publication establishes another owner's acceptance or close required handoff work while it remains pending.
 
+For a G3 return to Rework, link the failed original confirmation, current defect ticket revision, fix key, assessed target and assessment digest. Record the actual reviewer and decision before the move. [Rework evidence](../../../automation/regression/README.md#return-the-original-failure-to-rework)
+
 ## Applicable process records
 
 Link strategy/coverage/design/data/configuration or regression revisions actually reviewed, the affected condition/case/charter IDs and their limits. Preserve the original reply and decision scope. A record revision or helper-generated count does not establish approval. Link any material change to its affected gate through [QA Process Context](../../../QA%20Process%20Context/README.md).

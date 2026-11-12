@@ -2,6 +2,7 @@ import { digest, load, requireText, save, verifyEvidence, withLock, type Evidenc
 import { indexById, pinned, readLibrary } from '../release/library.js';
 import { retainedRun, retainedRuns, sameTarget, type Round, type Target } from '../release/round.js';
 import { sameEvidence, type Assignment } from '../release/scope.js';
+import type { ReleaseBoard } from './board.js';
 
 interface FixIdentity { defect: Assignment; fixRevision: string }
 interface Intake extends FixIdentity {
@@ -30,6 +31,7 @@ interface Review {
   fix: string; ticketRevision: string; assessmentDigest: string; targetObservation: Evidence; findings: Finding[];
 }
 export type DefectCompletion = { fix: string; refutation?: never } | { fix?: never; refutation: Evidence };
+export interface ReworkDecision { fix: string; review: Evidence }
 
 const ledgerPath = '.local/qa-regression/fixes.json';
 const coordinates = (check: Coordinate) => `${check.checkId}/${check.conditionId}`;
@@ -367,10 +369,112 @@ export function requireFixBatch(root: string, defect: Assignment, target: Target
   return { fix: entry.key, batchId: batch.id, phase: batch.phase, plan: revision.plan, checks: batch.checks.map(coordinates) };
 }
 
-export function releaseFixes(root: string, assignment: Assignment, round: Round, manifestRef: Evidence) {
+export function failedConfirmation(root: string, defect: Assignment, fix: string) {
+  const entry = findFix(root, fix);
+  const assessment = assess(root, entry);
+  if (!sameAssignment(entry.identity.defect, defect) || assessment?.report.state !== 'confirmationFailed') {
+    throw new Error('Rework requires a recorded failure of the original confirmation check for the current fix and target.');
+  }
+  return { fix, target: entry.identity.target, assessmentDigest: assessment.assessmentDigest };
+}
+
+export function verifyRework(root: string, defect: Assignment, ticketRevision: string, decision: ReworkDecision) {
+  const current = failedConfirmation(root, defect, decision.fix);
+  const reviewed = pinned<{ gate: string; decision: string; assignment: Assignment; ticketRevision: string; target: Target;
+    source: string; reviewer: string; packet: Evidence; rework: { fix: string; assessmentDigest: string } }>(root, decision.review, 'G3 Rework decision');
+  if (reviewed?.gate !== 'G3' || !['Approved', 'Approved with limits'].includes(reviewed.decision) ||
+      !sameAssignment(reviewed.assignment, defect) || reviewed.ticketRevision !== ticketRevision || !sameTarget(reviewed.target, current.target) ||
+      reviewed.rework?.fix !== current.fix || reviewed.rework.assessmentDigest !== current.assessmentDigest) {
+    throw new Error('G3 must review the recorded confirmation failure for this ticket revision, fix and target.');
+  }
+  requireText(reviewed.source, 'Actual G3 review source');
+  requireText(reviewed.reviewer, 'Actual G3 reviewer');
+  verifyEvidence(root, reviewed.packet);
+  return { ...current, review: decision.review };
+}
+
+interface ChangeManifest {
+  assignment: Assignment; target: Target; changes: Evidence; fixes: FixIdentity[];
+  policy: Evidence; coverage: 'targeted' | 'full'; affected: Coordinate[];
+  findingDispositions?: Evidence[]; exclusions?: Evidence[]; boardReadbacks?: Evidence[];
+}
+const assignmentKey = (item: Assignment) => JSON.stringify([item.source, item.ticketId]);
+
+function reviewedBoardEntries(root: string, manifest: ChangeManifest, refs: Evidence[] | undefined, label: 'exclusion' | 'board readback') {
+  const entries = new Map<string, { ref: Evidence; revision?: string; linked?: boolean }>();
+  for (const ref of refs ?? []) {
+    const record = pinned<{ assignment: Assignment; defect: Assignment; target: Target; source: string; evidence: Evidence;
+      reason?: string; reviewer?: string; revision?: string; linked?: boolean }>(root, ref, label);
+    assignmentValid(record?.defect);
+    const key = assignmentKey(record.defect);
+    if (entries.has(key) || !sameAssignment(record.assignment, manifest.assignment) || !sameTarget(record.target, manifest.target)) {
+      throw new Error(`Reconcile each ${label} for the exact assignment, defect and target.`);
+    }
+    requireText(record.source, `Actual ${label} source`);
+    verifyEvidence(root, record.evidence);
+    if (label === 'exclusion') {
+      requireText(record.reason, 'Reason the fix is outside this release build');
+      requireText(record.reviewer, 'Actual exclusion reviewer');
+    } else {
+      requireText(record.revision, 'Observed canonical ticket revision');
+      if (typeof record.linked !== 'boolean') throw new Error('Record the observed parent relationship in the board readback.');
+    }
+    entries.set(key, { ref, revision: record.revision, linked: record.linked });
+  }
+  return entries;
+}
+
+function reconcileBoard(root: string, manifest: ChangeManifest, board: ReleaseBoard, onTarget: Fix[], expected: Set<string>) {
+  if (!sameAssignment(board?.assignment, manifest.assignment)) throw new Error('Observe the canonical board for this release assignment.');
+  const { assignment, target } = manifest;
+  const exclusions = reviewedBoardEntries(root, manifest, manifest.exclusions, 'exclusion');
+  const readbacks = reviewedBoardEntries(root, manifest, manifest.boardReadbacks, 'board readback');
+  const candidates = new Map<string, Assignment>();
+  for (const row of board.rows) if (row.linked) {
+    const defect = { source: assignment.source, ticketId: row.id };
+    candidates.set(assignmentKey(defect), defect);
+  }
+  for (const row of onTarget) if (sameAssignment(row.identity.parent, assignment)) {
+    candidates.set(assignmentKey(row.identity.defect), row.identity.defect);
+  }
+  for (const fix of manifest.fixes) candidates.set(assignmentKey(fix.defect), fix.defect);
+  // A provider-filtered child can be supplied through an authoritative ticket readback.
+  for (const key of new Set([...exclusions.keys(), ...[...readbacks].filter(([, row]) => row.linked).map(([id]) => id)])) if (!candidates.has(key)) {
+    const [source, ticketId] = JSON.parse(key) as [string, string];
+    candidates.set(key, { source, ticketId });
+  }
+  const relationships = [];
+  for (const [key, defect] of candidates) {
+    const matches = defect.source === assignment.source ? board.rows.filter(row => row.id === defect.ticketId) : [];
+    const row = matches[0], readback = readbacks.get(key), exclusion = exclusions.get(key);
+    if (matches.length > 1 || row?.ambiguous) throw new Error(`Reconcile conflicting board relationships for ${defect.ticketId}.`);
+    if (!row && !readback) throw new Error(`Observe ${defect.ticketId} on the canonical board or supply an authoritative ticket readback.`);
+    if (row && readback && (row.revision !== readback.revision ||
+        (row.linked || row.parentSpecified) && row.linked !== readback.linked)) {
+      throw new Error(`Refresh the authoritative board readback for ${defect.ticketId}.`);
+    }
+    const current = currentFor(onTarget, defect, target.environment);
+    const linked = row?.linked || readback?.linked || false;
+    const intakeParent = current?.identity.parent;
+    if (intakeParent && (linked && !sameAssignment(intakeParent, assignment) ||
+        (row?.parentSpecified || readback) && !linked && sameAssignment(intakeParent, assignment))) {
+      throw new Error(`Reconcile the board and fix intake parent for ${defect.ticketId}.`);
+    }
+    if (current && !expected.has(identityKey(current.identity))) {
+      throw new Error(`The reviewed release change manifest omits a known linked fix for ${defect.ticketId}.`);
+    }
+    const included = manifest.fixes.some(item => sameAssignment(item.defect, defect));
+    if (exclusion && (current || included)) throw new Error(`The exclusion for ${defect.ticketId} conflicts with evidence that it belongs to this release build.`);
+    if (!included && !exclusion) throw new Error(`Establish whether linked defect ${defect.ticketId} is included in this exact build, or retain a reviewed exclusion.`);
+    relationships.push({ defect, revision: row?.revision ?? readback!.revision, linked,
+      ...(readback ? { readback: readback.ref } : {}), ...(exclusion ? { exclusion: exclusion.ref } : {}) });
+  }
+  return relationships.sort((a, b) => assignmentKey(a.defect).localeCompare(assignmentKey(b.defect)));
+}
+
+export function releaseFixes(root: string, assignment: Assignment, round: Round, manifestRef: Evidence, board: ReleaseBoard) {
   const { target, changes } = round;
-  const manifest = pinned<{ assignment: Assignment; target: Target; changes: Evidence; fixes: FixIdentity[];
-    policy: Evidence; coverage: 'targeted' | 'full'; affected: Coordinate[]; findingDispositions?: Evidence[] }>(root, manifestRef, 'reviewed release change manifest');
+  const manifest = pinned<ChangeManifest>(root, manifestRef, 'reviewed release change manifest');
   if (!sameAssignment(manifest?.assignment, assignment) || !sameTarget(manifest.target, target) ||
       !sameEvidence(manifest.changes, changes) || !Array.isArray(manifest.fixes) || !['targeted', 'full'].includes(manifest.coverage)) {
     throw new Error('Review the independent list of fixes included in this exact release build.');
@@ -390,9 +494,7 @@ export function releaseFixes(root: string, assignment: Assignment, round: Round,
   }
   const all = ledger(root).value.fixes;
   const onTarget = all.filter(row => sameTarget(row.identity.target, target));
-  const linked = onTarget.filter(row => sameAssignment(row.identity.parent, assignment) &&
-    currentFor(onTarget, row.identity.defect, target.environment)?.key === row.key);
-  if (linked.some(row => !expected.has(identityKey(row.identity)))) throw new Error('The reviewed release change manifest omits a known linked fix.');
+  const relationships = reconcileBoard(root, manifest, board, onTarget, expected);
   const fixes = manifest.fixes.map(fix => {
     const key = fixKey({ ...fix, target });
     const verified = requireVerifiedFix(root, key, fix.defect);
@@ -401,7 +503,7 @@ export function releaseFixes(root: string, assignment: Assignment, round: Round,
   });
   const known = new Map<string, Assignment>();
   for (const row of all.filter(entry => sameAssignment(entry.identity.parent, assignment) ||
-    manifest.fixes.some(fix => sameAssignment(fix.defect, entry.identity.defect)))) {
+    relationships.some(item => sameAssignment(item.defect, entry.identity.defect)))) {
     for (const ref of row.plans.flatMap(plan => plan.reviews)) {
       const review = pinned<Review>(root, ref, 'retained fix review');
       for (const finding of review.findings) if (finding.impact === 'blocking') {
@@ -424,6 +526,6 @@ export function releaseFixes(root: string, assignment: Assignment, round: Round,
       !dispositions.some(item => sameAssignment(item.ticket, ticket))) {
     throw new Error(`The prior blocking regression ${ticket.ticketId} still needs a reviewed release disposition.`);
   }
-  const report = { manifest: manifestRef, fixes, dispositions };
+  const report = { manifest: manifestRef, relationships, fixes, dispositions };
   return { ...report, digest: digest(JSON.stringify(report)) };
 }

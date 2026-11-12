@@ -104,6 +104,7 @@ function fixture() {
   upgradeBoard(root, 'Synthetic folder layout');
   const choice: LiveChoice = { kind: 'live', board: clickup, queues: { ready: ['qa'], retest: ['retest'], testedOk: ['done'], devTodo: ['dev'] }, actions: ['comment', 'move', 'createDefect'] };
   const board: Connection = { identity: { accountId: 'qa-agent', workspaceId: 'workspace', scopeId: '11', scopeName: 'Sandbox' }, states: [{ id: 'qa', name: 'QA' }, { id: 'retest', name: 'Retest' }, { id: 'done', name: 'Done' }, { id: 'dev', name: 'Dev Todo' }], tickets: [{ id: 'task', title: 'Synthetic task', url: 'https://app.clickup.com/t/task', state: 'qa', assignees: ['qa-agent'], closed: false, createdAt: time, priority: 1, revision: digest('snapshot') }] };
+  board.descriptions = { task: null };
   const reader = async () => structuredClone(board);
   const put = (path: string, value: unknown) => {
     const file = contained(root, path);
@@ -186,9 +187,9 @@ test('a reviewed G5 handoff uses the saved board route and gates completion afte
   const confirmation = { id: newMove.id, state: 'confirmed', remoteId: claim.ticket.id, source: 'Synthetic provider observation', evidence: [packet] } as const;
   assert.throws(() => live.reconcilePublication(f.root, { ...confirmation, evidence: [packet] }), /native move observation/);
   const moveObservation = f.put('actual-move.json', { ticketId: claim.ticket.id, destinationId: 'done', publicationId: newMove.id, source: 'Synthetic actual board view' });
-  const confirmed = live.reconcilePublication(f.root, { ...confirmation, evidence: [packet], moveObservation });
+  const confirmed = await live.reconcileCurrentPublication(f.root, { ...confirmation, evidence: [packet], moveObservation }, f.reader);
   assert.equal(confirmed.handoff?.kind, 'completion');
-  const closed = live.closeClaim(f.root, { claimId: claim.id, source: 'Synthetic G5 closure', evidence: [packet], disposition: 'completed' });
+  const closed = await live.closeCurrentClaim(f.root, { claimId: claim.id, source: 'Synthetic G5 closure', evidence: [packet], disposition: 'completed' }, f.reader);
   assert.equal(closed.terminal?.disposition, 'completed');
 });
 test('unset and removed settings cannot bypass a live parent release, including a return through Retest', async () => {
@@ -233,7 +234,54 @@ test('a read-only board records actual G5 delivery and native status before clos
   const acknowledgement = f.put('accepted.json', { ...base, state: 'accepted' });
   const verified = await live.observeReleaseCompletion(f.root, { ...request, delivery, acknowledgement }, f.reader);
   assert.equal(verified.handoff?.observed, true);
-  assert.equal(live.closeClaim(f.root, { ...request, evidence: [pilot.round.scope], disposition: 'completed' }).terminal?.disposition, 'completed');
+  assert.equal((await live.closeCurrentClaim(f.root, { ...request, evidence: [pilot.round.scope], disposition: 'completed' }, f.reader)).terminal?.disposition, 'completed');
+});
+
+test('live G5 reconciles linked children, filtered tickets and later board changes before closure', async () => {
+  const f = fixture();
+  await f.select();
+  const claim = await f.claim(), pilot = releaseFixture(f.root, claim.ticket.id);
+  const assignment = { source: claim.sourceKey, ticketId: claim.ticket.id };
+  const defect = { ...assignment, ticketId: 'child' };
+  const child = { ...claim.ticket, id: defect.ticketId, url: 'https://app.clickup.com/t/child', state: 'retest', revision: digest('child-v1') };
+  const fix = regressionFixture(f.root, defect, child.revision, { base: pilot });
+  fix.approve(); fix.retain('confirmation');
+  f.board.tickets.push(child);
+  f.board.descriptions![child.id] = 'Originating QA ticket: ' + claim.ticket.url;
+  pilot.bind(claim.sourceKey);
+  await assert.rejects(live.reconcileReleaseBoard(f.root, assignment, f.reader), /omits a known linked fix for child/);
+
+  const fixes = [{ defect, fixRevision: 'r1' }];
+  pilot.bind(claim.sourceKey, pilot.round, pilot.roundRef, 'included', fixes);
+  f.board.tickets.pop();
+  await assert.rejects(live.reconcileReleaseBoard(f.root, assignment, f.reader), /authoritative ticket readback/);
+  const raw = f.put('native-child.json', { id: child.id, url: child.url, revision: child.revision, parent: claim.ticket.url });
+  const readback = f.put('board-readback.json', { assignment, defect, target: pilot.target, linked: true,
+    revision: child.revision, source: 'Synthetic native ticket readback', evidence: raw });
+  pilot.bind(claim.sourceKey, pilot.round, pilot.roundRef, 'filtered', fixes, { boardReadbacks: [readback] });
+  await assert.rejects(live.reconcileReleaseBoard(f.root, assignment, f.reader), /reviewed confirmation and regression/);
+  fix.retain('regression'); fix.review();
+  const filtered = await live.reconcileReleaseBoard(f.root, assignment, f.reader);
+  assert.equal(filtered.relationships[0]?.readback?.sha256, readback.sha256);
+
+  f.board.tickets.push(child);
+  f.board.descriptions![child.id] = null;
+  assert.equal((await live.reconcileReleaseBoard(f.root, assignment, f.reader)).digest, filtered.digest);
+  f.board.descriptions![child.id] = 'Parent assignment: another-release';
+  await assert.rejects(live.reconcileReleaseBoard(f.root, assignment, f.reader), /Refresh the authoritative board readback/);
+  f.board.descriptions![child.id] = 'Originating QA ticket: ' + claim.ticket.url;
+  const run = pilot.put('parent-run.json', pilot.run('parent-pass', 'Pass'));
+  const { assessment } = recordAssessment(f.root, retainRun(f.root, { round: pilot.roundRef, run }));
+  const route = { channel: 'recorded', destination: 'Synthetic QA conversation', recipient: 'Release owner', acknowledgementRequired: false };
+  const decision = f.put('.local/g5-linked.json', { claimId: claim.id, ticketRevision: claim.ticket.revision, gate: 'G5', decision: 'Approved',
+    reviewer: 'Fixture reviewer', source: 'Synthetic G5 decision', packet: pilot.round.scope, target: pilot.target,
+    handoff: { route, assessment, targetObservation: pilot.g5Target, regressionDigest: filtered.digest } });
+  const delivery = f.put('delivered.json', { state: 'delivered', decisionSha256: decision.sha256, destination: route.destination,
+    recipient: route.recipient, source: 'Synthetic delivery observation' });
+  f.board.tickets[0]!.state = 'done';
+  await live.observeReleaseCompletion(f.root, { id: 'linked-move', claimId: claim.id, source: 'Synthetic native readback', decision, delivery }, f.reader);
+  child.revision = digest('child-v2');
+  await assert.rejects(live.closeCurrentClaim(f.root, { claimId: claim.id, source: 'Synthetic disposition', evidence: [delivery], disposition: 'completed' }, f.reader), /Refresh the authoritative board readback/);
 });
 
 test('a live fix uses two batches under one G4, then closes only with reviewed regression evidence', async () => {
@@ -552,16 +600,27 @@ test('a returned Retest ticket gets a new claim and can move to Rework again', a
   const first = await pickup();
   updated += 1000;
   assert.equal((await live.recheck(f.root, first.id, reader)).claim.id, first.id);
-  const failRetest = async (claimId: string, id: string) => {
-    const proposal = { id, claimId, action: 'move' as const, to: 'rework' as const };
-    const { publicationDigest } = await live.publicationPreview(f.root, proposal, reader);
-    const decision = f.put('.local/' + id + '.json', { claimId, ticketRevision: original.revision, gate: 'G3', decision: 'Approved', reviewer: 'Synthetic QA', source: 'Synthetic disposition', packet, publicationDigest });
-    return live.publish(f.root, { ...proposal, decision, source: 'Synthetic reviewed publication' }, reader, async () => async () => {
+  const assignment = { source: first.sourceKey, ticketId: original.id }, base = releaseFixture(f.root, original.id);
+  const rework = (claimId: string, id: string) => ({ id, claimId, action: 'move' as const, to: 'rework' as const });
+  await assert.rejects(live.publicationPreview(f.root, rework(first.id, 'no-failure'), reader), /recorded confirmation failure/);
+  const passing = regressionFixture(f.root, assignment, original.revision, { base, claimId: first.id });
+  passing.approve(); passing.retain('confirmation');
+  await assert.rejects(live.publicationPreview(f.root, { ...rework(first.id, 'pass-pending'), failedFix: passing.key }, reader), /recorded failure of the original confirmation/);
+  const failRetest = async (claimId: string, id: string, supersedes: string) => {
+    const fix = regressionFixture(f.root, assignment, original.revision, { base, claimId, fixRevision: id, supersedes });
+    fix.approve(); fix.retain('confirmation', 'Fail');
+    const proposal = { ...rework(claimId, id), failedFix: fix.key };
+    const { publicationDigest, failed } = await live.publicationPreview(f.root, proposal, reader);
+    const decision = f.put('.local/' + id + '.json', { claimId, assignment, target: base.target, ticketRevision: original.revision, gate: 'G3',
+      decision: 'Approved', reviewer: 'Synthetic QA', source: 'Synthetic disposition', packet, publicationDigest,
+      rework: { fix: fix.key, assessmentDigest: failed?.assessmentDigest } });
+    const publication = await live.publish(f.root, { ...proposal, decision, source: 'Synthetic reviewed publication' }, reader, async () => async () => {
       state = 'rework';
       return { remoteId: 'task' };
     });
+    return { publication, fix };
   };
-  await failRetest(first.id, 'first-rework');
+  const returned = await failRetest(first.id, 'first-rework', passing.key);
   state = 'retest';
   await assert.rejects(live.recheck(f.root, first.id, reader), /handoff already completed/);
   const handedOff = await live.checkIn(f.root, reader);
@@ -575,7 +634,7 @@ test('a returned Retest ticket gets a new claim and can move to Rework again', a
   const second = await pickup();
   assert.notEqual(second.id, first.id);
   await assert.rejects(pickup(), /already exists/);
-  assert.equal((await failRetest(second.id, 'second-rework')).state, 'confirmed');
+  assert.equal((await failRetest(second.id, 'second-rework', returned.fix.key)).publication.state, 'confirmed');
 });
 
 test('settings keeps the existing numeric close shortcut and offers Task source at 12', () => {

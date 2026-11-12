@@ -70,9 +70,39 @@ test('a parent in Retest still needs G5 and a scoped fix waits for its separate 
   assert.equal(status.state, 'regressionPending');
   assert.equal(b.defectRetestStatus(f.root, bug)?.[0]?.state, 'regressionPending');
   assert.throws(() => b.transitionTicket(f.root, { ...move, defect: { fix: fix.key } }), /every required regression check/);
+  const wrongG3 = put(f.root, 'pass-g3.json', { gate: 'G3', decision: 'Approved' });
+  assert.throws(() => b.transitionTicket(f.root, { ...move, to: 'Rework' }), /reviewed confirmation failure/);
+  assert.throws(() => b.transitionTicket(f.root, { ...move, to: 'Rework', rework: { fix: fix.key, review: wrongG3 } }), /recorded failure of the original confirmation/);
+  assert.equal(b.findTicket(f.root, bug.id).status, 'Retest');
   fix.retain('regression'); fix.review();
   b.transitionTicket(f.root, { ...move, defect: { fix: fix.key } });
   assert.equal(b.findTicket(f.root, bug.id).status, 'Tested-Ok');
+});
+test('Rework requires current G3 evidence and preserves observed moves when the fix changes during recovery', () => {
+  for (const outcome of ['current', 'unapplied', 'applied']) {
+    const f = fixture();
+    put(f.root, `${b.boardRoot}/Retest/BUG-001.md`, '# BUG-001: Synthetic defect\n\n| Type | Bug |\n');
+    const bug = b.findTicket(f.root, 'BUG-001'), assignment = { source: 'local', ticketId: bug.id };
+    const fix = regressionFixture(f.root, assignment, bug.revision);
+    fix.approve();
+    const { status } = fix.retain('confirmation', 'Fail');
+    const review = { assignment, target: fix.base.target, ticketRevision: bug.revision, gate: 'G3', decision: 'Approved',
+      reviewer: 'Fixture reviewer', source: 'Synthetic G3 decision', packet: fix.defectReport,
+      rework: { fix: fix.key, assessmentDigest: status.assessment?.digest } };
+    const request = { id: 'rework-move', ticketId: bug.id, expectedRevision: bug.revision, to: 'Rework', decision: f.d } as const;
+    const stale = put(f.root, 'stale-g3.json', { ...review, ticketRevision: 'stale revision' });
+    assert.throws(() => b.transitionTicket(f.root, { ...request, rework: { fix: fix.key, review: stale } }), /G3 must review/);
+    const prepared = b.prepareTransition(f.root, { ...request, rework: { fix: fix.key, review: put(f.root, 'g3.json', review) } });
+    if (outcome !== 'current') {
+      regressionFixture(f.root, assignment, bug.revision, { base: fix.base, fixRevision: 'r2', supersedes: fix.key });
+    }
+    if (outcome === 'applied') put(f.root, prepared.to, prepared.content);
+    assert.equal(b.recoverTransition(f.root, prepared.id).state, outcome === 'unapplied' ? 'superseded' : 'completed');
+    const ticket = b.findTicket(f.root, bug.id);
+    assert.equal(ticket.status, outcome === 'unapplied' ? 'Retest' : 'Rework');
+    assert.equal(Boolean(ticket.releaseReviewRequired), outcome === 'applied');
+    if (outcome === 'applied') assert.throws(() => b.assertExecutable(f.root, ticket.id, undefined, 'developer'), /Reconcile the observed move/);
+  }
 });
 test('recovery supersedes an unapplied legacy release move and flags one already applied', () => {
   for (const applied of [false, true]) {

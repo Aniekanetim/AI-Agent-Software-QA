@@ -4,8 +4,12 @@ import { contained, evidence } from '../shared/store.js';
 import type { Library } from '../release/library.js';
 import type { Round, Run } from '../release/round.js';
 import { bindReleaseScope, releaseScope } from '../release/scope.js';
+import { boardRoot, statuses } from '../board/layout.js';
+
+type BoardEvidence = { exclusions?: ReturnType<typeof evidence>[]; boardReadbacks?: ReturnType<typeof evidence>[] };
 
 export function releaseFixture(root: string, assignmentId: string) {
+  for (const status of statuses) mkdirSync(contained(root, `${boardRoot}/${status}`), { recursive: true });
   const put = (path: string, value: unknown) => {
     const file = contained(root, path);
     mkdirSync(dirname(file), { recursive: true });
@@ -47,22 +51,22 @@ export function releaseFixture(root: string, assignmentId: string) {
     observedAt: previousRunId ? '2026-01-01T00:04:00Z' : '2026-01-01T00:02:00Z',
     targetEvidence, observations: [{ checkId: 'shared', conditionId: 'route', outcome, previousRunId, evidence: [put(`${id}-result.json`, { actual: outcome })] }],
   });
-  const approvalFor = (source: string, plan: Round, ref: ReturnType<typeof put>, suffix: string, fixes: unknown[] = []) => {
+  const approvalFor = (source: string, plan: Round, ref: ReturnType<typeof put>, suffix: string, fixes: unknown[] = [], boardEvidence: BoardEvidence = {}) => {
     const assignment = { source, ticketId: assignmentId };
     const review = { assignment, decision: 'Approved', reviewer: 'Fixture reviewer', source: 'Synthetic actual decision', packet: plan.scope };
     const policy = put(`policy-${suffix}.json`, { library: plan.library, critical: [{ checkId: 'shared', conditionId: 'route' }] });
     const changeManifest = put(`manifest-${suffix}.json`, {
-      assignment, target: plan.target, changes: plan.changes, fixes, policy, coverage: 'targeted', affected: [],
+      assignment, target: plan.target, changes: plan.changes, fixes, policy, coverage: 'targeted', affected: [], ...boardEvidence,
     });
     const scopeReview = put(`g1-${suffix}.json`, {
       ...review, gate: 'G1', library: plan.library, modules: plan.moduleIds, obligations: plan.obligations, changeManifest,
     });
     return put(`g2-${suffix}.json`, { ...review, gate: 'G2', round: ref, scopeReview });
   };
-  const bind = (source = 'local', plan = round, ref = roundRef, suffix = 'initial', fixes: unknown[] = []) => {
+  const bind = (source = 'local', plan = round, ref = roundRef, suffix = 'initial', fixes: unknown[] = [], boardEvidence: BoardEvidence = {}) => {
     const assignment = { source, ticketId: assignmentId };
     return bindReleaseScope(root, { assignment, expectedRevision: releaseScope(root, assignment).revision, round: ref,
-      approval: approvalFor(source, plan, ref, suffix, fixes) });
+      approval: approvalFor(source, plan, ref, suffix, fixes, boardEvidence) });
   };
   return { put, library, round, roundRef, run, target, targetEvidence, g5Target, approvalFor, bind };
 }
