@@ -8,6 +8,7 @@ import * as s from '../shared/store.js';
 import * as gh from '../github/github.js';
 import { recordAssessment, retainRun } from '../release/round.js';
 import { releaseFixture } from './release-fixture.js';
+import { regressionFixture } from './regression-fixture.js';
 
 function put(root: string, path: string, value: unknown) { const file = s.contained(root, path); mkdirSync(dirname(file), { recursive: true }); writeFileSync(file, typeof value === 'string' ? value : JSON.stringify(value)); return s.evidence(root, path); }
 const rule: gh.RepositoryRule = { repository: 'fixture/product', branches: ['main'], labels: [], includeDrafts: false, reporting: 'comment' };
@@ -55,13 +56,22 @@ test('local assignment completion always requires G5 and delivery, including wit
   assert.equal(completed.status, 'Tested-Ok');
   assert(completed.lifecycle?.evidence.some(ref => ref.sha256 === f.delivery.sha256));
 });
-test('a parent in Retest still needs G5 while an individual bug keeps scoped closure', () => {
+test('a parent in Retest still needs G5 and a scoped fix waits for its separate regression', () => {
   const f = fixture();
   f.move('Retest');
   assert.throws(() => f.move('Tested-Ok'), /reviewed G5 release and delivery/);
   put(f.root, `${b.boardRoot}/Retest/BUG-001.md`, '# BUG-001: Synthetic scoped defect\n\n| Type | Bug |\n');
   const bug = b.findTicket(f.root, 'BUG-001');
-  b.transitionTicket(f.root, { id: 'scoped-retest', ticketId: bug.id, expectedRevision: bug.revision, to: 'Tested-Ok', decision: f.d });
+  const fix = regressionFixture(f.root, { source: 'local', ticketId: bug.id }, bug.revision);
+  fix.approve();
+  const move = { id: 'scoped-retest', ticketId: bug.id, expectedRevision: bug.revision, to: 'Tested-Ok', decision: f.d } as const;
+  assert.throws(() => b.transitionTicket(f.root, move), /separate confirmation and regression/);
+  const { status } = fix.retain('confirmation');
+  assert.equal(status.state, 'regressionPending');
+  assert.equal(b.defectRetestStatus(f.root, bug)?.[0]?.state, 'regressionPending');
+  assert.throws(() => b.transitionTicket(f.root, { ...move, defect: { fix: fix.key } }), /every required regression check/);
+  fix.retain('regression'); fix.review();
+  b.transitionTicket(f.root, { ...move, defect: { fix: fix.key } });
   assert.equal(b.findTicket(f.root, bug.id).status, 'Tested-Ok');
 });
 test('recovery supersedes an unapplied legacy release move and flags one already applied', () => {
@@ -78,6 +88,30 @@ test('recovery supersedes an unapplied legacy release move and flags one already
     assert.equal(ticket.status, applied ? 'Tested-Ok' : 'Ready for QA');
     assert.equal(Boolean(ticket.releaseReviewRequired), applied);
   }
+});
+test('a superseded fix cannot replay an interrupted move into Tested-Ok', () => {
+  const f = fixture();
+  const path = `${b.boardRoot}/Retest/BUG-001.md`;
+  put(f.root, path, '# BUG-001: Synthetic defect\n\n| Type | Bug |\n');
+  const bug = b.findTicket(f.root, 'BUG-001'), defect = { source: 'local', ticketId: bug.id };
+  const fix = regressionFixture(f.root, defect, bug.revision);
+  fix.approve(); fix.retain('confirmation'); fix.retain('regression'); fix.review();
+  const prepared = b.prepareTransition(f.root, { id: 'recover-fix', ticketId: bug.id, expectedRevision: bug.revision,
+    to: 'Tested-Ok', decision: f.d, defect: { fix: fix.key } });
+  regressionFixture(f.root, defect, bug.revision, { base: fix.base, fixRevision: 'r2', supersedes: fix.key });
+  assert.equal(b.recoverTransition(f.root, prepared.id).state, 'superseded');
+  assert.equal(b.findTicket(f.root, bug.id).status, 'Retest');
+});
+test('a reviewed owner refutation can close without creating a product-fix record', () => {
+  const f = fixture();
+  put(f.root, `${b.boardRoot}/Retest/BUG-001.md`, '# BUG-001: Synthetic report\n\n| Type | Bug |\n');
+  const bug = b.findTicket(f.root, 'BUG-001'), assignment = { source: 'local', ticketId: bug.id };
+  const ownerDecision = put(f.root, 'owner.json', { assignment, decision: 'noProductChange', source: 'Synthetic requirements owner confirmation' });
+  const refutation = put(f.root, 'no-change.json', { assignment, gate: 'G5', decision: 'Approved', reviewer: 'Fixture reviewer',
+    source: 'Synthetic QA disposition', ticketRevision: bug.revision, ownerDecision, defectReport: f.d.evidence[0] });
+  b.transitionTicket(f.root, { id: 'no-change-disposition', ticketId: bug.id, expectedRevision: bug.revision,
+    to: 'Tested-Ok', decision: f.d, defect: { refutation } });
+  assert.equal(b.findTicket(f.root, bug.id).status, 'Tested-Ok');
 });
 test('five-folder upgrades add only the new queues and are idempotent', () => {
   const f = fixture();

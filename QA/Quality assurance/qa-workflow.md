@@ -82,7 +82,7 @@ For newly reviewed scopes, record the exact approved batch and its [data readine
 | G1 — Scope and analysis | Objective, sources, risks, uncertainties, coverage intent and completion criteria | Approve or revise the test basis and scope |
 | G2 — Design and readiness | Cases, expected outcomes, scripts/assertions, data, build/environment checks and execution bounds | Approve bounded execution, or request preparation changes |
 | G3 — Findings confirmation | Actual outcomes, evidence, defect reproduction instructions, cause-check steps, severity/priority/status rationale, proposed correction and gaps | QA performs the focused confirmation, then approves, rejects, requests changes/investigation or reports blocked confirmation; fixed execution remains separate |
-| G4 — Fix and retest | Identified correction/build, original failure, confirmation checks and adjacent regression | Authorize retest; product-code changes require their own authorization |
+| G4 — Fix and retest | Identified correction/build, original failure, confirmation and regression batches, impact and critical baseline | Authorize the reviewed batches. Product-code changes have their own authorization. |
 | G5 — Completion and handoff | Versioned packet: release notes, completion/exit-criteria evidence, defect/risk disposition, scoped sign-off proposal and next-owner/recovery instructions | Approve, approve with stated limits, request changes or reject; then record the actual decision and deliver the handoff. Production authority remains separate |
 
 G1 and G2 can be reviewed together when the complete packet is available. Before asking for a decision, brief the QA engineer in the conversation on the objective, each proposed check and its expected outcome, why those checks were selected over alternatives, gaps and the exact next work. Link the details as supporting material; do not substitute a link or approval button for the briefing. The QA engineer can challenge, replace or expand the checks before authorizing execution. Approval identifies the packet revision, build, allowed work, reviewer and date. Silence is not approval. Within an approved scope, the agent performs routine preparation, execution, investigation and documentation autonomously.
@@ -159,7 +159,7 @@ Read [QA Process Context](../../QA%20Process%20Context/README.md) before prepari
 | G1 | Applicable strategy/risk register, source and condition IDs, measurable coverage items, scope/exclusions and unknowns |
 | G2 | Case/charter revisions, technique and positive/negative/edge considerations, selection rationale, pass criteria, data/configuration and exact execution bounds |
 | G3 | Actual exercised items and evidence, original failures, Partial/Blocked/Not run work and residual gaps |
-| G4 | Original failure, affected dependencies/conditions, selected regression and actual build; retain prior results separately |
+| G4 | Original failure, affected dependencies and conditions, critical baseline, approved batches and observed build |
 | G5 | Achieved coverage against agreed scope, unresolved intent, exclusions, residual risk, retained regression and named maintenance actions |
 
 The [design guide](../../QA%20Process%20Context/Test%20Design%20and%20Exploration/README.md) separates targets, quality objectives, scenario perspectives and techniques. Select relevant challenges without a case quota. Creative thinking supports both scripts and bounded exploratory charters; QA exploration uses this workflow, while Product Discovery retains its independent learning procedure.
@@ -178,7 +178,7 @@ Use the templates for a [test plan](templates/test-plan.md), [human review recor
 
 ## Release sign-off and operational handoff
 
-Follow the [release sign-off procedure](release-signoff.md). Before G5, prepare the packet from the change record and current module assessment for the verified build. Identify the intended use, exit criteria, open risks, proposed decision and next owners. After the actual decision, record its scope and limits, deliver the handoff through the authorized channel, and retain delivery and any required acceptance. Keep a parent assignment open while any required closure item is pending, including when it returns through Retest. An individual bug links its scoped disposition and applicable parent packet.
+Follow the [release sign-off procedure](release-signoff.md). Before G5, prepare the packet from the change record, current module assessment, and [regression evidence for included fixes](../../automation/regression/README.md#carry-regression-into-release-sign-off). Identify intended use, exit criteria, open risks, proposed decision and next owners. After the actual decision, retain its scope and limits, deliver the handoff through the authorized channel, and record delivery and any required acceptance. A scoped bug closure needs reviewed confirmation and regression for the fix, or an actual reviewed no-change disposition.
 
 The final response must include the target/verdict, changes, evidence, remaining limits, direct packet link and next-owner actions. A commit link or test totals alone cannot close the workflow. Local-only work marks production rollout/rollback/monitoring Not applicable with reasons. A later material change returns to the affected gate; a documentation supplement does not erase or invent the original decision.
 

@@ -2,6 +2,7 @@ import { assertNonsecret, load, requireText, verifyEvidence, type Evidence } fro
 import { pinned } from './library.js';
 import { sameTarget, verifyAssessment, type Target } from './round.js';
 import { requireCurrentScope, sameEvidence, type Assignment } from './scope.js';
+import { releaseFixes } from '../regression/fix.js';
 
 type Preferences =
   | { channel: 'taskBoard'; recipient: string; acknowledgementRequired: boolean }
@@ -9,6 +10,7 @@ type Preferences =
 export interface Route { channel: Preferences['channel']; destination: string; recipient: string; acknowledgementRequired: boolean }
 export interface HandoffApproval {
   assessment: Evidence; route: Route; targetObservation: Evidence;
+  regressionDigest?: string;
   exceptions?: { gapId: string; owner: string; reason: string; decision: Evidence }[];
 }
 interface ReleaseDecision {
@@ -63,6 +65,12 @@ export function currentAssessment(root: string, assessment: Evidence, assignment
   return report;
 }
 
+export function currentReleaseRegression(root: string, assignment: Assignment) {
+  const scope = requireCurrentScope(root, assignment);
+  if (!scope.changeManifest) throw new Error('Pin the independent release change manifest in the reviewed G1 scope before G5.');
+  return releaseFixes(root, assignment, scope.plan, scope.changeManifest);
+}
+
 export function reviewHandoff(root: string, decision: ReleaseDecision, assessment: Evidence, route: Route, assignment: Assignment) {
   if (decision.gate !== 'G5' || !['Approved', 'Approved with limits'].includes(decision.decision)) throw new Error('Record the actual G5 decision for this handoff.');
   requireText(decision.reviewer, 'Actual reviewer');
@@ -97,6 +105,14 @@ export function reviewHandoff(root: string, decision: ReleaseDecision, assessmen
     requireText(exception.owner, 'Risk owner');
     requireText(exception.reason, 'Accepted release exception');
     verifyEvidence(root, exception.decision);
+  }
+  const regression = currentReleaseRegression(root, assignment);
+  if ((regression.fixes.length || regression.dispositions.length) && reviewed.regressionDigest !== regression.digest) {
+    throw new Error('G5 must review the current regression evidence for the fixes included in this release.');
+  }
+  if ((regression.fixes.some(fix => fix.findings.length) || regression.dispositions.some(item => item.decision === 'acceptedNonblocking')) &&
+      decision.decision !== 'Approved with limits') {
+    throw new Error('Record the reviewed regression limits under G5 Approved with limits.');
   }
   return report;
 }

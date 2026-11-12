@@ -1,6 +1,10 @@
 # Package notes
 
-**Version:** 1.13.0. **Created:** 22 October 2026. **Updated:** 12 November 2026. **State:** reusable workflow package.
+**Version:** 1.14.0. **Created:** 22 October 2026. **Updated:** 12 November 2026. **State:** reusable workflow package.
+
+## Version 1.14.0 — required post-fix regression
+
+[Post-fix verification](../automation/regression/README.md) records confirmation and regression in separate batches under the same reviewed scope. Board check-ins surface pending evidence. Scoped Tested-Ok closure verifies both outcomes, and G5 reconciles the included fixes with the release change manifest and required baseline checks. Matching same-build results can support more than one fix. Existing historical evidence retains its original provenance.
 
 ## Version 1.13.0 — mandatory release evidence
 

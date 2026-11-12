@@ -103,6 +103,8 @@ After deliberately adopting the updated workflow files, follow [the lifecycle up
 
 When updating to 1.13.0, apply the [release upgrade guidance](automation/release/README.md#upgrade-open-assignments) to open parent assignments at their next G5. Keep existing onboarding, source records and historical approvals. Link traceable results for the current scope and build, and reconcile any interrupted release move before attempting another.
 
+In 1.14.0, apply [post-fix verification](automation/regression/README.md) to open Retest work. Establish the relevant baseline from existing suites and review only missing scope or changed evidence. Pin the change manifest before the next parent G5 and use the current check-in instructions.
+
 ## Optional blocker notifications
 
 Follow [notification setup](automation/attention/README.md#configure-once-preserving-existing-setup) when wanted. Establish the actual host conversation and evidence, responsible recipients, one designated notifier, batch size, pacing, timezone and quiet hours. Reuse supplied answers and ask only focused missing questions. Enable only after reviewing the concrete policy; initial guidance is three action groups with full backlog access. No new mandatory onboarding stage is introduced.

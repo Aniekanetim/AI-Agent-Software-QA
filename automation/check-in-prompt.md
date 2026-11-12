@@ -75,8 +75,10 @@ Resume eligible claimed work or select one actionable unclaimed ticket by
 priority and age. Respect other owners and work from the recorded checkpoint.
 Create each distinct defect as a separate linked Dev Todo ticket; preserve IDs,
 history and developer responses through Retest, Rework and Tested-Ok.
-Retest the original failure and run relevant authorized regression. A separate
-regression gets a new linked Dev Todo ticket; a failed original retest returns
+At Retest, follow automation/regression/README.md. Register the observed fix and
+prepare confirmation and regression batches for G4. A passing confirmation
+keeps the ticket in Retest while required regression evidence is pending.
+A separate regression gets a new linked Dev Todo ticket; a failed original retest returns
 the same bug to Rework after the required review. Preserve the parent blockers.
 Apply the workflow's human gates with complete conversational briefings.
 At G5, prepare the release-notes/sign-off/handoff packet before review. Record the

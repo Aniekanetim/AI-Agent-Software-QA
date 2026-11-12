@@ -5,6 +5,7 @@ import { contained, digest, load, save, replace, revision, withLock, verifyEvide
 import { requireLocalSource } from '../task-source/config.js';
 import { verifyLocalHandoff, type LocalHandoff } from '../release/handoff.js';
 import { sameEvidence } from '../release/scope.js';
+import { currentFixes, defectCompletion, fixStatus, type DefectCompletion } from '../regression/fix.js';
 
 export const boardRoot = 'QA task management Board';
 export const statuses = ['Ready for QA', 'Dev Todo', 'Tested-Ok', 'Retest', 'Rework', 'Deferred', 'Canceled'] as const;
@@ -17,11 +18,11 @@ export interface Decision {
   checkpoint: string; nextOwner: string; nextAction: string; review?: Review;
   handoff: string; waitingOn?: string;
 }
-export interface Transition { id: string; ticketId: string; expectedRevision: string; to: Status; decision: Decision; release?: LocalHandoff; navigation?: { path: string; expectedRevision: string; source: string }[] }
+export interface Transition { id: string; ticketId: string; expectedRevision: string; to: Status; decision: Decision; release?: LocalHandoff; defect?: DefectCompletion; navigation?: { path: string; expectedRevision: string; source: string }[] }
 export interface Lifecycle extends Decision { schemaVersion: 1; id: string; at: string; from: Status; to: Status; previousOwner: string; previousWaiting: string; previousCheckpoint: string }
 export interface Ticket { id: string; path: string; status: Status; text: string; revision: string; lifecycle: Lifecycle | null; generation: string; issues: string[]; releaseReviewRequired?: string }
 interface Patch { path: string; before: string; content: string; original?: string; source?: string }
-interface Journal { schemaVersion: 1 | 2; id: string; requestHash: string; ticketId: string; from: string; to: string; before: string; content: string; patches: Patch[]; ownerUpdates: { path: string; destination: string }[]; linkUpdates?: { path: string; destination: string; expectedRevision: string }[]; state: 'prepared' | 'completed' | 'superseded'; release?: LocalHandoff; releaseReviewRequired?: string }
+interface Journal { schemaVersion: 1 | 2; id: string; requestHash: string; ticketId: string; from: string; to: string; before: string; content: string; patches: Patch[]; ownerUpdates: { path: string; destination: string }[]; linkUpdates?: { path: string; destination: string; expectedRevision: string }[]; state: 'prepared' | 'completed' | 'superseded'; release?: LocalHandoff; defect?: DefectCompletion; defectDigest?: string; releaseReviewRequired?: string }
 const validId = (id: string) => /^[A-Z][A-Z0-9]{0,15}-\d{1,9}$/.test(id);
 function safeKey(id: string) { if (!/^[A-Za-z0-9_-]{1,100}$/.test(id)) throw new Error('Use a unique safe lifecycle operation ID.'); return id; }
 function entries(root: string, folder: string) { const path = contained(root, folder); return existsSync(path) ? readdirSync(path).filter(n => n.endsWith('.json')).map(n => `${folder}/${n}`) : []; }
@@ -48,6 +49,11 @@ export function assertBoardStable(root: string) {
 }
 function field(text: string, name: string) { const prefix = `| ${name} |`, line = text.split(/\r?\n/).find(l => l.startsWith(prefix)); return line ? line.slice(prefix.length).replace(/\|\s*$/, '').trim().replace(/\\\|/g, '|') : 'Not recorded'; }
 const requiresRelease = (ticketId: string, text: string) => !ticketId.startsWith('BUG-') || field(text, 'Type').toLowerCase() !== 'bug';
+export function defectRetestStatus(root: string, ticket: Ticket) {
+  if (ticket.status !== 'Retest' || requiresRelease(ticket.id, ticket.text)) return undefined;
+  const fixes = currentFixes(root, { source: 'local', ticketId: ticket.id });
+  return fixes.length ? fixes : [{ state: 'intakeNeeded' }];
+}
 function zonedTime(value: string) { return /^\d{4}-\d{2}-\d{2}T.+(?:Z|[+-]\d{2}:\d{2})$/.test(value) && Number.isFinite(Date.parse(value)); }
 function setField(text: string, name: string, value: string) { return text.replace(new RegExp(`^\\| ${name} \\|[^\\r\\n]*`, 'm'), `| ${name} | ${value.replaceAll('|', '\\|').replace(/[\r\n]/g, ' ')} |`); }
 function lifecycle(text: string): Lifecycle | null {
@@ -161,6 +167,9 @@ function decisionValid(root: string, request: Transition, ticket: Ticket) {
     if (!request.release) throw new Error('Record the reviewed G5 release and delivery for this assignment.');
     verifyLocalHandoff(root, ticket.id, ticket.revision, request.release);
   }
+  if (request.to === 'Tested-Ok' && !requiresRelease(ticket.id, ticket.text)) {
+    return defectCompletion(root, { source: 'local', ticketId: ticket.id }, ticket.revision, request.defect);
+  }
 }
 function markdownFiles(root: string, folder = ''): string[] {
   return readdirSync(contained(root, folder || '.'), { withFileTypes: true }).flatMap(e => {
@@ -204,12 +213,17 @@ function prepare(root: string, request: Transition): Journal {
   safeKey(request.id); const path = `.local/board-transitions/${request.id}.json`, hash = digest(JSON.stringify(request));
   const earlier = load<Journal | null>(root, path, () => null).value;
   if (earlier) { if (earlier.requestHash !== hash) throw new Error('This operation ID belongs to a different transition.'); return earlier; }
-  const ticket = findTicket(root, request.ticketId); decisionValid(root, request, ticket);
+  const ticket = findTicket(root, request.ticketId), defectDigest = decisionValid(root, request, ticket);
   const destination = `${boardRoot}/${request.to}/${ticket.path.split('/').at(-1)}`;
   if (destination !== ticket.path && existsSync(contained(root, destination))) throw new Error('The destination already exists; never overwrite another ticket.');
   const event: Lifecycle = { ...request.decision, schemaVersion: 1, id: request.id, at: new Date().toISOString(), from: ticket.status, to: request.to, previousOwner: field(ticket.text, 'Owner / claimed at'), previousWaiting: field(ticket.text, 'Waiting on'), previousCheckpoint: field(ticket.text, 'Workflow checkpoint') };
   if (request.to === 'Tested-Ok' && request.release) {
     event.evidence = [...event.evidence, ...[request.release.decision, request.release.delivery, request.release.acknowledgement].filter((ref): ref is Evidence => !!ref)];
+  }
+  if (defectDigest) {
+    event.handoff += request.defect?.fix ? ` Fix verification: ${request.defect.fix} (${defectDigest}).` : ` Reviewed no-change disposition: ${defectDigest}.`;
+    const reviewed = request.defect?.fix ? fixStatus(root, request.defect.fix).review : request.defect?.refutation;
+    if (reviewed) event.evidence = [...event.evidence, reviewed];
   }
   let content = ticket.text;
   if (!operations(root, ticket.id).length) content = setField(content, 'Owner / claimed at', 'Unassigned');
@@ -241,7 +255,8 @@ function prepare(root: string, request: Transition): Journal {
     }
   }
   const journal: Journal = { schemaVersion: 2, id: request.id, requestHash: hash, ticketId: ticket.id, from: ticket.path, to: destination, before: ticket.revision, content, patches, ownerUpdates, linkUpdates, state: 'prepared',
-    ...(request.to === 'Tested-Ok' && request.release ? { release: request.release } : {}) };
+    ...(request.to === 'Tested-Ok' && request.release ? { release: request.release } : {}),
+    ...(defectDigest ? { defect: request.defect, defectDigest } : {}) };
   save(root, path, journal, null); return journal;
 }
 function complete(root: string, journal: Journal) {
@@ -265,11 +280,21 @@ function complete(root: string, journal: Journal) {
   }
   const after = digest(journal.content), fromHash = revision(root, journal.from), toHash = revision(root, journal.to);
   const path = `.local/board-transitions/${journal.id}.json`;
-  if (entry.to === 'Tested-Ok' && (requiresRelease(journal.ticketId, journal.content) || journal.release)) {
+  if (entry.to === 'Tested-Ok') {
     try {
-      if (!journal.release || [journal.release.decision, journal.release.delivery, journal.release.acknowledgement]
-        .some(ref => ref && !entry.evidence.some(e => sameEvidence(e, ref)))) throw new Error('Record the reviewed G5 release and delivery for this assignment.');
-      verifyLocalHandoff(root, journal.ticketId, journal.before, journal.release);
+      const releaseRequired = requiresRelease(journal.ticketId, journal.content);
+      if (releaseRequired || journal.release) {
+        if (!journal.release || [journal.release.decision, journal.release.delivery, journal.release.acknowledgement]
+          .some(ref => ref && !entry.evidence.some(e => sameEvidence(e, ref)))) throw new Error('Record the reviewed G5 release and delivery for this assignment.');
+        verifyLocalHandoff(root, journal.ticketId, journal.before, journal.release);
+      }
+      if (!releaseRequired) {
+        const checked = defectCompletion(root, { source: 'local', ticketId: journal.ticketId }, journal.before, journal.defect);
+        const reviewed = journal.defect?.fix ? fixStatus(root, journal.defect.fix).review : journal.defect?.refutation;
+        if (checked !== journal.defectDigest || !reviewed || !entry.evidence.some(ref => sameEvidence(ref, reviewed))) {
+          throw new Error('The reviewed fix or no-change disposition changed before recovery.');
+        }
+      }
     } catch (error) {
       journal.releaseReviewRequired = error instanceof Error ? error.message : 'Review the G5 release evidence.';
       const unapplied = fromHash === journal.before && (journal.from === journal.to || toHash === null);

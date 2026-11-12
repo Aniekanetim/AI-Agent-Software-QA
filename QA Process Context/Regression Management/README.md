@@ -15,7 +15,7 @@ Retain checks that protect important behavior and use changes, dependencies, pri
 
 Keep passing baselines, original failures and retests as distinct linked records. A new build requires checking which coverage remains applicable. A previous passing check does not verify a later build. If a prior pass or causal relationship is missing, state that uncertainty rather than classify a finding as a confirmed regression.
 
-For a fix, select the original failure plus relevant adjacent/affected behavior. A separate regression gets a new linked Dev Todo ticket; a failed original retest keeps the original ticket and goes to Rework under the existing review rules. Retirement of a check needs a reason and owner decision; preserve its history.
+For a fix, use the [post-fix verification procedure](../../automation/regression/README.md). Review the original reproduction, affected checks and critical cross-module baseline. Expand to the maintained full suite when policy or impact requires it. A passing confirmation keeps the fix in Retest while required regression evidence is pending. A separate regression gets a new linked Dev Todo ticket, and a failed original retest returns to Rework under the existing review rules. Retire checks with a reason and owner decision and preserve their history.
 
 An exploratory finding may become a scripted regression when the expected behavior and reproducible conditions are established. Preserve the originating charter and actual evidence. Automation is a method, not a prerequisite for retaining a useful check.
 

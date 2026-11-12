@@ -14,7 +14,7 @@ export interface Round {
 type Outcome = 'Pass' | 'Fail' | 'Blocked' | 'Partial' | 'Not run';
 interface Observation {
   checkId: string; conditionId: string; outcome: Outcome; evidence: Evidence[];
-  note?: string; previousRunId?: string;
+  note?: string; previousRunId?: string; context?: Evidence;
 }
 export interface Run {
   schemaVersion: 1; id: string; round: Evidence; target: Target;
@@ -96,6 +96,7 @@ function readRun(root: string, ref: Evidence, scope: ReturnType<typeof readRound
     if (['Pass', 'Fail', 'Partial'].includes(observation.outcome) && !observation.evidence.length) throw new Error('Link evidence for the observed check outcome.');
     if (['Partial', 'Blocked', 'Not run'].includes(observation.outcome)) requireText(observation.note, 'Outcome reason');
     for (const item of observation.evidence) verifyEvidence(root, item);
+    if (observation.context) verifyEvidence(root, observation.context);
   }
   return run;
 }
@@ -236,6 +237,14 @@ export function retainRun(root: string, input: { round: Evidence; run: Evidence 
 export function retainedRuns(root: string, round: Evidence) {
   readRound(root, round);
   return { round, runs: runIndex(root, round).value.runs.map(row => row.ref) };
+}
+
+export function retainedRun(root: string, round: Evidence, ref: Evidence) {
+  if (!runIndex(root, round).value.runs.some(row => row.ref.path === ref.path && row.ref.sha256 === ref.sha256 && !ref.pointer)) {
+    throw new Error('Link a retained source run for these observations.');
+  }
+  const scope = readRound(root, round);
+  return { run: readRun(root, ref, scope, round), catalogue: scope.catalogue };
 }
 
 function verifyRunSet(root: string, input: AssessmentInput) {

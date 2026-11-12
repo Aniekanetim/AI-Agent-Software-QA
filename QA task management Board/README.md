@@ -70,17 +70,17 @@ Ticket references include stable IDs. When a file moves, keep its ID, contents a
 
 Developers check the unanswered-question index below as well as Dev Todo and Rework. They append a fix or refutation, its explanation and the applicable build/commit to the existing bug ticket, then move that ticket to Retest. A refutation cites the relevant requirement or decision; QA compares it with the applicable Project Context sources. Missing or conflicting expectations use the clarification procedure, with product/design questions referred to their responsible owner. Moving the ticket does not establish an accepted requirement change or a passing result.
 
-The AI QA reads the developer response, obtains the existing workflow's retest authorization, checks the original failure and runs relevant regression against the identified build.
+The AI QA reads the developer response and uses [post-fix verification](../automation/regression/README.md). Register the observed fix/build, then brief the reviewer on the confirmation and regression batches at G4. Keep the ticket in Retest while required evidence is pending.
 
 | Verification outcome | Action |
 | --- | --- |
 | Original failure persists | Append the failed retest and evidence; move the same bug ticket to Rework after the required findings review |
-| Original failure is resolved | Record verification and the required scoped QA decision; move the bug ticket to Tested-Ok |
+| Original failure is resolved and required regression is accounted for | Record the scoped QA decision and any separate regression finding, then move the bug ticket to Tested-Ok |
 | Regression discovers a separate defect | Create a new bug ticket in Dev Todo and classify it as Regression where supported |
 
 A regression ticket identifies the affected behavior, reproduction, expected/actual results, new build, originating fix/ticket and previous passing baseline. If a prior pass or causal link is not established, state that uncertainty instead of inventing it. Avoid duplicate tickets for the same existing finding; append new observations to that ticket.
 
-An original bug can reach Tested-Ok while a separate regression remains open. Link the regression to its parent assignment and originating fix. The parent remains in Ready for QA until blocking findings are resolved and its overall readiness decision is accepted. Do not interpret one fixed bug as approval of the entire build.
+An original bug can reach Tested-Ok while a separate reviewed regression remains open. Link the regression to its parent assignment and originating fix. Reconcile all included fixes with the parent change manifest. Blocking findings and missing required regression evidence hold parent G5.
 
 ## AI check-in procedure
 
