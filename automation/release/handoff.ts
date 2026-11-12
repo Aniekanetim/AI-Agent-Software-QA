@@ -1,4 +1,4 @@
-import { assertNonsecret, load, requireText, verifyEvidence, type Evidence } from '../shared/store.js';
+import { assertNonsecret, digest, load, requireText, verifyEvidence, type Evidence } from '../shared/store.js';
 import { pinned } from './library.js';
 import { sameTarget, verifyAssessment, type Target } from './round.js';
 import { releaseBoard, requireCurrentScope, sameEvidence, type Assignment } from './scope.js';
@@ -17,8 +17,13 @@ export interface HandoffApproval {
 }
 interface ReleaseDecision {
   gate: string; decision: string; reviewer: string; source: string; packet: Evidence;
-  target?: Target; handoff?: HandoffApproval;
+  target?: Target; handoff?: HandoffApproval; approvedAt?: string;
 }
+export interface InventoryRecheck {
+  evidence?: Evidence; decisionSha256: string;
+  action: 'publish' | 'reconcile' | 'observe' | 'close'; id: string; after?: string; priorInventory?: Evidence;
+}
+const inventoryRecheckMaxAgeMs = 5 * 60_000;
 export interface DeliveryEvidence { delivery?: Evidence; acknowledgement?: Evidence }
 export interface LocalHandoff extends DeliveryEvidence { decision: Evidence }
 
@@ -71,10 +76,45 @@ export function currentReleaseRegression(root: string, assignment: Assignment, l
   handoff: { inventory?: Evidence; observedAt?: string } = {}) {
   const scope = requireCurrentScope(root, assignment);
   if (!scope.changeManifest) throw new Error('Pin the independent release change manifest in the reviewed G1 scope before G5.');
-  return releaseFixes(root, assignment, scope.plan, scope.changeManifest, releaseBoard(root, assignment, liveBoard), handoff);
+  const report = releaseFixes(root, assignment, scope.plan, scope.changeManifest, releaseBoard(root, assignment, liveBoard), handoff);
+  const binding = { round: scope.round, approval: scope.approval };
+  return { ...report, binding, digest: digest(JSON.stringify([binding, report.digest])) };
 }
 
-export function reviewHandoff(root: string, decision: ReleaseDecision, assessment: Evidence, route: Route, assignment: Assignment, liveBoard?: ReleaseBoard) {
+function verifyInventoryRecheck(root: string, decision: ReleaseDecision, assignment: Assignment, board: ReleaseBoard | undefined,
+  approved: ReturnType<typeof currentReleaseRegression>, request: InventoryRecheck) {
+  if (!request.evidence) throw new Error('Record a fresh authoritative inventory recheck for this release action.');
+  const capture = pinned<{ observedAt: string; evidence: Evidence; recheck: { action: string; id: string; decisionSha256: string } }>(root, request.evidence, 'release action inventory');
+  if (capture?.recheck?.action !== request.action || capture.recheck.id !== request.id || capture.recheck.decisionSha256 !== request.decisionSha256) {
+    throw new Error('The authoritative inventory recheck must identify this G5 decision and exact release action.');
+  }
+  const approvedInventory = pinned<{ observedAt: string; evidence: Evidence }>(root, decision.handoff!.boardInventory!, 'reviewed G5 inventory');
+  const approvedTime = Date.parse(decision.approvedAt ?? '');
+  const observedTime = Date.parse(capture.observedAt);
+  const now = Date.now();
+  if (!Number.isFinite(approvedTime) || !/(Z|[+-]\d\d:\d\d)$/.test(decision.approvedAt!) ||
+      approvedTime < Date.parse(approvedInventory.observedAt) || approvedTime > now) {
+    throw new Error('Record the actual zoned G5 approval time on or after its reviewed inventory.');
+  }
+  if (!Number.isFinite(observedTime) || observedTime <= approvedTime || observedTime > now ||
+      observedTime < now - inventoryRecheckMaxAgeMs || request.after && observedTime < Date.parse(request.after)) {
+    throw new Error('Refresh the authoritative inventory within five minutes of this action, after G5 approval and any preceding release action.');
+  }
+  const prior = request.priorInventory && pinned<{ evidence: Evidence }>(root, request.priorInventory, 'previous release action inventory');
+  if (capture.evidence?.sha256 === approvedInventory.evidence.sha256 || prior && capture.evidence?.sha256 === prior.evidence.sha256) {
+    throw new Error('Retain the newly observed authoritative source evidence for this release action.');
+  }
+  const current = currentReleaseRegression(root, assignment, board, { inventory: request.evidence, observedAt: decision.approvedAt });
+  const comparable = ({ binding, manifest, fixes, dispositions, relationships }: typeof current) => ({
+    binding, manifest, fixes, dispositions, relationships: relationships.map(({ defect, revision, linked, exclusion }) => ({ defect, revision, linked, exclusion })),
+  });
+  if (JSON.stringify(comparable(current)) !== JSON.stringify(comparable(approved))) {
+    throw new Error('The authoritative inventory recheck changed the reviewed reconciliation. Review the affected release evidence again.');
+  }
+}
+
+export function reviewHandoff(root: string, decision: ReleaseDecision, assessment: Evidence, route: Route, assignment: Assignment,
+  liveBoard?: ReleaseBoard, recheck?: InventoryRecheck) {
   if (decision.gate !== 'G5' || !['Approved', 'Approved with limits'].includes(decision.decision)) throw new Error('Record the actual G5 decision for this handoff.');
   requireText(decision.reviewer, 'Actual reviewer');
   requireText(decision.source, 'Actual G5 decision source');
@@ -110,14 +150,14 @@ export function reviewHandoff(root: string, decision: ReleaseDecision, assessmen
     verifyEvidence(root, exception.decision);
   }
   const regression = currentReleaseRegression(root, assignment, liveBoard, { inventory: reviewed.boardInventory, observedAt: observed.observedAt });
-  if ((regression.boardInventory || regression.relationships.length || regression.fixes.length || regression.dispositions.length || reviewed.regressionDigest) &&
-      reviewed.regressionDigest !== regression.digest) {
+  if (reviewed.regressionDigest !== regression.digest) {
     throw new Error('G5 must review the current regression evidence and canonical board reconciliation for this release.');
   }
   if ((regression.fixes.some(fix => fix.findings.length) || regression.dispositions.some(item => item.decision === 'acceptedNonblocking')) &&
       decision.decision !== 'Approved with limits') {
     throw new Error('Record the reviewed regression limits under G5 Approved with limits.');
   }
+  if (recheck) verifyInventoryRecheck(root, decision, assignment, liveBoard, regression, recheck);
   return report;
 }
 

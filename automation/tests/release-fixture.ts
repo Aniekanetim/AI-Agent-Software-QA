@@ -5,6 +5,8 @@ import type { Library } from '../release/library.js';
 import type { Round, Run } from '../release/round.js';
 import { bindReleaseScope, releaseScope } from '../release/scope.js';
 import { boardRoot, statuses } from '../board/layout.js';
+import type { InventoryRecheck } from '../release/handoff.js';
+import { randomUUID } from 'node:crypto';
 
 type BoardEvidence = { exclusions?: ReturnType<typeof evidence>[]; boardReadbacks?: ReturnType<typeof evidence>[]; boardInventory?: ReturnType<typeof evidence> };
 
@@ -73,5 +75,13 @@ export function releaseFixture(root: string, assignmentId: string) {
     put(`board-inventory-${suffix}.json`, { assignment: { source, ticketId: assignmentId }, target, linkedTicketIds, boardReadbacks,
       observedAt: stage === 'scope' ? '2026-01-01T00:00:00Z' : '2026-01-01T00:10:00Z',
       owner: 'Synthetic release owner', source: 'Synthetic unfiltered provider inventory', evidence: round.changes });
-  return { put, library, round, roundRef, run, target, targetEvidence, g5Target, approvalFor, scopeRequest, bind, inventory };
+  const recheck = (source: string, action: InventoryRecheck['action'], id: string, decision: ReturnType<typeof evidence>,
+    options: { linkedTicketIds?: string[]; boardReadbacks?: ReturnType<typeof evidence>[]; observedAt?: string; capture?: ReturnType<typeof evidence> } = {}) => {
+    const path = `recheck-${randomUUID()}`, observedAt = options.observedAt ?? new Date().toISOString();
+    const sourceEvidence = options.capture ?? put(`${path}-source.json`, { observedAt, action, id, linkedTicketIds: options.linkedTicketIds ?? [] });
+    return put(`${path}.json`, { assignment: { source, ticketId: assignmentId }, target, linkedTicketIds: options.linkedTicketIds ?? [],
+      boardReadbacks: options.boardReadbacks, observedAt, owner: 'Synthetic release owner', source: 'Synthetic unfiltered provider recheck',
+      evidence: sourceEvidence, recheck: { action, id, decisionSha256: decision.sha256 } });
+  };
+  return { put, library, round, roundRef, run, target, targetEvidence, g5Target, approvalFor, scopeRequest, bind, inventory, recheck };
 }

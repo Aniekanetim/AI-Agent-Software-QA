@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { browseLibrary } from '../release/library.js';
 import { assessRound, recordAssessment, retainRun, verifyAssessment } from '../release/round.js';
-import { currentAssessment, reviewHandoff, type Route } from '../release/handoff.js';
+import { currentAssessment, currentReleaseRegression, reviewHandoff, type Route } from '../release/handoff.js';
 import { bindReleaseScope, invalidateReleaseScope, releaseScope } from '../release/scope.js';
 import { releaseFixture } from './release-fixture.js';
 
@@ -78,7 +78,8 @@ test('G5 can accept only scope-permitted gaps with evidence for every owner deci
   f.bind('local', limited, limitedRound, 'limited');
   const failure = f.put('limited-failure.json', { ...f.run('limited-failure', 'Fail'), round: limitedRound });
   const { assessment, report } = recordAssessment(f.root, retainRun(f.root, { round: limitedRound, run: failure }));
-  const handoff = { assessment, route, targetObservation, exceptions: report.gaps.map(gap => ({ gapId: gap.id, owner: 'Fixture risk owner', reason: 'Synthetic accepted limit', decision: packet })) };
+  const handoff = { assessment, route, targetObservation, regressionDigest: currentReleaseRegression(f.root, assignment).digest,
+    exceptions: report.gaps.map(gap => ({ gapId: gap.id, owner: 'Fixture risk owner', reason: 'Synthetic accepted limit', decision: packet })) };
   assert.throws(() => reviewHandoff(f.root, { ...decision, decision: 'Approved', handoff }, assessment, route, assignment), /Approved with limits/);
   assert.equal(reviewHandoff(f.root, { ...decision, handoff }, assessment, route, assignment).state, 'gaps');
 });
