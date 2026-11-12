@@ -5,11 +5,10 @@ import { contained, digest, load, save, replace, revision, withLock, verifyEvide
 import { requireLocalSource } from '../task-source/config.js';
 import { verifyLocalHandoff, type LocalHandoff } from '../release/handoff.js';
 import { sameEvidence } from '../release/scope.js';
-import { currentFixes, defectCompletion, fixStatus, type DefectCompletion } from '../regression/fix.js';
+import { currentFixes, defectCompletion, fixStatus, verifyRework, type DefectCompletion, type ReworkDecision } from '../regression/fix.js';
+import { boardFiles, boardRoot, field, regularDirectory, statuses, validId, type Status } from './layout.js';
 
-export const boardRoot = 'QA task management Board';
-export const statuses = ['Ready for QA', 'Dev Todo', 'Tested-Ok', 'Retest', 'Rework', 'Deferred', 'Canceled'] as const;
-export type Status = typeof statuses[number];
+export { boardRoot, statuses, type Status } from './layout.js';
 export const inactive = (status: Status) => status === 'Deferred' || status === 'Canceled';
 export interface Review { owner: string; dueAt: string | null; trigger: string | null; resumeWhen: string }
 export interface Decision {
@@ -18,15 +17,13 @@ export interface Decision {
   checkpoint: string; nextOwner: string; nextAction: string; review?: Review;
   handoff: string; waitingOn?: string;
 }
-export interface Transition { id: string; ticketId: string; expectedRevision: string; to: Status; decision: Decision; release?: LocalHandoff; defect?: DefectCompletion; navigation?: { path: string; expectedRevision: string; source: string }[] }
+export interface Transition { id: string; ticketId: string; expectedRevision: string; to: Status; decision: Decision; release?: LocalHandoff; defect?: DefectCompletion; rework?: ReworkDecision; navigation?: { path: string; expectedRevision: string; source: string }[] }
 export interface Lifecycle extends Decision { schemaVersion: 1; id: string; at: string; from: Status; to: Status; previousOwner: string; previousWaiting: string; previousCheckpoint: string }
 export interface Ticket { id: string; path: string; status: Status; text: string; revision: string; lifecycle: Lifecycle | null; generation: string; issues: string[]; releaseReviewRequired?: string }
 interface Patch { path: string; before: string; content: string; original?: string; source?: string }
-interface Journal { schemaVersion: 1 | 2; id: string; requestHash: string; ticketId: string; from: string; to: string; before: string; content: string; patches: Patch[]; ownerUpdates: { path: string; destination: string }[]; linkUpdates?: { path: string; destination: string; expectedRevision: string }[]; state: 'prepared' | 'completed' | 'superseded'; release?: LocalHandoff; defect?: DefectCompletion; defectDigest?: string; releaseReviewRequired?: string }
-const validId = (id: string) => /^[A-Z][A-Z0-9]{0,15}-\d{1,9}$/.test(id);
+interface Journal { schemaVersion: 1 | 2; id: string; requestHash: string; ticketId: string; from: string; to: string; before: string; content: string; patches: Patch[]; ownerUpdates: { path: string; destination: string }[]; linkUpdates?: { path: string; destination: string; expectedRevision: string }[]; state: 'prepared' | 'completed' | 'superseded'; release?: LocalHandoff; defect?: DefectCompletion; defectDigest?: string; rework?: ReworkDecision; releaseReviewRequired?: string }
 function safeKey(id: string) { if (!/^[A-Za-z0-9_-]{1,100}$/.test(id)) throw new Error('Use a unique safe lifecycle operation ID.'); return id; }
 function entries(root: string, folder: string) { const path = contained(root, folder); return existsSync(path) ? readdirSync(path).filter(n => n.endsWith('.json')).map(n => `${folder}/${n}`) : []; }
-function regularDirectory(root: string, path: string) { const target = contained(root, path); if (existsSync(target) && (!lstatSync(target).isDirectory() || lstatSync(target).isSymbolicLink())) throw new Error('Board directories must be regular directories, not file or link aliases.'); }
 export function missingFolders(root: string) {
   regularDirectory(root, boardRoot);
   return statuses.filter(s => { const path = `${boardRoot}/${s}`; regularDirectory(root, path); return !existsSync(contained(root, path)); });
@@ -47,7 +44,6 @@ export function assertBoardStable(root: string) {
   if (missingFolders(root).length) throw new Error('Upgrade the QA board to all seven status folders with board upgrade; existing tickets must be preserved.');
   if (pendingTransitions(root).length) throw new Error('A board transition is incomplete; recover its recorded operation before selecting or executing work.');
 }
-function field(text: string, name: string) { const prefix = `| ${name} |`, line = text.split(/\r?\n/).find(l => l.startsWith(prefix)); return line ? line.slice(prefix.length).replace(/\|\s*$/, '').trim().replace(/\\\|/g, '|') : 'Not recorded'; }
 const requiresRelease = (ticketId: string, text: string) => !ticketId.startsWith('BUG-') || field(text, 'Type').toLowerCase() !== 'bug';
 export function defectRetestStatus(root: string, ticket: Ticket) {
   if (ticket.status !== 'Retest' || requiresRelease(ticket.id, ticket.text)) return undefined;
@@ -77,21 +73,16 @@ function lifecycle(text: string): Lifecycle | null {
 export function tickets(root: string): Ticket[] {
   requireLocalSource(root);
   assertBoardStable(root);
-  const found = statuses.flatMap(status => readdirSync(contained(root, `${boardRoot}/${status}`), { withFileTypes: true }).filter(e => {
-    if (e.name.endsWith('.md') && e.isSymbolicLink()) throw new Error('Use regular Markdown ticket files; reconcile symbolic links before board intake.');
-    return e.isFile() && e.name.endsWith('.md');
-  }).map(e => {
-    const path = `${boardRoot}/${status}/${e.name}`, text = readFileSync(contained(root, path), 'utf8');
-    const id = text.match(/^\uFEFF?#\s+([A-Z][A-Z0-9]{0,15}-\d{1,9})(?=[:\s]|$)/m)?.[1];
-    if (!id || !validId(id)) throw new Error(`Record a stable ticket ID in the heading of ${path}.`);
+  const found = boardFiles(root).map(file => {
+    const { id, status, text } = file;
     let entry: Lifecycle | null = null; const issues: string[] = [];
     try { entry = lifecycle(text); if (entry && entry.to !== status) issues.push('The ticket folder and lifecycle history disagree.'); }
     catch (error) { issues.push(error instanceof Error ? error.message : 'Unreadable lifecycle history.'); }
-    const recovery = status === 'Tested-Ok' && entry && /^[A-Za-z0-9_-]{1,100}$/.test(entry.id)
+    const recovery = (status === 'Tested-Ok' || status === 'Rework') && entry && /^[A-Za-z0-9_-]{1,100}$/.test(entry.id)
       ? load<Journal | null>(root, `.local/board-transitions/${entry.id}.json`, () => null).value : null;
-    return { id, status, path, text, revision: digest(text), lifecycle: entry, generation: entry?.id ?? (issues.length ? `invalid-${digest(text)}` : 'legacy'), issues,
+    return { ...file, lifecycle: entry, generation: entry?.id ?? (issues.length ? `invalid-${file.revision}` : 'legacy'), issues,
       ...(recovery?.state === 'completed' && recovery.ticketId === id && recovery.releaseReviewRequired ? { releaseReviewRequired: recovery.releaseReviewRequired } : {}) };
-  }));
+  });
   if (new Set(found.map(t => t.id)).size !== found.length) throw new Error('Duplicate ticket IDs across the board; reconcile without overwriting history.');
   return found;
 }
@@ -99,6 +90,7 @@ export function findTicket(root: string, id: string) { const found = tickets(roo
 export function assertExecutable(root: string, id: string, generation?: string, role: 'qa' | 'developer' = 'qa') {
   const ticket = findTicket(root, id), allowed = role === 'qa' ? ['Ready for QA', 'Retest'] : ['Dev Todo', 'Rework'];
   if (ticket.issues.length) throw new Error(`Reconcile lifecycle for ${id}: ${ticket.issues.join(' ')}`);
+  if (ticket.releaseReviewRequired) throw new Error(`Reconcile the observed move for ${id}: ${ticket.releaseReviewRequired}`);
   if (!allowed.includes(ticket.status) || ticket.lifecycle && ticket.lifecycle.to !== ticket.status) throw new Error(`Ticket ${id} is not eligible for ${role} execution in ${ticket.status}; retain its actual decision and checkpoint.`);
   if (generation !== undefined && generation !== ticket.generation) throw new Error('Ticket lifecycle changed; an old approval continuation or running operation cannot resume automatically.');
   return ticket;
@@ -170,6 +162,11 @@ function decisionValid(root: string, request: Transition, ticket: Ticket) {
   if (request.to === 'Tested-Ok' && !requiresRelease(ticket.id, ticket.text)) {
     return defectCompletion(root, { source: 'local', ticketId: ticket.id }, ticket.revision, request.defect);
   }
+  if (request.to === 'Rework' && (ticket.status === 'Retest' || request.rework)) {
+    if (!request.rework || requiresRelease(ticket.id, ticket.text)) throw new Error('Record the reviewed confirmation failure for this defect before moving it to Rework.');
+    if (operations(root, ticket.id).length) throw new Error('Settle the current execution before moving the defect to Rework.');
+    verifyRework(root, { source: 'local', ticketId: ticket.id }, ticket.revision, request.rework);
+  }
 }
 function markdownFiles(root: string, folder = ''): string[] {
   return readdirSync(contained(root, folder || '.'), { withFileTypes: true }).flatMap(e => {
@@ -225,6 +222,7 @@ function prepare(root: string, request: Transition): Journal {
     const reviewed = request.defect?.fix ? fixStatus(root, request.defect.fix).review : request.defect?.refutation;
     if (reviewed) event.evidence = [...event.evidence, reviewed];
   }
+  if (request.to === 'Rework' && request.rework) event.evidence = [...event.evidence, request.rework.review];
   let content = ticket.text;
   if (!operations(root, ticket.id).length) content = setField(content, 'Owner / claimed at', 'Unassigned');
   content = setField(setField(content, 'Workflow checkpoint', event.checkpoint), 'Next action', event.nextAction);
@@ -256,7 +254,8 @@ function prepare(root: string, request: Transition): Journal {
   }
   const journal: Journal = { schemaVersion: 2, id: request.id, requestHash: hash, ticketId: ticket.id, from: ticket.path, to: destination, before: ticket.revision, content, patches, ownerUpdates, linkUpdates, state: 'prepared',
     ...(request.to === 'Tested-Ok' && request.release ? { release: request.release } : {}),
-    ...(defectDigest ? { defect: request.defect, defectDigest } : {}) };
+    ...(defectDigest ? { defect: request.defect, defectDigest } : {}),
+    ...(request.to === 'Rework' && request.rework ? { rework: request.rework } : {}) };
   save(root, path, journal, null); return journal;
 }
 function complete(root: string, journal: Journal) {
@@ -280,15 +279,20 @@ function complete(root: string, journal: Journal) {
   }
   const after = digest(journal.content), fromHash = revision(root, journal.from), toHash = revision(root, journal.to);
   const path = `.local/board-transitions/${journal.id}.json`;
-  if (entry.to === 'Tested-Ok') {
+  if (entry.to === 'Tested-Ok' || entry.to === 'Rework' && (entry.from === 'Retest' || journal.rework)) {
     try {
       const releaseRequired = requiresRelease(journal.ticketId, journal.content);
-      if (releaseRequired || journal.release) {
+      if (entry.to === 'Rework') {
+        if (releaseRequired || !journal.rework || !entry.evidence.some(ref => sameEvidence(ref, journal.rework!.review))) {
+          throw new Error('Record the reviewed confirmation failure for this defect before moving it to Rework.');
+        }
+        verifyRework(root, { source: 'local', ticketId: journal.ticketId }, journal.before, journal.rework);
+      } else if (releaseRequired || journal.release) {
         if (!journal.release || [journal.release.decision, journal.release.delivery, journal.release.acknowledgement]
           .some(ref => ref && !entry.evidence.some(e => sameEvidence(e, ref)))) throw new Error('Record the reviewed G5 release and delivery for this assignment.');
         verifyLocalHandoff(root, journal.ticketId, journal.before, journal.release);
       }
-      if (!releaseRequired) {
+      if (entry.to === 'Tested-Ok' && !releaseRequired) {
         const checked = defectCompletion(root, { source: 'local', ticketId: journal.ticketId }, journal.before, journal.defect);
         const reviewed = journal.defect?.fix ? fixStatus(root, journal.defect.fix).review : journal.defect?.refutation;
         if (checked !== journal.defectDigest || !reviewed || !entry.evidence.some(ref => sameEvidence(ref, reviewed))) {
@@ -296,7 +300,7 @@ function complete(root: string, journal: Journal) {
         }
       }
     } catch (error) {
-      journal.releaseReviewRequired = error instanceof Error ? error.message : 'Review the G5 release evidence.';
+      journal.releaseReviewRequired = error instanceof Error ? error.message : 'Review the evidence for the observed move.';
       const unapplied = fromHash === journal.before && (journal.from === journal.to || toHash === null);
       if (unapplied) {
         journal.state = 'superseded';
@@ -322,7 +326,7 @@ function complete(root: string, journal: Journal) {
   journal.state = 'completed'; save(root, path, journal, revision(root, path)); return journal;
 }
 function finish(root: string, journal: Journal) {
-  return journal.state === 'prepared' && journal.to.startsWith(`${boardRoot}/Tested-Ok/`)
+  return journal.state === 'prepared' && ['Tested-Ok', 'Rework'].includes(journal.to.split('/')[1]!)
     ? withLock(root, 'release-records', () => complete(root, journal)) : complete(root, journal);
 }
 export function prepareTransition(root: string, request: Transition) { return withLock(root, 'qa-board', () => prepare(root, request)); }

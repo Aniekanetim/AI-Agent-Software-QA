@@ -24,7 +24,7 @@ When the original reproduction is already in the baseline suite, count it once u
 
 ## Run the checks and retain observations
 
-Execute confirmation against the actual fixed target. For live execution use the existing `task-source preflight` and `begin` inputs with `fixBatch: { fix, batchId }`. The two phases can use one matching G4 decision. If confirmation fails, retain the evidence and follow the existing reviewed Rework route. If confirmation passes, continue the approved regression batches. `regression status`, local `board status`, and live `task-source check-in` show pending evidence.
+Execute confirmation against the actual fixed target. For live execution use the existing `task-source preflight` and `begin` inputs with `fixBatch: { fix, batchId }`. The two phases can use one matching G4 decision. If confirmation fails, retain the evidence and [review the return to Rework](#return-the-original-failure-to-rework). If confirmation passes, continue the approved regression batches. `regression status`, local `board status`, and live `task-source check-in` show pending evidence.
 
 Use the applicable approved manual, scripted, or CI runner. A project can capture the results in a scoped [release run](../release/README.md#retain-runs-and-assess-the-round), with a separate round for standalone fix work or the parent round when it already includes the checks. Each reusable observation includes its actual `context` evidence. Register the source once with `release retain-run`, then use:
 
@@ -33,6 +33,14 @@ npm run qa -- regression retain-results --input .local/fix-results-input.json
 ```
 
 The input is `{ fix, plan, batchId, round, run }`, with pinned references for the plan, source round and retained run. Match the observed build, environment, library check definition, condition basis and test context. Several fixes can link the same observed CI result. The fix assessment reads matching attempts from each linked round, so a later compatible failure can reopen review. Revised plans reuse compatible linked evidence. Reconcile uncertain execution before retry. For a deliberate rerun, record the batch's `retryReason` in a renewed G4 plan and link the resulting observation to the earlier attempt with `previousRunId`.
+
+## Return the original failure to Rework
+
+Review the actual failure of the original reproduction on the current fix and target. Record G3 with `gate: "G3"`, `decision`, `reviewer`, `source`, `packet`, the defect `assignment`, its `ticketRevision`, the observed `target`, and `rework: { fix, assessmentDigest }` from the failed assessment. A passing confirmation with pending regression stays in Retest. Open a separate Dev Todo ticket for a distinct regression.
+
+- Local Retest → Rework uses `rework: { fix, review }`, with the actual G3 reference.
+- Native Rework preview and publication take `failedFix` with the fix key. Include the `claimId` and exact `publicationDigest` in G3 for a tool-managed move. Use `failedFix` with `task-source observe-completion` when a human moves the ticket.
+- For interrupted moves, reconcile the observed destination and retained review. A move already applied can be recorded with a review-required flag when its evidence is stale. Review the current evidence before treating the handoff as complete.
 
 ## Review and close the defect
 
@@ -48,12 +56,16 @@ For a refutation that genuinely requires no product change, retain the requireme
 
 ## Carry regression into release sign-off
 
-At G1, pin the independent `changeManifest` from the actual release change record and reconcile it with included board fixes. Its JSON contains `assignment`, `target`, the round's `changes` reference, `fixes` as defect/fix-revision pairs, `policy`, `coverage`, and `affected` check and condition pairs. Use an empty fixes list only when the reviewed change record has no included fixes. Include critical and affected checks in the parent round for feature and PR assignments too.
+At G1, pin the independent `changeManifest` from the actual release change record. Its JSON contains `assignment`, `target`, the round's `changes` reference, `fixes` as defect/fix-revision pairs, `policy`, `coverage`, and `affected` check and condition pairs. Reconcile the list against the canonical board and fix ledger. Include critical and affected checks in the parent round for feature and PR assignments too.
+
+- Keep the local defect's stable parent ID in its `Parent assignment` row. On a connected board, use `Parent assignment: <native ticket ID or URL>` in the child description. Defects created by the helper already record an `Originating QA ticket` link. If a regression is found while retesting another defect, link its parent assignment explicitly when it affects that release.
+- Resolve a linked defect for the exact release target. Include its fix and regression evidence when deployed in that build. For a reviewed exclusion, add a pinned reference to `exclusions`. The record includes `assignment`, `defect`, `target`, `reason`, `reviewer`, `source`, and supporting `evidence`.
+- If a provider filter hides a known defect or its relationship, obtain an authoritative readback. Put the pinned reference in `boardReadbacks`. The record includes `assignment`, `defect`, `target`, observed ticket `revision`, `linked` as a boolean, actual `source`, and `evidence`. Refresh a readback that conflicts with the current board.
 
 Link previously blocking regression tickets to their included verified fix or add `findingDispositions` evidence to the manifest. Each disposition records the `ticket`, release `target`, actual `owner` and `source`, `evidence` of the review, and the `decision` (`resolved` or `acceptedNonblocking`). An accepted nonblocking disposition is a release limit.
 
-Use `regression release --input` with the assignment object to prepare the current evidence for G5. The helper checks the parent round's required coverage, cross-checks known linked fixes, verifies each included fix on the exact target, and reports unresolved blocking findings. For a release with included fixes, record the returned digest as `handoff.regressionDigest` in G5. Review accepted nonblocking findings under Approved with limits. Release notes link to the actual verified results and any limits.
+Use `regression release --input` with the assignment object to prepare the current evidence for G5. The helper checks the parent round's required coverage, reconciles board relationships with the manifest and fix ledger, verifies each included fix on the exact target, and reports unresolved blocking findings. When the report contains relationships, fixes, or dispositions, record its digest as `handoff.regressionDigest` in G5. Changes to that evidence require renewed review before handoff or closure. Review accepted nonblocking findings under Approved with limits. Release notes link to the actual verified results and any limits.
 
 ## Upgrade open work
 
-Apply this procedure to open fixes at their next review. Reuse traceable prior outcomes and inspect interrupted work before retry. Preserve completed historical tickets and approvals. Update the current check-in instructions through the existing adoption process so agents can surface the new checkpoints. Product-specific scope and approvals belong to each project.
+Apply this procedure to open fixes and releases at their next review. Reuse traceable prior outcomes and inspect interrupted work before retry. Older prepared Rework or G5 moves with missing or stale proof need reconciliation. Preserve completed historical tickets and approvals. Update the current check-in instructions through the existing adoption process so agents can surface the new checkpoints. Product-specific scope and approvals belong to each project.

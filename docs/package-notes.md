@@ -1,6 +1,10 @@
 # Package notes
 
-**Version:** 1.14.0. **Created:** 22 October 2026. **Updated:** 12 November 2026. **State:** reusable workflow package.
+**Version:** 1.14.1. **Created:** 22 October 2026. **Updated:** 12 November 2026. **State:** reusable workflow package.
+
+## Version 1.14.1 — release reconciliation and Rework
+
+G5 checks canonical local or connected-board defect links against the reviewed manifest and fix ledger for the exact release target. An omitted linked fix, unresolved release membership, or stale relationship evidence holds sign-off. Rework requires current G3 evidence that the original failure persists. Recovery preserves observed moves and flags stale review evidence. [Post-fix verification](../automation/regression/README.md)
 
 ## Version 1.14.0 — required post-fix regression
 

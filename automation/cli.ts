@@ -28,7 +28,7 @@ import * as postman from './postman/postman.js';
 import { assessCoverage, type CoverageSnapshot } from './coverage/coverage.js';
 import { browseLibrary } from './release/library.js';
 import { assessRound, recordAssessment, retainRun, retainedRuns, verifyAssessment } from './release/round.js';
-import { currentReleaseRegression, handoffRoute, reportingPreference } from './release/handoff.js';
+import { handoffRoute, reportingPreference } from './release/handoff.js';
 import { bindReleaseScope, invalidateReleaseScope, releaseScope } from './release/scope.js';
 import { approveFixPlan, fixStatus, recordFixReview, registerFix, retainFixResults } from './regression/fix.js';
 import { validateFlowMap, traceFlowMap, type FlowMapSnapshot, type Direction } from './flow-map/flow-map.js';
@@ -125,9 +125,9 @@ async function main() {
     else if (action === 'settle') output(taskSource.settleExecution(root, input()));
     else if (action === 'publication-preview') output(await taskSource.publicationPreview(root, input()));
     else if (action === 'publish') output(await taskSource.publish(root, input()));
-    else if (action === 'reconcile-publication') output(taskSource.reconcilePublication(root, input()));
+    else if (action === 'reconcile-publication') output(await taskSource.reconcileCurrentPublication(root, input()));
     else if (action === 'observe-completion') output(await taskSource.observeReleaseCompletion(root, input()));
-    else if (action === 'close') output(taskSource.closeClaim(root, input()));
+    else if (action === 'close') output(await taskSource.closeCurrentClaim(root, input()));
     else throw new Error('Unknown task-source operation; use help.');
     return;
   }
@@ -146,7 +146,7 @@ async function main() {
               ...(board.inactive(ticket.status) && !ticket.lifecycle ? ['Actual lifecycle decision is missing; execution remains blocked.'] : [])] };
         });
         const next = options.has('ticket') && !tickets.length ? 'Check the ticket ID or run board status to list all tickets.'
-          : tickets.some(ticket => ticket.releaseReviewRequired) ? 'Review the flagged release before claiming QA completion. Independent eligible tickets can proceed.'
+          : tickets.some(ticket => ticket.releaseReviewRequired) ? 'Reconcile the flagged board move and its current review. Independent eligible tickets can proceed.'
           : tickets.some(ticket => ['Ready for QA', 'Retest'].includes(ticket.status))
             ? 'Review Ready for QA and Retest tickets for eligible work and the next required decision.'
             : 'Share a testing objective to prepare a Ready for QA ticket, or wait for a defect to return for retest.';
@@ -219,7 +219,7 @@ async function main() {
     else if (action === 'status') output(fixStatus(root, option('fix')));
     else if (action === 'retain-results') output(retainFixResults(root, input()));
     else if (action === 'record-review') output(recordFixReview(root, input()));
-    else if (action === 'release') output(currentReleaseRegression(root, input()));
+    else if (action === 'release') output(await taskSource.reconcileReleaseBoard(root, input()));
     else throw new Error('Run regression help to see the available commands.');
     return;
   }
