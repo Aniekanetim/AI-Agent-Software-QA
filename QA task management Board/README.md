@@ -42,7 +42,7 @@ Preserve the same ID/file/history. Use the [lifecycle helper](../automation/boar
 
 Deferred needs a review owner, date or trigger, and resume conditions. Check due reviews during check-ins, brief the owner once and acknowledge the actual briefing reference. A due date or a new answer does not reactivate work. Canceled has no routine execution pickup. Unfinished stop/cleanup observations may still need follow-up within existing authority.
 
-To reactivate, record the actual decision and route the same assignment to Ready for QA, or the same defect to Retest, Dev Todo or Rework according to its next action. Recheck affected sources/build/data and applicable approvals. Keep old results; never restore an old continuation just because an approval reply arrived later. Unresolved execution must be observed and settled before reactivation.
+To reactivate, record the actual decision and route the same assignment to Ready for QA, or the same defect to Retest or Dev Todo according to its next action. Rework requires the original confirmation failure and its current G3 decision, including after deferral or cancellation. Recheck affected sources, build, data and approvals. Keep old results and settle any unresolved execution before reactivation.
 
 For in-flight work, stop scheduling steps, request supported safe cancellation and inspect actual process/workflow state. A local abort error, a CI dispatch receipt or a folder move does not prove all work stopped. Retain partial results and next-owner cleanup/recovery actions. Remote runners need the canonical board changes or an authorized cancellation request delivered to them; this package cannot stop an arbitrary remote job by moving a local file.
 
@@ -80,7 +80,7 @@ The AI QA reads the developer response and uses [post-fix verification](../autom
 
 A regression ticket identifies the affected behavior, reproduction, expected/actual results, new build, originating fix/ticket and previous passing baseline. If a prior pass or causal link is not established, state that uncertainty instead of inventing it. Avoid duplicate tickets for the same existing finding; append new observations to that ticket.
 
-An original bug can reach Tested-Ok while a separate reviewed regression remains open. Link the regression to its parent assignment and originating fix. Before parent G5, reconcile the canonical board links, fix ledger and change manifest for the exact target. Blocking findings and missing required regression evidence hold parent G5.
+An original bug can reach Tested-Ok while a separate reviewed regression remains open. Link the regression to its parent assignment and originating fix. Reconcile the canonical board links, fix ledger and change manifest at scope review and again at parent G5. Blocking findings and missing required regression evidence hold parent G5.
 
 ## AI check-in procedure
 

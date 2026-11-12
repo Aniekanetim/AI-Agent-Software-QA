@@ -11,7 +11,7 @@
 | Audience / handoff recipient | <named person or responsible role; acceptance required or not> |
 | Target version / served build / source revision | <exact identities> |
 | Current round / module assessment | <pinned G1/G2 scope, assessment and G5 target observation> |
-| Change manifest / canonical board reconciliation | <approved manifest, linked defect revisions, reviewed exclusions and any authoritative readbacks> |
+| Change manifest / canonical board reconciliation | <approved manifest, linked defect revisions, reviewed exclusions, and for connected boards the refreshed authoritative inventory and any required readbacks> |
 | Included fix regression | <same-build evidence, current regression digest and open findings> |
 | Test basis / design revision / criterion IDs | <actual applicable sources> |
 | Discovery references / versions | <relevant OBS IDs/versions or None used; learning coverage is not test execution> |

@@ -8,7 +8,7 @@ import { activeSource, sourcePath, validateBoard, validateChoice, id, type Activ
 import { readBoard, prepareWrite, type BoardReader, type BoardWriter, type Connection, type Mutation, type Ticket } from './provider.js';
 import { currentAssessment, currentReleaseRegression, resolveHandoffRoute, reviewHandoff, verifyDelivery, type DeliveryEvidence, type HandoffApproval, type Route } from '../release/handoff.js';
 import { pinned } from '../release/library.js';
-import { releaseScope, sameEvidence } from '../release/scope.js';
+import { bindReleaseScope, previewReleaseScope, releaseScope, sameEvidence } from '../release/scope.js';
 import { currentFixes, defectCompletion, failedConfirmation, fixStatus, requireFixBatch, verifyRework, type DefectCompletion, type ReworkDecision } from '../regression/fix.js';
 import { nativeReleaseBoard, type ReleaseBoard } from '../regression/board.js';
 import type { Assignment } from '../release/scope.js';
@@ -126,14 +126,25 @@ export async function liveBoard(root: string, reader: BoardReader) {
   return { choice, revision: active.revision, connection };
 }
 
-export async function reconcileReleaseBoard(root: string, assignment: Assignment, reader: BoardReader = readBoard) {
+async function readReleaseBoard(root: string, assignment: Assignment, reader: BoardReader) {
   if (assignment.source === 'local') {
     if (activeSource(root).value.choice.kind !== 'local') throw new Error('Select the canonical local task source for this release assignment.');
-    return currentReleaseRegression(root, assignment);
+    return undefined;
   }
   const { choice, connection } = await liveBoard(root, reader);
   if (assignment.source !== sourceKey(choice, connection.identity)) throw new Error('Use the canonical source for this release assignment.');
-  return currentReleaseRegression(root, assignment, nativeReleaseBoard(assignment, connection));
+  return nativeReleaseBoard(assignment, connection);
+}
+export async function previewCurrentReleaseScope(root: string, request: Parameters<typeof previewReleaseScope>[1], reader: BoardReader = readBoard) {
+  return previewReleaseScope(root, request, await readReleaseBoard(root, request.assignment, reader));
+}
+export async function bindCurrentReleaseScope(root: string, request: Parameters<typeof bindReleaseScope>[1], reader: BoardReader = readBoard) {
+  return bindReleaseScope(root, request, await readReleaseBoard(root, request.assignment, reader));
+}
+export async function reconcileReleaseBoard(root: string, request: Assignment & { boardInventory?: Evidence }, reader: BoardReader = readBoard) {
+  const { source, ticketId, boardInventory } = request;
+  const assignment = { source, ticketId };
+  return currentReleaseRegression(root, assignment, await readReleaseBoard(root, assignment, reader), { inventory: boardInventory });
 }
 function alreadyClaimed(work: Journal, key: string, ticket: Ticket, queue: Queue | null) {
   return work.claims.some(claim => {
@@ -403,7 +414,7 @@ export async function closeCurrentClaim(root: string, request: CloseClaimRequest
   return closeClaim(root, request, nativeReleaseBoard(assignmentFor(claim), connection));
 }
 
-type Proposal = { id: string; claimId: string; assessment?: Evidence; route?: Route; defect?: Evidence; completion?: DefectCompletion; failedFix?: string } & (
+type Proposal = { id: string; claimId: string; assessment?: Evidence; route?: Route; defect?: Evidence; completion?: DefectCompletion; failedFix?: string; boardInventory?: Evidence } & (
   | { action: 'comment'; body: string; purpose?: 'releaseHandoff' }
   | { action: 'move'; to: 'testedOk' | 'rework' }
   | { action: 'createDefect'; title: string; body: string }
@@ -431,11 +442,11 @@ function releasePublication(root: string, request: Proposal, claim: Claim, choic
   const comment = request.action === 'comment' && request.purpose === 'releaseHandoff';
   const completion = request.action === 'move' && request.to === 'testedOk';
   if (!comment && !completion) {
-    if (request.assessment || request.route || request.defect || request.completion) throw new Error('Use the reviewed release or scoped defect evidence for its own completion.');
+    if (request.assessment || request.route || request.defect || request.completion || request.boardInventory) throw new Error('Use the reviewed release or scoped defect evidence for its own completion.');
     return undefined;
   }
   if (request.defect) {
-    if (comment || request.assessment || request.route) throw new Error('Use the reviewed scoped defect disposition for its own completion.');
+    if (comment || request.assessment || request.route || request.boardInventory) throw new Error('Use the reviewed scoped defect disposition for its own completion.');
     if (scopedDefect(root, claim, request.defect)) return undefined;
   }
   if (request.completion) throw new Error('Link the scoped G4 defect decision for fix completion.');
@@ -446,7 +457,7 @@ function releasePublication(root: string, request: Proposal, claim: Claim, choic
     throw new Error('The selected task source must permit comments for the board handoff route.');
   }
   const kind: 'delivery' | 'completion' = comment ? 'delivery' : 'completion';
-  return { kind, assessment: request.assessment, route };
+  return { kind, assessment: request.assessment, route, boardInventory: request.boardInventory };
 }
 
 function reworkPreview(root: string, request: Proposal, claim: Claim) {
@@ -472,7 +483,8 @@ export async function publicationPreview(root: string, request: Proposal, reader
   const release = releasePublication(root, request, claim, choice);
   if (release) currentAssessment(root, release.assessment, assignmentFor(claim));
   const assignment = assignmentFor(claim);
-  const releaseRegression = release ? currentReleaseRegression(root, assignment, nativeReleaseBoard(assignment, connection)) : undefined;
+  const releaseRegression = release ? currentReleaseRegression(root, assignment, nativeReleaseBoard(assignment, connection),
+    { inventory: release.boardInventory }) : undefined;
   const fix = request.defect ? scopedCompletion(root, claim, request.defect, request.completion, true) : undefined;
   const failed = reworkPreview(root, request, claim);
   return { ticket: claim.ticket.url, mutation, ...(release ? { release, releaseRegression } : {}), ...(fix ? { fix } : {}), ...(failed ? { failed } : {}),
@@ -489,6 +501,9 @@ function approvedPublication(root: string, request: PublicationRequest, claim: C
   if (decision.publicationDigest !== reviewed && !(Array.isArray(decision.publicationDigests) && decision.publicationDigests.includes(reviewed))) throw new Error('The actual review must cover this exact board publication.');
   if (release) {
     const assignment = assignmentFor(claim);
+    if (!sameEvidence(release.boardInventory, decision.handoff?.boardInventory)) {
+      throw new Error('Use the authoritative live-board inventory reviewed in this G5 decision.');
+    }
     reviewHandoff(root, decision, release.assessment, release.route, assignment, nativeReleaseBoard(assignment, connection));
     if (release.kind === 'completion') {
       const confirmed = journal(root).value.publications.some(item =>

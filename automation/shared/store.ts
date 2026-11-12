@@ -4,6 +4,9 @@ import { createHash, randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 
 export interface Evidence { path: string; sha256: string; pointer?: string }
+export function sameEvidence(a: Evidence | undefined, b: Evidence | undefined) {
+  return !!a && !!b && a.path === b.path && a.sha256 === b.sha256 && a.pointer === b.pointer;
+}
 export const digest = (value: string | Buffer) => createHash('sha256').update(value).digest('hex');
 export function requireText(value: unknown, label = 'Value'): asserts value is string {
   if (typeof value !== 'string' || !value.trim() || /\0/.test(value)) throw new Error(`${label} is required.`);

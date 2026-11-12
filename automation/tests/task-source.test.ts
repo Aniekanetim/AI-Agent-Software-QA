@@ -123,13 +123,15 @@ test('a reviewed G5 handoff uses the saved board route and gates completion afte
   const f = fixture();
   await f.select();
   const claim = await f.claim(), pilot = releaseFixture(f.root, claim.ticket.id);
-  pilot.bind(claim.sourceKey);
+  const scopeInventory = pilot.inventory(claim.sourceKey, 'scope');
+  const boardInventory = pilot.inventory(claim.sourceKey, 'handoff');
+  await live.bindCurrentReleaseScope(f.root, pilot.scopeRequest(claim.sourceKey, pilot.round, pilot.roundRef, 'initial', [], { boardInventory: scopeInventory }), f.reader);
   const run = pilot.put('run.json', pilot.run('pass', 'Pass'));
   const { assessment } = recordAssessment(f.root, retainRun(f.root, { round: pilot.roundRef, run }));
   const preference = { channel: 'taskBoard', recipient: 'Release owner', acknowledgementRequired: true };
   f.put('.local/reporting-settings.json', { releaseHandoff: preference });
-  const comment = { id: 'g5-comment', claimId: claim.id, action: 'comment', purpose: 'releaseHandoff', assessment, body: 'Synthetic reviewed release handoff' } as const;
-  const move = { id: 'g5-move', claimId: claim.id, action: 'move', to: 'testedOk', assessment } as const;
+  const comment = { id: 'g5-comment', claimId: claim.id, action: 'comment', purpose: 'releaseHandoff', assessment, boardInventory, body: 'Synthetic reviewed release handoff' } as const;
+  const move = { id: 'g5-move', claimId: claim.id, action: 'move', to: 'testedOk', assessment, boardInventory } as const;
   const prepared = await live.publicationPreview(f.root, comment, f.reader);
   const completion = await live.publicationPreview(f.root, move, f.reader);
   assert.equal(prepared.release?.route.destination, claim.ticket.url);
@@ -138,7 +140,8 @@ test('a reviewed G5 handoff uses the saved board route and gates completion afte
   const decision = f.put('.local/g5.json', {
     claimId: claim.id, ticketRevision: claim.ticket.revision, gate: 'G5', decision: 'Approved',
     reviewer: 'Synthetic reviewer', source: 'Synthetic actual decision', packet, target: pilot.target,
-    handoff: { assessment, route: prepared.release!.route, targetObservation: pilot.g5Target }, publicationDigests: [prepared.publicationDigest, completion.publicationDigest],
+    handoff: { assessment, route: prepared.release!.route, targetObservation: pilot.g5Target, boardInventory, regressionDigest: prepared.releaseRegression?.digest },
+    publicationDigests: [prepared.publicationDigest, completion.publicationDigest],
   });
   const args = { decision, source: 'Synthetic reviewed publication' };
   const writer = async () => async () => {
@@ -172,7 +175,8 @@ test('a reviewed G5 handoff uses the saved board route and gates completion afte
   const newDecision = f.put('.local/g5-current.json', {
     claimId: claim.id, ticketRevision: claim.ticket.revision, gate: 'G5', decision: 'Approved',
     reviewer: 'Synthetic reviewer', source: 'Synthetic review of newly retained evidence', packet, target: pilot.target,
-    handoff: { assessment: current, route: newPrepared.release!.route, targetObservation: pilot.g5Target },
+    handoff: { assessment: current, route: newPrepared.release!.route, targetObservation: pilot.g5Target, boardInventory,
+      regressionDigest: newPrepared.releaseRegression?.digest },
     publicationDigests: [newPrepared.publicationDigest, newCompletion.publicationDigest],
   });
   const newArgs = { ...args, decision: newDecision };
@@ -216,13 +220,17 @@ test('a read-only board records actual G5 delivery and native status before clos
   f.choice.actions = [];
   await f.select();
   const claim = await f.claim(), pilot = releaseFixture(f.root, claim.ticket.id);
-  pilot.bind(claim.sourceKey);
+  const assignment = { source: claim.sourceKey, ticketId: claim.ticket.id };
+  const boardInventory = pilot.inventory(claim.sourceKey, 'handoff');
+  await live.bindCurrentReleaseScope(f.root, pilot.scopeRequest(claim.sourceKey, pilot.round, pilot.roundRef, 'initial', [],
+    { boardInventory: pilot.inventory(claim.sourceKey, 'scope') }), f.reader);
+  const regression = await live.reconcileReleaseBoard(f.root, { ...assignment, boardInventory }, f.reader);
   const run = pilot.put('run.json', pilot.run('pass', 'Pass'));
   const { assessment } = recordAssessment(f.root, retainRun(f.root, { round: pilot.roundRef, run }));
   const route = { channel: 'taskBoard', destination: claim.ticket.url, recipient: 'Release owner', acknowledgementRequired: true };
   const decision = f.put('.local/observed-g5.json', { claimId: claim.id, ticketRevision: claim.ticket.revision, gate: 'G5',
     decision: 'Approved', reviewer: 'Fixture reviewer', source: 'Synthetic G5 decision', packet: pilot.round.scope, target: pilot.target,
-    handoff: { route, assessment, targetObservation: pilot.g5Target } });
+    handoff: { route, assessment, targetObservation: pilot.g5Target, boardInventory, regressionDigest: regression.digest } });
   const request = { id: 'observed-move', claimId: claim.id, source: 'Synthetic board observation', decision };
   await assert.rejects(live.observeReleaseCompletion(f.root, request, f.reader), /configured Tested-Ok destination/);
   f.board.tickets[0]!.state = 'done';
@@ -246,36 +254,54 @@ test('live G5 reconciles linked children, filtered tickets and later board chang
   const child = { ...claim.ticket, id: defect.ticketId, url: 'https://app.clickup.com/t/child', state: 'retest', revision: digest('child-v1') };
   const fix = regressionFixture(f.root, defect, child.revision, { base: pilot });
   fix.approve(); fix.retain('confirmation');
+  const scopeInventory = pilot.inventory(claim.sourceKey, 'scope', [child.id]);
+  const scopeRequest = (suffix: string, fixes: unknown[], boardInventory?: typeof scopeInventory) =>
+    pilot.scopeRequest(claim.sourceKey, pilot.round, pilot.roundRef, suffix, fixes, { boardInventory });
+  await assert.rejects(live.bindCurrentReleaseScope(f.root, scopeRequest('no-inventory', []), f.reader), /authoritative live-board inventory for release scope/);
+  const initiallyStandalone = pilot.inventory(claim.sourceKey, 'scope', [], undefined, 'initially-standalone');
+  await live.bindCurrentReleaseScope(f.root, scopeRequest('standalone', [], initiallyStandalone), f.reader);
+  const newlyLinkedOutsideView = pilot.inventory(claim.sourceKey, 'handoff', [child.id], undefined, 'new-hidden-child');
+  await assert.rejects(live.reconcileReleaseBoard(f.root, assignment, f.reader), /authoritative live-board inventory for release handoff/);
+  await assert.rejects(live.reconcileReleaseBoard(f.root, { ...assignment, boardInventory: newlyLinkedOutsideView }, f.reader), /inventory changed/);
   f.board.tickets.push(child);
   f.board.descriptions![child.id] = 'Originating QA ticket: ' + claim.ticket.url;
-  pilot.bind(claim.sourceKey);
-  await assert.rejects(live.reconcileReleaseBoard(f.root, assignment, f.reader), /omits a known linked fix for child/);
+  await assert.rejects(live.bindCurrentReleaseScope(f.root, scopeRequest('omitted', [], scopeInventory), f.reader), /omits a known linked fix for child/);
 
   const fixes = [{ defect, fixRevision: 'r1' }];
-  pilot.bind(claim.sourceKey, pilot.round, pilot.roundRef, 'included', fixes);
+  await live.bindCurrentReleaseScope(f.root, scopeRequest('included', fixes, scopeInventory), f.reader);
   f.board.tickets.pop();
-  await assert.rejects(live.reconcileReleaseBoard(f.root, assignment, f.reader), /authoritative ticket readback/);
+  const handoffInventory = pilot.inventory(claim.sourceKey, 'handoff', [child.id]);
+  await assert.rejects(live.reconcileReleaseBoard(f.root, assignment, f.reader), /authoritative live-board inventory for release handoff/);
+  await assert.rejects(live.reconcileReleaseBoard(f.root, { ...assignment, boardInventory: scopeInventory }, f.reader), /Refresh the authoritative live-board inventory/);
+  await assert.rejects(live.reconcileReleaseBoard(f.root, { ...assignment, boardInventory: handoffInventory }, f.reader), /authoritative ticket readback/);
+  const emptyInventory = pilot.inventory(claim.sourceKey, 'handoff', [], undefined, 'empty-handoff');
+  await assert.rejects(live.reconcileReleaseBoard(f.root, { ...assignment, boardInventory: emptyInventory }, f.reader), /inventory changed/);
   const raw = f.put('native-child.json', { id: child.id, url: child.url, revision: child.revision, parent: claim.ticket.url });
-  const readback = f.put('board-readback.json', { assignment, defect, target: pilot.target, linked: true,
-    revision: child.revision, source: 'Synthetic native ticket readback', evidence: raw });
-  pilot.bind(claim.sourceKey, pilot.round, pilot.roundRef, 'filtered', fixes, { boardReadbacks: [readback] });
-  await assert.rejects(live.reconcileReleaseBoard(f.root, assignment, f.reader), /reviewed confirmation and regression/);
+  const readbackRecord = { assignment, defect, target: pilot.target, linked: true, revision: child.revision,
+    source: 'Synthetic native ticket readback', evidence: raw };
+  const oldReadback = f.put('old-board-readback.json', { ...readbackRecord, observedAt: '2026-01-01T00:00:00Z' });
+  const staleBoardInventory = pilot.inventory(claim.sourceKey, 'handoff', [child.id], [oldReadback], 'old-readback');
+  await assert.rejects(live.reconcileReleaseBoard(f.root, { ...assignment, boardInventory: staleBoardInventory }, f.reader), /within the current G5 observation window/);
+  const readback = f.put('board-readback.json', { ...readbackRecord, observedAt: '2026-01-01T00:10:00Z' });
+  const boardInventory = pilot.inventory(claim.sourceKey, 'handoff', [child.id], [readback], 'filtered');
+  const releaseRequest = { ...assignment, boardInventory };
+  await assert.rejects(live.reconcileReleaseBoard(f.root, releaseRequest, f.reader), /reviewed confirmation and regression/);
   fix.retain('regression'); fix.review();
-  const filtered = await live.reconcileReleaseBoard(f.root, assignment, f.reader);
+  const filtered = await live.reconcileReleaseBoard(f.root, releaseRequest, f.reader);
   assert.equal(filtered.relationships[0]?.readback?.sha256, readback.sha256);
 
   f.board.tickets.push(child);
   f.board.descriptions![child.id] = null;
-  assert.equal((await live.reconcileReleaseBoard(f.root, assignment, f.reader)).digest, filtered.digest);
+  assert.equal((await live.reconcileReleaseBoard(f.root, releaseRequest, f.reader)).digest, filtered.digest);
   f.board.descriptions![child.id] = 'Parent assignment: another-release';
-  await assert.rejects(live.reconcileReleaseBoard(f.root, assignment, f.reader), /Refresh the authoritative board readback/);
+  await assert.rejects(live.reconcileReleaseBoard(f.root, releaseRequest, f.reader), /Refresh the authoritative board readback/);
   f.board.descriptions![child.id] = 'Originating QA ticket: ' + claim.ticket.url;
   const run = pilot.put('parent-run.json', pilot.run('parent-pass', 'Pass'));
   const { assessment } = recordAssessment(f.root, retainRun(f.root, { round: pilot.roundRef, run }));
   const route = { channel: 'recorded', destination: 'Synthetic QA conversation', recipient: 'Release owner', acknowledgementRequired: false };
   const decision = f.put('.local/g5-linked.json', { claimId: claim.id, ticketRevision: claim.ticket.revision, gate: 'G5', decision: 'Approved',
     reviewer: 'Fixture reviewer', source: 'Synthetic G5 decision', packet: pilot.round.scope, target: pilot.target,
-    handoff: { route, assessment, targetObservation: pilot.g5Target, regressionDigest: filtered.digest } });
+    handoff: { route, assessment, targetObservation: pilot.g5Target, boardInventory, regressionDigest: filtered.digest } });
   const delivery = f.put('delivered.json', { state: 'delivered', decisionSha256: decision.sha256, destination: route.destination,
     recipient: route.recipient, source: 'Synthetic delivery observation' });
   f.board.tickets[0]!.state = 'done';

@@ -6,7 +6,7 @@ import type { Round, Run } from '../release/round.js';
 import { bindReleaseScope, releaseScope } from '../release/scope.js';
 import { boardRoot, statuses } from '../board/layout.js';
 
-type BoardEvidence = { exclusions?: ReturnType<typeof evidence>[]; boardReadbacks?: ReturnType<typeof evidence>[] };
+type BoardEvidence = { exclusions?: ReturnType<typeof evidence>[]; boardReadbacks?: ReturnType<typeof evidence>[]; boardInventory?: ReturnType<typeof evidence> };
 
 export function releaseFixture(root: string, assignmentId: string) {
   for (const status of statuses) mkdirSync(contained(root, `${boardRoot}/${status}`), { recursive: true });
@@ -63,10 +63,15 @@ export function releaseFixture(root: string, assignmentId: string) {
     });
     return put(`g2-${suffix}.json`, { ...review, gate: 'G2', round: ref, scopeReview });
   };
-  const bind = (source = 'local', plan = round, ref = roundRef, suffix = 'initial', fixes: unknown[] = [], boardEvidence: BoardEvidence = {}) => {
+  const scopeRequest = (source = 'local', plan = round, ref = roundRef, suffix = 'initial', fixes: unknown[] = [], boardEvidence: BoardEvidence = {}) => {
     const assignment = { source, ticketId: assignmentId };
-    return bindReleaseScope(root, { assignment, expectedRevision: releaseScope(root, assignment).revision, round: ref,
-      approval: approvalFor(source, plan, ref, suffix, fixes, boardEvidence) });
+    return { assignment, expectedRevision: releaseScope(root, assignment).revision, round: ref,
+      approval: approvalFor(source, plan, ref, suffix, fixes, boardEvidence) };
   };
-  return { put, library, round, roundRef, run, target, targetEvidence, g5Target, approvalFor, bind };
+  const bind = (...args: Parameters<typeof scopeRequest>) => bindReleaseScope(root, scopeRequest(...args));
+  const inventory = (source: string, stage: 'scope' | 'handoff', linkedTicketIds: string[] = [], boardReadbacks?: ReturnType<typeof evidence>[], suffix = stage as string) =>
+    put(`board-inventory-${suffix}.json`, { assignment: { source, ticketId: assignmentId }, target, linkedTicketIds, boardReadbacks,
+      observedAt: stage === 'scope' ? '2026-01-01T00:00:00Z' : '2026-01-01T00:10:00Z',
+      owner: 'Synthetic release owner', source: 'Synthetic unfiltered provider inventory', evidence: round.changes });
+  return { put, library, round, roundRef, run, target, targetEvidence, g5Target, approvalFor, scopeRequest, bind, inventory };
 }

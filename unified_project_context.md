@@ -34,7 +34,7 @@ Version 1.7.0 adds [Application Flow Map](Application%20Flow%20Map/README.md) an
 
 Version 1.8.0 introduces agent tool selection per task and explicit test-data initiative. Onboarding preserves schemaVersion 1/answers and reports optional capability gaps separately; task checks still require actual selected operations, access, data/state and authorization. This master has no sourced tool restrictions, data-preparation authority, live inputs or verified application states. Adopting projects retain actual constraints, identity history, failed attempts and original owner questions.
 
-Version 1.14.1 requires [current confirmation and regression evidence](automation/regression/README.md) at scoped closure. Retest check-ins show pending batches. Rework requires a reviewed failure of the original confirmation. Parent G5 reconciles canonical board links, the fix ledger and the independent change manifest for the exact target.
+Version 1.14.2 reconciles board links, the fix ledger and the independent manifest at scope review and G5. A connected board needs an authoritative linked-ticket inventory at both reviews. Every Rework route requires a reviewed failure of the original confirmation. Retest check-ins show pending regression batches, and scoped closure requires [current confirmation and regression evidence](automation/regression/README.md).
 
 Version 1.13.0 requires [module-based release evidence](automation/release/README.md) for parent G5 completion. The current assignment round binds approved coverage to the exact target and retained runs. Actual handoff and required acceptance govern closure across local and live sources. Upgrade open assignments using traceable evidence and preserve completed decisions.
 

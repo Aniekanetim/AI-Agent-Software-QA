@@ -1,9 +1,9 @@
 import { assertNonsecret, load, requireText, verifyEvidence, type Evidence } from '../shared/store.js';
 import { pinned } from './library.js';
 import { sameTarget, verifyAssessment, type Target } from './round.js';
-import { requireCurrentScope, sameEvidence, type Assignment } from './scope.js';
+import { releaseBoard, requireCurrentScope, sameEvidence, type Assignment } from './scope.js';
 import { releaseFixes } from '../regression/fix.js';
-import { localReleaseBoard, type ReleaseBoard } from '../regression/board.js';
+import type { ReleaseBoard } from '../regression/board.js';
 
 type Preferences =
   | { channel: 'taskBoard'; recipient: string; acknowledgementRequired: boolean }
@@ -12,6 +12,7 @@ export interface Route { channel: Preferences['channel']; destination: string; r
 export interface HandoffApproval {
   assessment: Evidence; route: Route; targetObservation: Evidence;
   regressionDigest?: string;
+  boardInventory?: Evidence;
   exceptions?: { gapId: string; owner: string; reason: string; decision: Evidence }[];
 }
 interface ReleaseDecision {
@@ -66,12 +67,11 @@ export function currentAssessment(root: string, assessment: Evidence, assignment
   return report;
 }
 
-export function currentReleaseRegression(root: string, assignment: Assignment, liveBoard?: ReleaseBoard) {
+export function currentReleaseRegression(root: string, assignment: Assignment, liveBoard?: ReleaseBoard,
+  handoff: { inventory?: Evidence; observedAt?: string } = {}) {
   const scope = requireCurrentScope(root, assignment);
   if (!scope.changeManifest) throw new Error('Pin the independent release change manifest in the reviewed G1 scope before G5.');
-  const board = assignment.source === 'local' ? localReleaseBoard(root, assignment) : liveBoard;
-  if (!board) throw new Error('Observe the canonical live board before reconciling the release.');
-  return releaseFixes(root, assignment, scope.plan, scope.changeManifest, board);
+  return releaseFixes(root, assignment, scope.plan, scope.changeManifest, releaseBoard(root, assignment, liveBoard), handoff);
 }
 
 export function reviewHandoff(root: string, decision: ReleaseDecision, assessment: Evidence, route: Route, assignment: Assignment, liveBoard?: ReleaseBoard) {
@@ -109,8 +109,8 @@ export function reviewHandoff(root: string, decision: ReleaseDecision, assessmen
     requireText(exception.reason, 'Accepted release exception');
     verifyEvidence(root, exception.decision);
   }
-  const regression = currentReleaseRegression(root, assignment, liveBoard);
-  if ((regression.relationships.length || regression.fixes.length || regression.dispositions.length || reviewed.regressionDigest) &&
+  const regression = currentReleaseRegression(root, assignment, liveBoard, { inventory: reviewed.boardInventory, observedAt: observed.observedAt });
+  if ((regression.boardInventory || regression.relationships.length || regression.fixes.length || regression.dispositions.length || reviewed.regressionDigest) &&
       reviewed.regressionDigest !== regression.digest) {
     throw new Error('G5 must review the current regression evidence and canonical board reconciliation for this release.');
   }

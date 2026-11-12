@@ -1,7 +1,7 @@
-import { digest, load, requireText, save, verifyEvidence, withLock, type Evidence } from '../shared/store.js';
+import { digest, load, requireText, sameEvidence, save, verifyEvidence, withLock, type Evidence } from '../shared/store.js';
 import { indexById, pinned, readLibrary } from '../release/library.js';
 import { retainedRun, retainedRuns, sameTarget, type Round, type Target } from '../release/round.js';
-import { sameEvidence, type Assignment } from '../release/scope.js';
+import type { Assignment } from '../release/scope.js';
 import type { ReleaseBoard } from './board.js';
 
 interface FixIdentity { defect: Assignment; fixRevision: string }
@@ -396,15 +396,36 @@ export function verifyRework(root: string, defect: Assignment, ticketRevision: s
 interface ChangeManifest {
   assignment: Assignment; target: Target; changes: Evidence; fixes: FixIdentity[];
   policy: Evidence; coverage: 'targeted' | 'full'; affected: Coordinate[];
-  findingDispositions?: Evidence[]; exclusions?: Evidence[]; boardReadbacks?: Evidence[];
+  findingDispositions?: Evidence[]; exclusions?: Evidence[]; boardReadbacks?: Evidence[]; boardInventory?: Evidence;
+}
+interface BoardInventory {
+  assignment: Assignment; target: Target; linkedTicketIds: string[];
+  owner: string; source: string; evidence: Evidence; observedAt: string; boardReadbacks?: Evidence[];
 }
 const assignmentKey = (item: Assignment) => JSON.stringify([item.source, item.ticketId]);
 
-function reviewedBoardEntries(root: string, manifest: ChangeManifest, refs: Evidence[] | undefined, label: 'exclusion' | 'board readback') {
+function readInventory(root: string, manifest: ChangeManifest, ref: Evidence | undefined, stage: 'scope' | 'handoff') {
+  if (!ref) throw new Error(`Supply an authoritative live-board inventory for release ${stage}, even if it contains no linked tickets.`);
+  const inventory = pinned<BoardInventory>(root, ref, 'authoritative live-board inventory');
+  if (!sameAssignment(inventory?.assignment, manifest.assignment) || !sameTarget(inventory.target, manifest.target) ||
+      !Array.isArray(inventory.linkedTicketIds) || new Set(inventory.linkedTicketIds).size !== inventory.linkedTicketIds.length ||
+      inventory.linkedTicketIds.includes(manifest.assignment.ticketId) ||
+      !Number.isFinite(Date.parse(inventory.observedAt)) || !/(Z|[+-]\d\d:\d\d)$/.test(inventory.observedAt)) {
+    throw new Error('Record the complete linked-ticket inventory for the exact release assignment and target, with the actual observation time.');
+  }
+  for (const id of inventory.linkedTicketIds) requireText(id, 'Canonical linked ticket ID');
+  requireText(inventory.owner, 'Responsible owner for the complete live-board inventory');
+  requireText(inventory.source, 'Authoritative source covering tickets outside the selected board view');
+  verifyEvidence(root, inventory.evidence);
+  return inventory;
+}
+
+function reviewedBoardEntries(root: string, manifest: ChangeManifest, refs: Evidence[] | undefined, label: 'exclusion' | 'board readback',
+  readbackWindow?: { earliest: number; latest: number }) {
   const entries = new Map<string, { ref: Evidence; revision?: string; linked?: boolean }>();
   for (const ref of refs ?? []) {
     const record = pinned<{ assignment: Assignment; defect: Assignment; target: Target; source: string; evidence: Evidence;
-      reason?: string; reviewer?: string; revision?: string; linked?: boolean }>(root, ref, label);
+      reason?: string; reviewer?: string; revision?: string; linked?: boolean; observedAt?: string }>(root, ref, label);
     assignmentValid(record?.defect);
     const key = assignmentKey(record.defect);
     if (entries.has(key) || !sameAssignment(record.assignment, manifest.assignment) || !sameTarget(record.target, manifest.target)) {
@@ -418,18 +439,31 @@ function reviewedBoardEntries(root: string, manifest: ChangeManifest, refs: Evid
     } else {
       requireText(record.revision, 'Observed canonical ticket revision');
       if (typeof record.linked !== 'boolean') throw new Error('Record the observed parent relationship in the board readback.');
+      if (readbackWindow) {
+        const time = Date.parse(record.observedAt ?? '');
+        if (!Number.isFinite(time) || !/(Z|[+-]\d\d:\d\d)$/.test(record.observedAt!) ||
+            time < readbackWindow.earliest || time > readbackWindow.latest) {
+          throw new Error(`Refresh the authoritative board readback for ${record.defect.ticketId} within the current G5 observation window.`);
+        }
+      }
     }
     entries.set(key, { ref, revision: record.revision, linked: record.linked });
   }
   return entries;
 }
 
-function reconcileBoard(root: string, manifest: ChangeManifest, board: ReleaseBoard, onTarget: Fix[], expected: Set<string>) {
+function reconcileBoard(root: string, manifest: ChangeManifest, board: ReleaseBoard, onTarget: Fix[], expected: Set<string>,
+  inventory?: BoardInventory, readbackWindow?: { earliest: number; latest: number }) {
   if (!sameAssignment(board?.assignment, manifest.assignment)) throw new Error('Observe the canonical board for this release assignment.');
   const { assignment, target } = manifest;
   const exclusions = reviewedBoardEntries(root, manifest, manifest.exclusions, 'exclusion');
-  const readbacks = reviewedBoardEntries(root, manifest, manifest.boardReadbacks, 'board readback');
+  const readbacks = reviewedBoardEntries(root, manifest, inventory ? inventory.boardReadbacks : manifest.boardReadbacks, 'board readback', readbackWindow);
+  const roster = inventory && new Set(inventory.linkedTicketIds);
   const candidates = new Map<string, Assignment>();
+  for (const ticketId of roster ?? []) {
+    const defect = { source: assignment.source, ticketId };
+    candidates.set(assignmentKey(defect), defect);
+  }
   for (const row of board.rows) if (row.linked) {
     const defect = { source: assignment.source, ticketId: row.id };
     candidates.set(assignmentKey(defect), defect);
@@ -456,6 +490,10 @@ function reconcileBoard(root: string, manifest: ChangeManifest, board: ReleaseBo
     const current = currentFor(onTarget, defect, target.environment);
     const linked = row?.linked || readback?.linked || false;
     const intakeParent = current?.identity.parent;
+    if (roster && defect.source === assignment.source && roster.has(defect.ticketId) !==
+        (linked || sameAssignment(intakeParent, assignment))) {
+      throw new Error(`Reconcile ${defect.ticketId} with the authoritative live-board inventory. Refresh the release scope if its membership changed.`);
+    }
     if (intakeParent && (linked && !sameAssignment(intakeParent, assignment) ||
         (row?.parentSpecified || readback) && !linked && sameAssignment(intakeParent, assignment))) {
       throw new Error(`Reconcile the board and fix intake parent for ${defect.ticketId}.`);
@@ -466,13 +504,16 @@ function reconcileBoard(root: string, manifest: ChangeManifest, board: ReleaseBo
     const included = manifest.fixes.some(item => sameAssignment(item.defect, defect));
     if (exclusion && (current || included)) throw new Error(`The exclusion for ${defect.ticketId} conflicts with evidence that it belongs to this release build.`);
     if (!included && !exclusion) throw new Error(`Establish whether linked defect ${defect.ticketId} is included in this exact build, or retain a reviewed exclusion.`);
+    if (included && !current) throw new Error(`Record the observed fix intake for ${defect.ticketId} on this exact release build and environment.`);
+    if (current) findFix(root, current.key, false, onTarget);
     relationships.push({ defect, revision: row?.revision ?? readback!.revision, linked,
       ...(readback ? { readback: readback.ref } : {}), ...(exclusion ? { exclusion: exclusion.ref } : {}) });
   }
   return relationships.sort((a, b) => assignmentKey(a.defect).localeCompare(assignmentKey(b.defect)));
 }
 
-export function releaseFixes(root: string, assignment: Assignment, round: Round, manifestRef: Evidence, board: ReleaseBoard) {
+export function reconcileReleaseScope(root: string, assignment: Assignment, round: Round, manifestRef: Evidence, board: ReleaseBoard,
+  handoff?: { inventory?: Evidence; observedAt?: string }) {
   const { target, changes } = round;
   const manifest = pinned<ChangeManifest>(root, manifestRef, 'reviewed release change manifest');
   if (!sameAssignment(manifest?.assignment, assignment) || !sameTarget(manifest.target, target) ||
@@ -485,16 +526,45 @@ export function releaseFixes(root: string, assignment: Assignment, round: Round,
     }
   }
   const expected = new Set<string>();
+  const defects = new Set<string>();
   for (const fix of manifest.fixes) {
     assignmentValid(fix.defect);
     requireText(fix.fixRevision, 'Included fix revision');
-    const identity = identityKey(fix);
-    if (expected.has(identity)) throw new Error('Include each defect and fix revision once.');
-    expected.add(identity);
+    const key = assignmentKey(fix.defect);
+    if (defects.has(key)) throw new Error('Include one current fix revision per defect for the exact release build.');
+    defects.add(key);
+    expected.add(identityKey(fix));
   }
   const all = ledger(root).value.fixes;
   const onTarget = all.filter(row => sameTarget(row.identity.target, target));
-  const relationships = reconcileBoard(root, manifest, board, onTarget, expected);
+  let inventory: BoardInventory | undefined;
+  let readbackWindow: { earliest: number; latest: number } | undefined;
+  if (assignment.source !== 'local') {
+    const scope = readInventory(root, manifest, manifest.boardInventory, 'scope');
+    inventory = { ...scope, boardReadbacks: scope.boardReadbacks ?? manifest.boardReadbacks };
+    if (handoff) {
+      inventory = readInventory(root, manifest, handoff.inventory, 'handoff');
+      const scoped = new Set(scope.linkedTicketIds);
+      if (scoped.size !== inventory.linkedTicketIds.length || inventory.linkedTicketIds.some(id => !scoped.has(id))) {
+        throw new Error('The authoritative live-board inventory changed. Review the updated release scope before G5.');
+      }
+      const scopeTime = Date.parse(scope.observedAt);
+      const latest = Date.parse(inventory.observedAt);
+      const earliest = Math.max(scopeTime + 1, handoff.observedAt ? Date.parse(handoff.observedAt) : scopeTime);
+      if (latest < earliest) {
+        throw new Error('Refresh the authoritative live-board inventory for the current G5 target observation.');
+      }
+      readbackWindow = { earliest, latest };
+    }
+  }
+  const relationships = reconcileBoard(root, manifest, board, onTarget, expected, inventory, readbackWindow);
+  return { manifest, relationships, all };
+}
+
+export function releaseFixes(root: string, assignment: Assignment, round: Round, manifestRef: Evidence, board: ReleaseBoard,
+  handoff: { inventory?: Evidence; observedAt?: string }) {
+  const { target } = round;
+  const { manifest, relationships, all } = reconcileReleaseScope(root, assignment, round, manifestRef, board, handoff);
   const fixes = manifest.fixes.map(fix => {
     const key = fixKey({ ...fix, target });
     const verified = requireVerifiedFix(root, key, fix.defect);
@@ -526,6 +596,6 @@ export function releaseFixes(root: string, assignment: Assignment, round: Round,
       !dispositions.some(item => sameAssignment(item.ticket, ticket))) {
     throw new Error(`The prior blocking regression ${ticket.ticketId} still needs a reviewed release disposition.`);
   }
-  const report = { manifest: manifestRef, relationships, fixes, dispositions };
+  const report = { manifest: manifestRef, ...(handoff.inventory ? { boardInventory: handoff.inventory } : {}), relationships, fixes, dispositions };
   return { ...report, digest: digest(JSON.stringify(report)) };
 }

@@ -103,7 +103,7 @@ After deliberately adopting the updated workflow files, follow [the lifecycle up
 
 When updating to 1.13.0, apply the [release upgrade guidance](automation/release/README.md#upgrade-open-assignments) to open parent assignments at their next G5. Keep existing onboarding, source records and historical approvals. Link traceable results for the current scope and build, and reconcile any interrupted release move before attempting another.
 
-In 1.14.1, apply [post-fix verification](automation/regression/README.md) to open Retest work. Reuse traceable results and review missing or changed evidence. Before the next parent G5, reconcile canonical board links with the change manifest for the exact build. Recheck interrupted Rework and release moves using the current evidence. Retain completed historical records.
+In 1.14.2, apply [post-fix verification](automation/regression/README.md) to open Retest work. Preview and reconcile the current manifest before binding new release scope. For open connected-board releases, add the authoritative inventory to the scope record and review the affected scope before the next G5. Reuse traceable results and refresh the inventory at handoff. Recheck interrupted Rework and release moves using current evidence. Retain completed historical records.
 
 ## Optional blocker notifications
 
