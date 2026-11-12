@@ -115,18 +115,19 @@ test('G5 rejects an earlier or invalidated round while retaining historical asse
     round: f.roundRef, approval: f.approvalFor('local', f.round, f.roundRef, 'initial') }), /renewed G2/);
 });
 
-test('zero executions cannot support G5 even when every applicability decision is an exclusion', () => {
+test('scope requires the regression baseline and zero executions still cannot support G5', () => {
   const f = fixture(), assignment = { source: 'local', ticketId: 'QA-001' };
   const plan = { ...f.round, obligations: f.round.obligations.map(item => ({
     ...item, state: 'excluded' as const, checkIds: [], reason: 'Synthetic exclusion', decision: f.round.scope,
   })) };
   const round = f.put('excluded-round.json', plan);
-  f.bind('local', plan, round);
-  const input = { round, runs: [] };
+  assert.throws(() => f.bind('local', plan, round), /omits the required regression check/);
+  f.bind('local', f.round, f.roundRef, 'valid');
+  const input = { round: f.roundRef, runs: [] };
   const { report } = recordAssessment(f.root, input);
-  assert.deepEqual(report.gaps.map(gap => gap.outcome), ['No checks executed']);
+  assert(report.gaps.some(gap => gap.outcome === 'No checks executed'));
   const legacy = f.put('legacy-assessment.json', { schemaVersion: 1, input, report: assessRound(f.root, input, 1) });
-  assert.equal(verifyAssessment(f.root, legacy).state, 'evidenceReady');
+  assert.equal(verifyAssessment(f.root, legacy).uniqueCheckExecutions, 0);
   const route: Route = { channel: 'recorded', destination: 'Fixture QA conversation', recipient: 'Release owner', acknowledgementRequired: false };
   const decision = { gate: 'G5', decision: 'Approved', reviewer: 'Fixture reviewer', source: 'Synthetic reviewer decision',
     packet: f.round.scope, target: f.target, handoff: { assessment: legacy, route, targetObservation: f.g5Target } };

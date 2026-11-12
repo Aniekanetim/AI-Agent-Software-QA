@@ -1,6 +1,10 @@
-import { digest, load, requireText, save, verifyEvidence, withLock, type Evidence } from '../shared/store.js';
+import { digest, load, requireText, sameEvidence, save, verifyEvidence, withLock, type Evidence } from '../shared/store.js';
 import { indexById, pinned } from './library.js';
 import { readRound } from './round.js';
+import { localReleaseBoard, type ReleaseBoard } from '../regression/board.js';
+import { reconcileReleaseScope } from '../regression/fix.js';
+
+export { sameEvidence } from '../shared/store.js';
 
 export interface Assignment { source: string; ticketId: string }
 
@@ -20,10 +24,6 @@ interface ReadinessReview extends Review { round: Evidence; scopeReview: Evidenc
 interface Binding {
   schemaVersion: 1; assignment: Assignment;
   history: ({ round: Evidence; approval: Evidence } | { invalidation: Evidence })[];
-}
-
-export function sameEvidence(a: Evidence | undefined, b: Evidence | undefined) {
-  return !!a && !!b && a.path === b.path && a.sha256 === b.sha256 && a.pointer === b.pointer;
 }
 
 function sameAssignment(a: Assignment | undefined, b: Assignment) {
@@ -86,19 +86,40 @@ export function requireCurrentScope(root: string, assignment: Assignment) {
   return { ...current, ...matchCoverage(root, assignment, current.round, current.approval) };
 }
 
-export function bindReleaseScope(root: string, request: { assignment: Assignment; expectedRevision: string | null; round: Evidence; approval: Evidence }) {
+export function releaseBoard(root: string, assignment: Assignment, liveBoard?: ReleaseBoard) {
+  const board = assignment.source === 'local' ? localReleaseBoard(root, assignment) : liveBoard;
+  if (!board) throw new Error('Observe the canonical live board before reconciling the release.');
+  return board;
+}
+
+function checkScope(root: string, assignment: Assignment, plan: ReturnType<typeof readRound>['round'], manifest: Evidence | undefined, liveBoard?: ReleaseBoard) {
+  if (!manifest) throw new Error('Pin the independent release change manifest in the reviewed G1 scope.');
+  if (!plan.assignmentIds.includes(assignment.ticketId)) throw new Error('Include the release assignment in the proposed round.');
+  const { relationships } = reconcileReleaseScope(root, assignment, plan, manifest, releaseBoard(root, assignment, liveBoard));
+  return { target: plan.target, changeManifest: manifest, relationships };
+}
+
+export function previewReleaseScope(root: string, request: { assignment: Assignment; round: Evidence; changeManifest: Evidence }, liveBoard?: ReleaseBoard) {
+  const { assignment, round, changeManifest } = request;
+  return checkScope(root, assignment, readRound(root, round).round, changeManifest, liveBoard);
+}
+
+export function bindReleaseScope(root: string, request: { assignment: Assignment; expectedRevision: string | null; round: Evidence; approval: Evidence }, liveBoard?: ReleaseBoard) {
   return withLock(root, 'qa-board', () => {
     const { assignment, expectedRevision, round, approval } = request;
     const record = scopeRecord(root, assignment);
     const current = record.value.history.at(-1);
     if (current && 'round' in current && sameEvidence(current.round, round) && sameEvidence(current.approval, approval)) {
+      const { plan, changeManifest } = matchCoverage(root, assignment, round, approval);
+      checkScope(root, assignment, plan, changeManifest, liveBoard);
       return releaseScope(root, assignment);
     }
     if (record.revision !== expectedRevision) throw new Error('The assignment release scope changed. Read its current revision before binding.');
     if (record.value.history.some(entry => 'round' in entry && entry.approval.sha256 === approval?.sha256)) {
       throw new Error('Record the actual renewed G2 decision before restoring a previous round.');
     }
-    matchCoverage(root, assignment, round, approval);
+    const { plan, changeManifest } = matchCoverage(root, assignment, round, approval);
+    checkScope(root, assignment, plan, changeManifest, liveBoard);
     record.value.history.push({ round, approval });
     save(root, record.path, record.value, record.revision);
     return releaseScope(root, assignment);

@@ -162,7 +162,7 @@ function decisionValid(root: string, request: Transition, ticket: Ticket) {
   if (request.to === 'Tested-Ok' && !requiresRelease(ticket.id, ticket.text)) {
     return defectCompletion(root, { source: 'local', ticketId: ticket.id }, ticket.revision, request.defect);
   }
-  if (request.to === 'Rework' && (ticket.status === 'Retest' || request.rework)) {
+  if (request.to === 'Rework') {
     if (!request.rework || requiresRelease(ticket.id, ticket.text)) throw new Error('Record the reviewed confirmation failure for this defect before moving it to Rework.');
     if (operations(root, ticket.id).length) throw new Error('Settle the current execution before moving the defect to Rework.');
     verifyRework(root, { source: 'local', ticketId: ticket.id }, ticket.revision, request.rework);
@@ -279,7 +279,7 @@ function complete(root: string, journal: Journal) {
   }
   const after = digest(journal.content), fromHash = revision(root, journal.from), toHash = revision(root, journal.to);
   const path = `.local/board-transitions/${journal.id}.json`;
-  if (entry.to === 'Tested-Ok' || entry.to === 'Rework' && (entry.from === 'Retest' || journal.rework)) {
+  if (entry.to === 'Tested-Ok' || entry.to === 'Rework') {
     try {
       const releaseRequired = requiresRelease(journal.ticketId, journal.content);
       if (entry.to === 'Rework') {

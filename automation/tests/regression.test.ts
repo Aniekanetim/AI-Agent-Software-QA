@@ -5,10 +5,12 @@ import { resolve } from 'node:path';
 import { approveFixPlan, fixStatus, registerFix, requireVerifiedFix, retainFixResults } from '../regression/fix.js';
 import { currentReleaseRegression, reviewHandoff, type Route } from '../release/handoff.js';
 import { recordAssessment, retainRun } from '../release/round.js';
+import { previewReleaseScope, releaseScope } from '../release/scope.js';
+import { evidence } from '../shared/store.js';
 import { regressionFixture } from './regression-fixture.js';
 import { releaseFixture } from './release-fixture.js';
 
-function fixture(linkIntake = true) {
+function fixture(linkIntake = true, linkBoard = true) {
   const folder = resolve('output/regression-fixtures');
   mkdirSync(folder, { recursive: true });
   const root = mkdtempSync(resolve(folder, 'run-'));
@@ -16,9 +18,10 @@ function fixture(linkIntake = true) {
   const defect = { source: 'local', ticketId: 'BUG-001' };
   const base = releaseFixture(root, parent.ticketId);
   const child = resolve(root, 'QA task management Board', 'Retest', 'BUG-001.md');
-  writeFileSync(child, '# BUG-001: Synthetic linked defect\n\n| Type | Bug |\n| Parent assignment | [QA-001](../Ready%20for%20QA/QA-001.md) |\n');
+  const parentLink = '| Parent assignment | [QA-001](../Ready%20for%20QA/QA-001.md) |\n';
+  writeFileSync(child, '# BUG-001: Synthetic linked defect\n\n| Type | Bug |\n' + (linkBoard ? parentLink : ''));
   const fix = regressionFixture(root, defect, 'ticket-v1', { ...(linkIntake ? { parent } : {}), base });
-  return { root, parent, defect, base, fix, child };
+  return { root, parent, defect, base, fix, child, parentLink };
 }
 
 test('duplicate intake resumes and same-build CI observations can satisfy multiple fixes without another run', () => {
@@ -73,8 +76,8 @@ test('reviewed regression failures require separate findings and blocking ones p
   assert.throws(() => currentReleaseRegression(root, parent), /blocks release/);
 });
 
-test('G5 catches an omitted fix through the canonical board alone and binds the child revision', () => {
-  const { root, parent, defect, base, fix, child } = fixture(false);
+test('scope preview and binding catch an omitted fix through the canonical board alone, and G5 catches a new link', () => {
+  const { root, parent, defect, base, fix, child, parentLink } = fixture(false, false);
   fix.approve(); fix.retain('confirmation');
   const run = base.put('parent-pass.json', base.run('parent-pass', 'Pass'));
   const { assessment } = recordAssessment(root, retainRun(root, { round: base.roundRef, run }));
@@ -82,6 +85,15 @@ test('G5 catches an omitted fix through the canonical board alone and binds the 
   const decision = { gate: 'G5', decision: 'Approved', reviewer: 'Fixture reviewer', source: 'Synthetic decision', packet: base.round.scope, target: base.target,
     handoff: { assessment, route, targetObservation: base.g5Target } };
   base.bind();
+  assert.equal(reviewHandoff(root, decision, assessment, route, parent).state, 'evidenceReady');
+  appendFileSync(child, parentLink);
+  const current = releaseScope(root, parent);
+  assert.throws(() => previewReleaseScope(root, { assignment: parent, round: base.roundRef,
+    changeManifest: evidence(root, 'manifest-initial.json') }), /omits a known linked fix/);
+  assert.throws(() => base.bind('local', base.round, base.roundRef, 'new-link'), /omits a known linked fix/);
+  assert.throws(() => base.bind('local', base.round, base.roundRef, 'conflicting-revisions',
+    [{ defect, fixRevision: 'r1' }, { defect, fixRevision: 'different-revision' }]), /one current fix revision per defect/);
+  assert.equal(releaseScope(root, parent).revision, current.revision);
   assert.throws(() => reviewHandoff(root, decision, assessment, route, parent), /omits a known linked fix/);
   base.bind('local', base.round, base.roundRef, 'included', [{ defect, fixRevision: 'r1' }]);
   assert.throws(() => reviewHandoff(root, decision, assessment, route, parent), /reviewed confirmation and regression results/);
@@ -100,19 +112,16 @@ test('linked defects outside the target need reviewed exclusions and same-build 
   const round = { ...base.round, id: 'build-2', target };
   const roundRef = base.put('next-round.json', round);
   const evidence = base.put('deployment.json', { source: 'Synthetic deployment manifest' });
-  base.bind('local', round, roundRef, 'unresolved');
-  assert.throws(() => currentReleaseRegression(root, parent), /linked defect BUG-001 is included in this exact build/);
+  assert.throws(() => base.bind('local', round, roundRef, 'unresolved'), /linked defect BUG-001 is included in this exact build/);
   const exclusion = (build: typeof target, name: string) => base.put(name, {
     assignment: parent, defect, target: build, reviewer: 'Fixture reviewer', source: 'Synthetic actual decision',
     reason: 'Fix is deployed in a different build.', evidence,
   });
   const stale = exclusion(base.target, 'stale-exclusion.json');
-  base.bind('local', round, roundRef, 'stale', [], { exclusions: [stale] });
-  assert.throws(() => currentReleaseRegression(root, parent), /exact assignment, defect and target/);
+  assert.throws(() => base.bind('local', round, roundRef, 'stale', [], { exclusions: [stale] }), /exact assignment, defect and target/);
   base.bind('local', round, roundRef, 'excluded', [], { exclusions: [exclusion(target, 'exclusion.json')] });
   assert.equal(currentReleaseRegression(root, parent).relationships[0]?.exclusion?.path, 'exclusion.json');
-  base.bind('local', base.round, base.roundRef, 'same-build', [{ defect, fixRevision: 'r1' }], { exclusions: [stale] });
-  assert.throws(() => currentReleaseRegression(root, parent), /conflicts with evidence/);
+  assert.throws(() => base.bind('local', base.round, base.roundRef, 'same-build', [{ defect, fixRevision: 'r1' }], { exclusions: [stale] }), /conflicts with evidence/);
 });
 
 test('a new fix revision invalidates active completion while preserving the original receipt', () => {

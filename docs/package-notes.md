@@ -1,6 +1,10 @@
 # Package notes
 
-**Version:** 1.14.1. **Created:** 22 October 2026. **Updated:** 12 November 2026. **State:** reusable workflow package.
+**Version:** 1.14.2. **Created:** 22 October 2026. **Updated:** 12 November 2026. **State:** reusable workflow package.
+
+## Version 1.14.2 — scope reconciliation and reactivation
+
+Release scope preview and binding reconcile the board, fix ledger and manifest before execution. Connected boards require an authoritative linked-ticket inventory at scope review and a fresh observation for G5. Every local Rework move and its recovery require reviewed original confirmation failure, including moves from Deferred. [Post-fix verification](../automation/regression/README.md)
 
 ## Version 1.14.1 — release reconciliation and Rework
 

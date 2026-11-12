@@ -29,7 +29,7 @@ The input is the evidence reference itself. The result shows module, test type, 
 
 At G1, record the expected coverage before observing results. Identify the affected modules, shared journeys, applicable test types, required conditions, and exclusions or open questions. At G2, link the checks and bind the reviewed round to its assignment and exact target. Bring these details into the existing human briefings.
 
-In the G1 record, pin the [release change manifest](../regression/README.md#carry-regression-into-release-sign-off) as `changeManifest`. It independently accounts for included fixes and the regression baseline and affected checks. G5 compares it with known linked fixes and checks their current evidence for the exact release target.
+In the G1 record, pin the [release change manifest](../regression/README.md#carry-regression-into-release-sign-off) as `changeManifest`. Preview the reconciliation before briefing the reviewer. Binding rechecks membership, fix intake and coverage for the exact target. G5 rechecks those relationships and requires current test results.
 
 | Version 1 round field | Contents |
 | --- | --- |
@@ -50,11 +50,12 @@ Use `assignment: { source, ticketId }` in the review records. For the local boar
 
 ```shell
 npm run qa -- release scope --input .local/assignment.json
+npm run qa -- release preview-scope --input .local/draft-scope.json
 npm run qa -- release bind-scope --input .local/approved-round.json
 npm run qa -- release invalidate-scope --input .local/changed-round.json
 ```
 
-`scope` takes the assignment object and returns the current binding and its revision. `bind-scope` takes `{ assignment, expectedRevision, round, approval }`, where `approval` is the G2 evidence reference and the first `expectedRevision` is `null`. Use one binding per parent assignment. Several assignments can bind to the same round when their reviews cover it. On a material change, `invalidate-scope` takes `{ assignment, expectedRevision, observation }`; the observation JSON records the assignment, affected round reference, actual reason and source. Record the revised binding when its affected gate is approved. An old assessment can still be opened for historical review.
+`scope` takes the assignment object and returns the current binding and its revision. `preview-scope` takes `{ assignment, round, changeManifest }` with pinned draft references. `bind-scope` takes `{ assignment, expectedRevision, round, approval }`, where `approval` is the G2 evidence reference and the first `expectedRevision` is `null`. Use one binding per parent assignment. Several assignments can bind to the same round when their reviews cover it. On a material change, `invalidate-scope` takes `{ assignment, expectedRevision, observation }`. The observation JSON records the assignment, affected round reference, actual reason and source. Record the revised binding when its affected gate is approved. An old assessment can still be opened for historical review.
 
 ## Retain runs and assess the round
 
@@ -80,7 +81,7 @@ Reuse the authorized route in **Reporting and evidence preferences** when one is
 
 The G5 record includes the existing gate, decision, reviewer, source, and packet, plus the assessed `target` and `handoff: { assessment, route, targetObservation, exceptions? }`. The route has `channel`, `destination`, `recipient`, and boolean `acknowledgementRequired`. The pinned target observation JSON records the actual `buildId`, `environment`, zoned `observedAt` on or after the retained run observations, and `source`. Use a full hashed reference to the decision. A delivery or acknowledgement observation records `decisionSha256`, `recipient`, `destination`, actual `source`, and `state` of `delivered` or `accepted`, respectively.
 
-- **Live board.** Preview the handoff comment with `purpose: "releaseHandoff"` and the assessment reference. Preview the Tested-Ok move with the same assessment. Include `route` in both proposals when there is no saved destination. The G5 decision covers the exact preview digests. Publish the reviewed comment first or retain delivery through the recorded channel. Then provide applicable delivery and acknowledgement references with the move. Reconcile uncertain writes against the actual native record. Close the claim with `disposition: "completed"` after confirmation. Use `released` with actual disposition evidence to release a claim and keep the assignment eligible for future work.
+- **Live board.** Preview the handoff comment with `purpose: "releaseHandoff"` and the assessment reference. Preview the Tested-Ok move with the same assessment. Include the fresh `boardInventory` in both proposals and the G5 handoff, and include the returned regression digest in G5. Add `route` to both proposals when there is no saved destination. The G5 decision covers the exact preview digests. Publish the reviewed comment first or retain delivery through the recorded channel. Then provide applicable delivery and acknowledgement references with the move. Reconcile uncertain writes against the actual native record. Close the claim with `disposition: "completed"` after confirmation. Use `released` with actual disposition evidence to release a claim and keep the assignment eligible for future work.
 - **Human-managed live board.** Use `task-source observe-completion --input` with `{ id, claimId, decision, source, delivery, acknowledgement? }` after the human has delivered the approved handoff and the native ticket can be read at its single mapped Tested-Ok destination. Then close the claim with the actual disposition. This route also works for read-only board access.
 - **Local board.** Use the recorded channel. The G5 decision binds the local `ticketId` and `ticketRevision`. Include `release: { decision, delivery, acknowledgement? }` on the Tested-Ok transition. The transition retains those evidence references in the ticket history.
 
