@@ -36,7 +36,7 @@ Version 1.8.0 introduces agent tool selection per task and explicit test-data in
 
 Version 1.14.3 binds every parent G5 decision to the exact reviewed scope and change manifest. A connected board also needs a fresh authoritative inventory for each publication and closure action. Every Rework route requires a reviewed failure of the original confirmation. Retest check-ins show pending regression batches, and scoped closure requires [current confirmation and regression evidence](automation/regression/README.md).
 
-Version 1.15.0 carries a single human batch approval into [case checkpoints](automation/execution/README.md). Current sign-off links conclusive verdicts to settled case evidence. Flow disputes identify affected cases for review and can leave independent work eligible.
+Version 1.15.1 carries a single human batch approval into [case checkpoints](automation/execution/README.md). Current sign-off links conclusive verdicts to settled case evidence. Flow disputes identify affected cases for review and can leave independent work eligible. Product runner invocations consume reviewed reservations, and eligible prerequisite receipts survive repeated resumes. Open-fix disposition and current release verification require case evidence.
 
 Version 1.13.0 requires [module-based release evidence](automation/release/README.md) for parent G5 completion. The current assignment round binds approved coverage to the exact target and retained runs. Actual handoff and required acceptance govern closure across local and live sources. Upgrade open assignments using traceable evidence and preserve completed decisions.
 

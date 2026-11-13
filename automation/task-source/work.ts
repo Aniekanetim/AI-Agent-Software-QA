@@ -358,15 +358,15 @@ function scopedDefect(root: string, claim: Claim, ref: Evidence | undefined) {
   return true;
 }
 
-function scopedCompletion(root: string, claim: Claim, defect: Evidence, completion: DefectCompletion | undefined, preview = false) {
+function scopedCompletion(root: string, claim: Claim, defect: Evidence, completion: DefectCompletion | undefined, preview = false, requireCases = false) {
   scopedDefect(root, claim, defect);
-  const digest = defectCompletion(root, assignmentFor(claim), claim.ticket.revision, completion, defect, preview);
+  const digest = defectCompletion(root, assignmentFor(claim), claim.ticket.revision, completion, defect, preview, requireCases);
   const review = preview ? undefined : completion?.fix ? fixStatus(root, completion.fix).review ?? undefined : completion?.refutation;
   return { defect, completion: completion!, digest, ...(review ? { review } : {}) };
 }
 
 function confirmRelease(root: string, claim: Claim, completion: Publication, publications: Publication[], board: ReleaseBoard | undefined,
-  inventoryRecheck: Evidence | undefined) {
+  inventoryRecheck: Evidence | undefined, requireCases = false) {
   const handoff = completion.handoff!;
   const decision = approvedGate(root, claim, completion.decision, 'G5');
   const route = handoff.route ?? decision.handoff?.route;
@@ -374,7 +374,7 @@ function confirmRelease(root: string, claim: Claim, completion: Publication, pub
     throw new Error('Verify the actual reviewed release completion at its native destination.');
   }
   reviewHandoff(root, decision, handoff.assessment, route, assignmentFor(claim), board,
-    actionInventory('close', claim.id, completion.decision, inventoryRecheck, completion));
+    actionInventory('close', claim.id, completion.decision, inventoryRecheck, completion), requireCases);
   const confirmed = publications.some(item => item.handoff?.kind === 'delivery' &&
     sameEvidence(item.decision, completion.decision) && sameEvidence(item.handoff.assessment, handoff.assessment));
   verifyDelivery(root, completion.decision, route, handoff.delivery ?? {}, handoff.observed ? 'observed' : confirmed ? 'publication' : undefined);
@@ -403,12 +403,12 @@ export function closeClaim(root: string, request: CloseClaimRequest, board?: Rel
     const completion = publications.filter(item => item.handoff?.kind === 'completion').at(-1);
     if (request.disposition === 'completed' && completion) {
       if (request.requireCases) verifyHandoffCases(root, approvedGate(root, claim, completion.decision, 'G5'));
-      confirmRelease(root, claim, completion, publications, board, request.inventoryRecheck);
+      confirmRelease(root, claim, completion, publications, board, request.inventoryRecheck, request.requireCases);
     } else if (request.disposition === 'completed') {
       const moved = publications.filter(item => item.destination?.queue === 'testedOk').at(-1);
       if (!moved?.fixProof && !request.defect) throw new Error('Use completed after the confirmed G5 move with current release or fix evidence.');
       if (!moved?.fixProof || moved.remoteId !== claim.ticket.id ||
-          JSON.stringify(scopedCompletion(root, claim, moved.fixProof.defect, moved.fixProof.completion)) !== JSON.stringify(moved.fixProof)) {
+          JSON.stringify(scopedCompletion(root, claim, moved.fixProof.defect, moved.fixProof.completion, false, request.requireCases)) !== JSON.stringify(moved.fixProof)) {
         throw new Error('Verify the actual scoped defect completion with confirmation and regression evidence.');
       }
     } else if (request.disposition !== 'released') {
@@ -508,7 +508,7 @@ const proposalDigest = (claim: Claim, mutation: Mutation, release?: ReturnType<t
   fix?: ReturnType<typeof scopedCompletion>, failed?: ReturnType<typeof reworkPreview>) =>
   digest(JSON.stringify({ claimId: claim.id, revision: claim.ticket.revision, mutation, ...(release ? { release } : {}),
     ...(fix ? { fix } : {}), ...(failed ? { failed } : {}) }));
-export async function publicationPreview(root: string, request: Proposal, reader: BoardReader = readBoard) {
+export async function publicationPreview(root: string, request: Proposal & { requireCases?: boolean }, reader: BoardReader = readBoard) {
   assertNonsecret(request); id(request.id);
   const { claim, choice, connection } = await recheck(root, request.claimId, reader);
   const mutation = publicationMutation(request, claim, choice, connection);
@@ -516,8 +516,8 @@ export async function publicationPreview(root: string, request: Proposal, reader
   if (release) currentAssessment(root, release.assessment, assignmentFor(claim));
   const assignment = assignmentFor(claim);
   const releaseRegression = release ? currentReleaseRegression(root, assignment, nativeReleaseBoard(assignment, connection),
-    { inventory: release.boardInventory }) : undefined;
-  const fix = request.defect ? scopedCompletion(root, claim, request.defect, request.completion, true) : undefined;
+    { inventory: release.boardInventory, requireCases: request.requireCases }) : undefined;
+  const fix = request.defect ? scopedCompletion(root, claim, request.defect, request.completion, true, request.requireCases) : undefined;
   const failed = reworkPreview(root, request, claim);
   return { ticket: claim.ticket.url, mutation, ...(release ? { release, releaseRegression } : {}), ...(fix ? { fix } : {}), ...(failed ? { failed } : {}),
     publicationDigest: proposalDigest(claim, mutation, release, fix, failed) };
@@ -527,7 +527,7 @@ function approvedPublication(root: string, request: PublicationRequest, claim: C
   const release = releasePublication(root, request, claim, choice);
   const gate = release || request.action === 'move' && request.to === 'testedOk' ? 'G5' : 'G3';
   const decision = approvedGate(root, claim, request.decision, gate);
-  const fix = request.defect ? scopedCompletion(root, claim, request.defect, request.completion, true) : undefined;
+  const fix = request.defect ? scopedCompletion(root, claim, request.defect, request.completion, true, request.requireCases) : undefined;
   const failed = reworkPreview(root, request, claim);
   const reviewed = proposalDigest(claim, mutation, release, fix, failed);
   if (decision.publicationDigest !== reviewed && !(Array.isArray(decision.publicationDigests) && decision.publicationDigests.includes(reviewed))) throw new Error('The actual review must cover this exact board publication.');
@@ -554,7 +554,7 @@ function approvedPublication(root: string, request: PublicationRequest, claim: C
       verifyUnderstandingReview(root, decision, readCaseBatch(root, session.batch).batch.understanding);
     }
   }
-  const fixProof = request.defect ? scopedCompletion(root, claim, request.defect, request.completion) : undefined;
+  const fixProof = request.defect ? scopedCompletion(root, claim, request.defect, request.completion, false, request.requireCases) : undefined;
   if (fixProof?.review && !sameEvidence(decision.fixReview, fixProof.review)) throw new Error('Bind the actual G5 publication to the reviewed fix disposition.');
   const rework = failed ? { fix: failed.fix, review: request.decision } : undefined;
   if (rework) verifyRework(root, assignmentFor(claim), claim.ticket.revision, rework);
@@ -614,7 +614,7 @@ export async function publish(root: string, request: PublicationRequest, reader:
       }
     }
     return updatePublication(root, record.id, item => {
-      finishObservedReview(root, claim, item, observedReleaseBoard);
+      finishObservedReview(root, claim, item, observedReleaseBoard, undefined, request.requireCases);
       item.state = 'confirmed';
       if (item.handoff) item.confirmedAt = new Date().toISOString();
       delete item.writerPid;
@@ -636,23 +636,27 @@ function updatePublication(root: string, publicationId: string, update: (item: P
   }));
 }
 
-function finishObservedReview(root: string, claim: Claim, item: Publication, board?: ReleaseBoard, recheck?: InventoryRecheck) {
+function finishObservedReview(root: string, claim: Claim, item: Publication, board?: ReleaseBoard, recheck?: InventoryRecheck, requireCases = false) {
   try {
     if (item.destination?.queue === 'rework') {
       if (!item.rework) throw new Error('Record the reviewed confirmation failure for the observed Rework move.');
       verifyRework(root, assignmentFor(claim), claim.ticket.revision, item.rework);
     }
+    if (item.fixProof && requireCases) {
+      const current = scopedCompletion(root, claim, item.fixProof.defect, item.fixProof.completion, false, true);
+      if (JSON.stringify(current) !== JSON.stringify(item.fixProof)) throw new Error('Reconcile the observed move against the current reviewed fix disposition.');
+    }
     if (item.handoff && (item.handoff.kind === 'completion' || recheck)) {
       const route = item.handoff.route;
       if (!route || !board) throw new Error('Reconcile the observed release move against the current canonical board.');
-      reviewHandoff(root, approvedGate(root, claim, item.decision, 'G5'), item.handoff.assessment, route, assignmentFor(claim), board, recheck);
+      reviewHandoff(root, approvedGate(root, claim, item.decision, 'G5'), item.handoff.assessment, route, assignmentFor(claim), board, recheck, requireCases);
     }
   } catch (error) {
     item.reviewRequired = error instanceof Error ? error.message : 'Review the evidence for the observed board move.';
   }
 }
 
-interface PublicationObservation { id: string; state: 'confirmed' | 'notApplied'; remoteId?: string; source: string; evidence: Evidence[]; moveObservation?: Evidence; inventoryRecheck?: Evidence }
+interface PublicationObservation { id: string; state: 'confirmed' | 'notApplied'; remoteId?: string; source: string; evidence: Evidence[]; moveObservation?: Evidence; inventoryRecheck?: Evidence; requireCases?: boolean }
 export function reconcilePublication(root: string, request: PublicationObservation, board?: ReleaseBoard) {
   requireText(request.source, 'Actual reconciliation observation');
   if (!['confirmed', 'notApplied'].includes(request.state) || !request.evidence?.length) throw new Error('Record the independently observed terminal outcome with evidence.');
@@ -680,7 +684,7 @@ export function reconcilePublication(root: string, request: PublicationObservati
     item.reconciliation = { source: request.source, evidence: [...request.evidence, ...(request.moveObservation ? [request.moveObservation] : [])] };
     if (request.state === 'confirmed') {
       const recheck = item.handoff ? actionInventory('reconcile', item.id, item.decision, request.inventoryRecheck, item) : undefined;
-      finishObservedReview(root, claim, item, board, recheck);
+      finishObservedReview(root, claim, item, board, recheck, request.requireCases);
       if (recheck?.evidence && !item.reviewRequired) item.reconciliation.inventoryRecheck = recheck.evidence;
       if (item.handoff) item.confirmedAt = new Date().toISOString();
     }
@@ -732,7 +736,15 @@ export async function observeReleaseCompletion(root: string, request: { id: stri
       throw new Error('Reconcile any pending publication or execution before recording release completion.');
     }
     const decision = approvedGate(root, claim, request.decision, queue === 'rework' ? 'G3' : 'G5');
-    const fixProof = request.defect ? scopedCompletion(root, claim, request.defect, request.completion) : undefined;
+    let fixProof: ReturnType<typeof scopedCompletion> | undefined;
+    let reviewRequired: string | undefined;
+    if (request.defect) {
+      fixProof = scopedCompletion(root, claim, request.defect, request.completion);
+      if (request.requireCases) {
+        try { scopedCompletion(root, claim, request.defect, request.completion, false, true); }
+        catch (error) { reviewRequired = error instanceof Error ? error.message : 'Review the observed fix completion.'; }
+      }
+    }
     let rework: ReworkDecision | undefined;
     let handoff: Publication['handoff'];
     if (queue === 'rework') {
@@ -763,6 +775,7 @@ export async function observeReleaseCompletion(root: string, request: { id: stri
       id: request.id, claimId: claim.id, ticketId: claim.ticket.id, fingerprint, action: 'move', state: 'confirmed',
       startedAt: confirmedAt, source: request.source, decision: request.decision, remoteId: observed.id,
       destination: { queue, id: destinationId },
+      ...(reviewRequired ? { reviewRequired } : {}),
       ...(fixProof ? { fixProof } : rework ? { rework } : { handoff, confirmedAt }),
     };
     current.value.publications.push(publication);

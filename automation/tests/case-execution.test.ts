@@ -2,14 +2,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { caseResult, finishCases, inspectCases, observeCheckpoint, prepareCheckpoint, runApprovedCases, startCases, verifyCaseAuthorization, verifyCaseCheckpoint } from '../execution/cases.js';
+import { caseResult, claimCaseCheckpoint, finishCases, inspectCases, observeCheckpoint, prepareCheckpoint, runApprovedCases, startCases, verifyCaseAuthorization, verifyCaseCheckpoint, type CaseDefinition } from '../execution/cases.js';
 import { recordAssessment, retainRun, verifyAssessment } from '../release/round.js';
 import { releaseFixture } from './release-fixture.js';
 import { pinned } from '../release/library.js';
 import { currentAssessment, verifyHandoffCases } from '../release/handoff.js';
 import { preflightLocalData, prepareLocalCase, runLocalCases } from '../data/local.js';
 import { boardRoot, findTicket } from '../board/board.js';
-import type { Evidence } from '../shared/store.js';
+import { spawnSync } from 'node:child_process';
+import { digest, type Evidence } from '../shared/store.js';
+import { execute as executeWebMcp, type Invocation } from '../chrome-devtools/webmcp.js';
+import type { Bridge } from '../chrome-devtools/transport.js';
+import type { ChromeSettings } from '../chrome-devtools/config.js';
 
 function fixture() {
   const folder = resolve('output/case-execution-fixtures');
@@ -20,11 +24,12 @@ function fixture() {
   const definition = base.library.checks[0]!.definition;
   const original = base.library.conditions[0]!.basis;
   const current = base.put('current-settings.json', { requirement: 'A saved reporting route governs handoff delivery.' });
-  const other = base.put('other-rule.json', { requirement: 'The reporting list loads independently.' });
+  const other = base.put('accepted-other-rule.json', { requirement: 'The reporting list loads independently.' });
+  const currentOther = base.put('other-rule.json', { requirement: 'The reporting list loads independently.' });
   const log = base.put('observed.json', { source: 'Synthetic test observation' });
   const checkpoint = [{ id: 'precondition', action: 'Inspect approved starting state', expected: 'Role and state match' },
     { id: 'result', action: 'Perform reviewed action', expected: 'Approved outcome occurs' }];
-  const cases = [
+  const cases: CaseDefinition[] = [
     { id: 'first', flowId: 'route', checkId: 'shared', conditionId: 'route', criteria: ['route-rule'], definition, dependsOn: [], checkpoints: checkpoint },
     { id: 'dependent', flowId: 'route', checkId: 'dependent-check', conditionId: 'route', criteria: ['route-rule'], definition,
       dependsOn: ['first'], checkpoints: checkpoint },
@@ -35,7 +40,7 @@ function fixture() {
   function authorize(selected = cases, suffix = 'original', accepted = original, liveSource = current, flow = 'Save a route and deliver using that route.') {
     const understanding = base.put(`understanding-${suffix}.json`, { schemaVersion: 1, assignment,
       sources: [{ id: 'route-rule', authority: 'Reviewed reporting rule', accepted, current: liveSource },
-        { id: 'list-rule', authority: 'Reviewed listing rule', accepted: other, current: other }],
+        { id: 'list-rule', authority: 'Reviewed listing rule', accepted: other, current: currentOther }],
       flows: [{ id: 'route', featureId: 'reporting', relationshipIds: [], actor: 'Release reviewer', startingState: 'Approved target',
         expectedFlow: flow, criteria: ['route-rule'] },
       { id: 'list', featureId: 'reporting-list', relationshipIds: [], actor: 'Release reviewer', startingState: 'Approved target',
@@ -182,6 +187,46 @@ test('a runner can invoke only the reserved action after preconditions and sourc
   assert.throws(invoke, /evidence is missing or changed/);
 });
 
+test('the public product commands reject omitted checkpoints before dispatch', async () => {
+  const f = fixture();
+  const target = { environment: 'staging', build: 'build-1', baseUrl: 'http://127.0.0.1:12345', source: 'Synthetic' };
+  const request = f.base.put('.local/postman-run.json', { id: 'no-checkpoint', target, source: 'Synthetic',
+    authorizationReference: 'Synthetic scope', approvedInputs: [f.definition],
+    collection: { kind: 'file', reference: f.definition.path, format: 'v2.1' }, timeoutMs: 1000 });
+  const cli = resolve('.local/build/automation/cli.js');
+  const result = spawnSync(process.execPath, [cli, '--root', f.root, 'postman', 'run', '--input', request.path], { encoding: 'utf8' });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /approved case checkpoint/);
+  const bridge = { call: async () => { assert.fail('Product action was dispatched'); } } as unknown as Bridge;
+  await assert.rejects(executeWebMcp(f.root, bridge, {} as ChromeSettings, { id: 'no-checkpoint' } as Invocation), /approved case checkpoint/);
+});
+
+test('a reserved runner action cannot be substituted or sent twice under different invocation IDs', async () => {
+  const f = fixture();
+  const checkpoint = { id: 'guarded', caseId: 'first', checkpoint: 'result' };
+  const inputDigest = digest('approved invocation');
+  const first = f.cases[0]!;
+  const auth = f.authorize([{ ...first, checkpoints: [first.checkpoints[0]!, {
+    ...first.checkpoints[1]!, runner: { kind: 'postman', inputDigest },
+  }] }]);
+  startCases(f.root, { ...auth, id: checkpoint.id, target: f.base.targetEvidence });
+  const next = { id: checkpoint.id, caseId: 'first', target: f.base.targetEvidence };
+  prepareCheckpoint(f.root, next);
+  observeCheckpoint(f.root, { ...f.observation, ...checkpoint, checkpoint: 'precondition', outcome: 'matched' });
+  prepareCheckpoint(f.root, next);
+  const claim = (id: string, inputs = inputDigest) => claimCaseCheckpoint(f.root, checkpoint, [f.definition], f.base.target,
+    { kind: 'postman', id, inputDigest: inputs });
+  assert.throws(() => claim('different-input', digest('different invocation')), /exact runner and inputs/);
+  assert.throws(() => observeCheckpoint(f.root, { ...f.observation, ...checkpoint, outcome: 'matched' }), /recorded runner/);
+  claim('original');
+  assert.throws(() => claim('retry-with-new-id'), /already has a runner invocation/);
+  assert.throws(() => finishCases(f.root, checkpoint.id), /in-flight/);
+  observeCheckpoint(f.root, { ...f.observation, ...checkpoint, outcome: 'interrupted' });
+  const original = finishCases(f.root, checkpoint.id);
+  assert.equal(original.session.attempts[0]?.status, 'Partial');
+  assert.equal(original.session.attempts[0]?.observations[1]?.invocation?.id, 'original');
+});
+
 test('resuming an interrupted dependent case reuses a valid prerequisite and rechecks starting state', async () => {
   const f = fixture(), auth = f.authorize(f.cases.slice(0, 2));
   startCases(f.root, { ...auth, id: 'original', target: f.base.targetEvidence });
@@ -189,11 +234,35 @@ test('resuming an interrupted dependent case reuses a valid prerequisite and rec
     ({ ...f.observation, outcome: step.caseId === 'dependent' && step.checkpoint.id === 'result' ? 'interrupted' : 'matched' }) });
   assert.deepEqual(result.session.attempts.map(item => item.status), ['Pass', 'Partial']);
   startCases(f.root, { ...auth, id: 'resumed', target: f.base.targetEvidence, previous: result.receipt, caseIds: ['dependent'] });
+  const interrupted = await runApprovedCases(f.root, 'resumed', { target: () => f.base.targetEvidence, execute: step =>
+    ({ ...f.observation, outcome: step.checkpoint.id === 'result' ? 'interrupted' : 'matched' }) });
+  assert.equal(interrupted.session.attempts[0]?.status, 'Partial');
+  startCases(f.root, { ...auth, id: 'resumed-again', target: f.base.targetEvidence, previous: interrupted.receipt, caseIds: ['dependent'] });
   const checkpoints: string[] = [];
-  const resumed = await runApprovedCases(f.root, 'resumed', { target: () => f.base.targetEvidence, execute: step => {
+  const resumed = await runApprovedCases(f.root, 'resumed-again', { target: () => f.base.targetEvidence, execute: step => {
     checkpoints.push(step.checkpoint.id);
     return { ...f.observation, outcome: 'matched' };
   } });
   assert.deepEqual(checkpoints, ['precondition', 'result']);
   assert.equal(resumed.session.attempts[0]?.status, 'Pass');
+  assert.deepEqual(resumed.session.verifiedPrerequisites?.[0]?.receipt, result.receipt);
+});
+
+test('a stale carried prerequisite blocks its dependent but does not block unrelated cases', async () => {
+  const f = fixture();
+  const cases = [{ ...f.cases[0]!, flowId: 'list', criteria: ['list-rule'] }, f.cases[1]!, f.cases[2]!];
+  const auth = f.authorize(cases);
+  startCases(f.root, { ...auth, id: 'initial', target: f.base.targetEvidence, caseIds: ['first'] });
+  const first = await runApprovedCases(f.root, 'initial', { target: () => f.base.targetEvidence,
+    execute: () => ({ ...f.observation, outcome: 'matched' }) });
+  startCases(f.root, { ...auth, id: 'partial', target: f.base.targetEvidence, previous: first.receipt, caseIds: ['dependent'] });
+  const partial = await runApprovedCases(f.root, 'partial', { target: () => f.base.targetEvidence,
+    execute: () => ({ ...f.observation, outcome: 'interrupted' }) });
+  f.base.put('other-rule.json', { requirement: 'Changed independently of the dependent flow.' });
+  startCases(f.root, { ...auth, id: 'retry', target: f.base.targetEvidence, previous: partial.receipt, caseIds: ['dependent', 'same-flow'] });
+  const settled = await runApprovedCases(f.root, 'retry', { target: () => f.base.targetEvidence,
+    execute: () => ({ ...f.observation, outcome: 'matched' }) });
+  assert.equal(settled.session.verifiedPrerequisites, undefined);
+  assert.equal(settled.session.attempts.find(item => item.caseId === 'dependent')?.observations.length, 0);
+  assert.equal(settled.session.attempts.find(item => item.caseId === 'same-flow')?.status, 'Pass');
 });

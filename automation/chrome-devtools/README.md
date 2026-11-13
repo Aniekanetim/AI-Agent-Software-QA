@@ -86,6 +86,7 @@ For CLI operation, prepare `.local/chrome-scope.json` containing `source` and `a
 npm run qa -- chrome session-start --input .local/chrome-scope.json
 npm run qa -- chrome page --input .local/chrome-page.json
 npm run qa -- chrome inventory --input .local/chrome-inventory-input.json
+npm run qa -- chrome case-input-digest --input .local/chrome-invocation-request.json
 npm run qa -- chrome execute --input .local/chrome-invocation-input.json
 npm run qa -- chrome confirm --input .local/chrome-confirmation.json
 npm run qa -- chrome session-stop --id actual-returned-session-id
@@ -98,7 +99,7 @@ The agent prepares the input files, using actual returned identities and observa
 | Page | `sessionId`, `url`, `source`, `authorization` evidence array |
 | Inventory | `sessionId`, `source`, optional `channel` (`application` or `debugging`), and `target` |
 | Target | `pageId`, exact current `url`, `role`, `accountState`, `build` (or null if unknown), `contextEvidence` array |
-| Invocation | `sessionId` and `request`: unique `id`, inventory evidence reference, target, toolName, JSON-object input, effect (`read`/`write`/`unknown`), source and authorization evidence |
+| Invocation | `sessionId` and `request`: unique `id`, inventory evidence reference, target, toolName, JSON-object input, effect (`read`/`write`/`unknown`), source, authorization evidence including the case definition, and `caseCheckpoint` |
 | Confirmation | Original invocation `id` and `confirmation`: outcome (`confirmed`/`failed`/`blocked`), source, evidence array and redacted summary |
 
 An example invocation shape:
@@ -114,19 +115,20 @@ An example invocation shape:
       "url": "https://staging.example.test/drafts",
       "role": "actual-observed-role",
       "accountState": "actual-account-and-starting-state-reference",
-      "build": null,
+      "build": "actual-observed-build-identity",
       "contextEvidence": [ { "path": "actual-context-evidence.md", "sha256": "actual-hash" } ]
     },
     "toolName": "actual-discovered-tool-name",
     "input": { "name": "Task-authorized synthetic draft" },
     "effect": "write",
     "source": "actual-task-and-action-reference",
-    "authorization": [ { "path": "actual-reviewed-action-scope.md", "sha256": "actual-hash" } ]
+    "authorization": [ { "path": "actual-case-definition.json", "sha256": "actual-hash" } ],
+    "caseCheckpoint": { "id": "approved-execution-id", "caseId": "case-id", "checkpoint": "reviewed-action-id", "environment": "staging" }
   }
 }
 ```
 
-The reviewed scope must cover the actual operation and inputs. A nonempty source/evidence field is not proof of human approval; the agent must read and follow the actual decision. Routine in-scope choices require no repeated approval. Material changes return to the affected existing review gate.
+For `case-input-digest`, pass the inner `request` object. Pin the digest on the WebMCP action checkpoint before G2 or G4 review. During execution, observe the starting state and reserve that checkpoint before sending the product invocation. Catalogue inspection and independently authorized discovery retain their existing procedures. A nonempty source/evidence field is not proof of human approval; the agent must read and follow the actual decision. Routine in-scope choices require no repeated approval. Material changes return to the affected existing review gate.
 
 Programmatic terminal SDK use is available through `withMcpSession`, `openPage`, `captureInventory`, `execute` and `confirmOutcome`. The SDK callback receives a `Bridge`; it is scoped to that owned connection and is closed after the callback. Do not classify it as `chromeDevtoolsHost`.
 

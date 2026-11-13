@@ -135,7 +135,7 @@ export function settleOperation(root: string, request: { id: string; source: str
     save(root, path, record.value, record.revision); return record.value;
   });
 }
-function decisionValid(root: string, request: Transition, ticket: Ticket) {
+function decisionValid(root: string, request: Transition, ticket: Ticket, requireCases: boolean) {
   const d = request.decision; assertNonsecret(request);
   if (ticket.issues.length) throw new Error(`Reconcile lifecycle for ${ticket.id}: ${ticket.issues.join(' ')}`);
   if (!statuses.includes(request.to) || request.expectedRevision !== ticket.revision) throw new Error('Reload the actual ticket revision and select a supported destination.');
@@ -160,7 +160,7 @@ function decisionValid(root: string, request: Transition, ticket: Ticket) {
     verifyLocalHandoff(root, ticket.id, ticket.revision, request.release);
   }
   if (request.to === 'Tested-Ok' && !requiresRelease(ticket.id, ticket.text)) {
-    return defectCompletion(root, { source: 'local', ticketId: ticket.id }, ticket.revision, request.defect);
+    return defectCompletion(root, { source: 'local', ticketId: ticket.id }, ticket.revision, request.defect, undefined, false, requireCases);
   }
   if (request.to === 'Rework') {
     if (!request.rework || requiresRelease(ticket.id, ticket.text)) throw new Error('Record the reviewed confirmation failure for this defect before moving it to Rework.');
@@ -206,11 +206,11 @@ function navigationContent(root: string, text: string, path: string, from: strin
   if (last < first) throw new Error('The mutable navigation markers are out of order.');
   return text.slice(0, first) + rewriteLinks(root, text.slice(first, last), path, path, from, to) + text.slice(last);
 }
-function prepare(root: string, request: Transition): Journal {
+function prepare(root: string, request: Transition, requireCases = false): Journal {
   safeKey(request.id); const path = `.local/board-transitions/${request.id}.json`, hash = digest(JSON.stringify(request));
   const earlier = load<Journal | null>(root, path, () => null).value;
   if (earlier) { if (earlier.requestHash !== hash) throw new Error('This operation ID belongs to a different transition.'); return earlier; }
-  const ticket = findTicket(root, request.ticketId), defectDigest = decisionValid(root, request, ticket);
+  const ticket = findTicket(root, request.ticketId), defectDigest = decisionValid(root, request, ticket, requireCases);
   const destination = `${boardRoot}/${request.to}/${ticket.path.split('/').at(-1)}`;
   if (destination !== ticket.path && existsSync(contained(root, destination))) throw new Error('The destination already exists; never overwrite another ticket.');
   const event: Lifecycle = { ...request.decision, schemaVersion: 1, id: request.id, at: new Date().toISOString(), from: ticket.status, to: request.to, previousOwner: field(ticket.text, 'Owner / claimed at'), previousWaiting: field(ticket.text, 'Waiting on'), previousCheckpoint: field(ticket.text, 'Workflow checkpoint') };
@@ -293,7 +293,7 @@ function complete(root: string, journal: Journal, requireCases = false) {
         verifyLocalHandoff(root, journal.ticketId, journal.before, { ...journal.release, requireCases: requireCases || journal.release.requireCases });
       }
       if (entry.to === 'Tested-Ok' && !releaseRequired) {
-        const checked = defectCompletion(root, { source: 'local', ticketId: journal.ticketId }, journal.before, journal.defect);
+        const checked = defectCompletion(root, { source: 'local', ticketId: journal.ticketId }, journal.before, journal.defect, undefined, false, requireCases);
         const reviewed = journal.defect?.fix ? fixStatus(root, journal.defect.fix).review : journal.defect?.refutation;
         if (checked !== journal.defectDigest || !reviewed || !entry.evidence.some(ref => sameEvidence(ref, reviewed))) {
           throw new Error('The reviewed fix or no-change disposition changed before recovery.');
@@ -331,7 +331,7 @@ function finish(root: string, journal: Journal, requireCases = false) {
 }
 export function prepareTransition(root: string, request: Transition) { return withLock(root, 'qa-board', () => prepare(root, request)); }
 export function recoverTransition(root: string, id: string, requireCases = false) { return withLock(root, 'qa-board', () => finish(root, load<Journal>(root, `.local/board-transitions/${safeKey(id)}.json`, () => { throw new Error('Unknown transition journal.'); }).value, requireCases)); }
-export function transitionTicket(root: string, request: Transition) { return withLock(root, 'qa-board', () => finish(root, prepare(root, request))); }
+export function transitionTicket(root: string, request: Transition, requireCases = false) { return withLock(root, 'qa-board', () => finish(root, prepare(root, request, requireCases), requireCases)); }
 export function reviews(root: string, now = new Date().toISOString(), trigger?: string) {
   if (!zonedTime(now)) throw new Error('Use the actual review-check time with timezone.');
   return tickets(root).filter(t => t.status === 'Deferred' && t.lifecycle?.to === 'Deferred' && t.lifecycle.review).flatMap(t => {

@@ -77,8 +77,8 @@ const help = {
   coverage: 'assess --input : read-only consistency/count check of a canonical-record snapshot; no execution, approval or product verdict',
   tools: 'bind --input | scan --source [--tool] | select --input | status --tool [--requires operation,operation] | import-host --input | assess-task --input [--claim ID] : read-only assessment of agent-selected capabilities',
   data: 'status [--input] | inventory [--input] | assess --input | preflight --input | intake-inspect --file [--format] [--table N] [--from-line N] [--through-line N] | intake-note --input | intake-preview --input | intake-register --input --preview-sha256 --review-source | intake-list',
-  chrome: 'check --source | mcp-config | rehearse --provider cli/mcpServer [--headless] [--executable path] | session-start --input | page --input | inventory --input | import-host-inventory --input | execute --input | confirm --input | session-stop --id : explicit scoped WebMCP operations; no implicit product authorization',
-  postman: 'check --source | login-instructions | run --input | run-status --id : detects/reuses the CLI; local runs need no login; cloud operations need selected account/reporting scope',
+  chrome: 'check --source | mcp-config | rehearse --provider cli/mcpServer [--headless] [--executable path] | session-start --input | page --input | inventory --input | import-host-inventory --input | case-input-digest --input | execute --input | confirm --input | session-stop --id : explicit scoped WebMCP operations; no implicit product authorization',
+  postman: 'check --source | login-instructions | case-input-digest --input | run --input | run-status --id : detects/reuses the CLI; local runs need no login; cloud operations need selected account/reporting scope',
   onboarding: 'start | roadmap-shown --source | status | next | queue --input | shown/not-shown --id --source | reply --input | recover | reconcile --input | retire-tool-questions --input | pause/resume --source | clarify/defer --input | check/domains --input | finish --input',
   settings: 'open --source | show | choose --area | edit --input | present | save --input | attention-shown --source | save-attention --input | cancel | back | close',
   browser: 'versions | install | mcp-config | check --provider library/cli/mcpServer [--headless] [--context interactive/scheduled/ci] | import-report --input | fixture',
@@ -145,9 +145,9 @@ async function main() {
     else if (action === 'preflight') output(await taskSource.preflight(root, input()));
     else if (action === 'begin') output(await taskSource.beginExecution(root, { ...input<Parameters<typeof taskSource.beginExecution>[1]>(), requireCaseBatch: true }));
     else if (action === 'settle') output(taskSource.settleExecution(root, input()));
-    else if (action === 'publication-preview') output(await taskSource.publicationPreview(root, input()));
+    else if (action === 'publication-preview') output(await taskSource.publicationPreview(root, { ...input<Parameters<typeof taskSource.publicationPreview>[1]>(), requireCases: true }));
     else if (action === 'publish') output(await taskSource.publish(root, { ...input<Parameters<typeof taskSource.publish>[1]>(), requireCases: true }));
-    else if (action === 'reconcile-publication') output(await taskSource.reconcileCurrentPublication(root, input()));
+    else if (action === 'reconcile-publication') output(await taskSource.reconcileCurrentPublication(root, { ...input<Parameters<typeof taskSource.reconcileCurrentPublication>[1]>(), requireCases: true }));
     else if (action === 'observe-completion') output(await taskSource.observeReleaseCompletion(root, { ...input<Parameters<typeof taskSource.observeReleaseCompletion>[1]>(), requireCases: true }));
     else if (action === 'close') output(await taskSource.closeCurrentClaim(root, { ...input<Parameters<typeof taskSource.closeCurrentClaim>[1]>(), requireCases: true }));
     else throw new Error('Unknown task-source operation; use help.');
@@ -179,7 +179,7 @@ async function main() {
       if (action === 'transition') {
         const request = input<board.Transition>();
         if (request.release) request.release.requireCases = true;
-        record = board.transitionTicket(root, request);
+        record = board.transitionTicket(root, request, true);
       } else record = board.recoverTransition(root, option('id'), true);
       output({ id: record.id, ticketId: record.ticketId, state: record.state, recordedDestination: record.to, ownerUpdates: record.ownerUpdates, linkUpdates: record.linkUpdates ?? [],
         ...(record.releaseReviewRequired ? { releaseReviewRequired: record.releaseReviewRequired } : {}) });
@@ -245,7 +245,7 @@ async function main() {
     else if (action === 'approve-plan') output(approveFixPlan(root, { ...input<Parameters<typeof approveFixPlan>[1]>(), requireCases: true }));
     else if (action === 'status') output(fixStatus(root, option('fix')));
     else if (action === 'retain-results') output(retainFixResults(root, input()));
-    else if (action === 'record-review') output(recordFixReview(root, input()));
+    else if (action === 'record-review') output(recordFixReview(root, { ...input<Parameters<typeof recordFixReview>[1]>(), requireCases: true }));
     else if (action === 'release') output(await taskSource.reconcileReleaseBoard(root, input()));
     else throw new Error('Run regression help to see the available commands.');
     return;
@@ -301,7 +301,8 @@ async function main() {
     else if (action === 'inventory') {
       const value = input<{ sessionId: string; target: webmcp.Target; source: string; channel?: webmcp.Inventory['channel'] }>();
       output(await webmcp.captureInventory(root, chromeTransport.cliBridge(root, value.sessionId), chromeConfig.requireSettings(root), value.target, value.source, value.channel));
-    } else if (action === 'execute') {
+    } else if (action === 'case-input-digest') output({ inputDigest: webmcp.caseInputDigest(input()) });
+    else if (action === 'execute') {
       const value = input<{ sessionId: string; request: webmcp.Invocation }>();
       const result = await webmcp.execute(root, chromeTransport.cliBridge(root, value.sessionId), chromeConfig.requireSettings(root), value.request);
       output(result); if (result.invocation !== 'reportedCompleted') process.exitCode = 1;
@@ -314,6 +315,7 @@ async function main() {
     if (action === 'check') output(await postman.inspect(root, option('source')));
     else if (action === 'login-instructions') output(postman.loginInstructions(root));
     else if (action === 'run-status') output(postman.runStatus(root, option('id')));
+    else if (action === 'case-input-digest') output({ inputDigest: postman.caseInputDigest(input()) });
     else if (action === 'run') { const result = await postman.runCollection(root, input()); output(result); if (result.outcome !== 'passed') process.exitCode = 1; }
     else throw new Error('Unknown Postman command.');
     return;

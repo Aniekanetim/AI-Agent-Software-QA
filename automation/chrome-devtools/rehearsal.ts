@@ -7,7 +7,7 @@ import { probe, readRecord, saveRecord, packageCommand, runProcess } from '../to
 import { startWebMcpFixture } from './fixture.js';
 import { withMcpSession, startCliSession, cliBridge, stopCliSession, structured, responseMessage, BridgeFailure, type Bridge } from './transport.js';
 import { type ChromeSettings } from './config.js';
-import { captureInventory, execute, confirmOutcome, type Target } from './webmcp.js';
+import { captureInventory, rehearseInvocation as execute, confirmOutcome, type Target } from './webmcp.js';
 import { fixtureBrowser } from './fixture-browser.js';
 import { rehearseProtocol } from './protocol-rehearsal.js';
 export { fixtureBrowser } from './fixture-browser.js';

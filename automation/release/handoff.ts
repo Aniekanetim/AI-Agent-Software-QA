@@ -74,12 +74,12 @@ export function currentAssessment(root: string, assessment: Evidence, assignment
 }
 
 export function currentReleaseRegression(root: string, assignment: Assignment, liveBoard?: ReleaseBoard,
-  handoff: { inventory?: Evidence; observedAt?: string } = {}) {
+  handoff: { inventory?: Evidence; observedAt?: string; requireCases?: boolean } = {}) {
   const scope = requireCurrentScope(root, assignment);
   if (!scope.changeManifest) throw new Error('Pin the independent release change manifest in the reviewed G1 scope before G5.');
   const report = releaseFixes(root, assignment, scope.plan, scope.changeManifest, releaseBoard(root, assignment, liveBoard), handoff);
   const binding = { round: scope.round, approval: scope.approval };
-  return { ...report, binding, digest: digest(JSON.stringify([binding, report.digest])) };
+  return { ...report, binding, requireCases: handoff.requireCases ?? !!scope.plan.caseBatches, digest: digest(JSON.stringify([binding, report.digest])) };
 }
 
 function verifyInventoryRecheck(root: string, decision: ReleaseDecision, assignment: Assignment, board: ReleaseBoard | undefined,
@@ -105,7 +105,7 @@ function verifyInventoryRecheck(root: string, decision: ReleaseDecision, assignm
   if (capture.evidence?.sha256 === approvedInventory.evidence.sha256 || prior && capture.evidence?.sha256 === prior.evidence.sha256) {
     throw new Error('Retain the newly observed authoritative source evidence for this release action.');
   }
-  const current = currentReleaseRegression(root, assignment, board, { inventory: request.evidence, observedAt: decision.approvedAt });
+  const current = currentReleaseRegression(root, assignment, board, { inventory: request.evidence, observedAt: decision.approvedAt, requireCases: approved.requireCases });
   const comparable = ({ binding, manifest, fixes, dispositions, relationships }: typeof current) => ({
     binding, manifest, fixes, dispositions, relationships: relationships.map(({ defect, revision, linked, exclusion }) => ({ defect, revision, linked, exclusion })),
   });
@@ -161,7 +161,7 @@ export function reviewHandoff(root: string, decision: ReleaseDecision, assessmen
     requireText(exception.reason, 'Accepted release exception');
     verifyEvidence(root, exception.decision);
   }
-  const regression = currentReleaseRegression(root, assignment, liveBoard, { inventory: reviewed.boardInventory, observedAt: observed.observedAt });
+  const regression = currentReleaseRegression(root, assignment, liveBoard, { inventory: reviewed.boardInventory, observedAt: observed.observedAt, requireCases: requireCases || !!requireCurrentScope(root, assignment).plan.caseBatches });
   if (reviewed.regressionDigest !== regression.digest) {
     throw new Error('G5 must review the current regression evidence and canonical board reconciliation for this release.');
   }

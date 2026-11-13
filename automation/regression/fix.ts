@@ -299,7 +299,14 @@ export function currentFixes(root: string, defect: Assignment) {
     })() }));
 }
 
-function verifyReview(root: string, entry: Fix, ref: Evidence) {
+function requireCasePlan(root: string, entry: Fix, revision: Revision | undefined) {
+  if (!revision || !readPlan(root, entry, revision).caseDesigns.size) {
+    throw new Error(`Review the confirmation and regression case batches for ${entry.identity.defect.ticketId} at G4 before using this fix as current evidence.`);
+  }
+}
+
+function verifyReview(root: string, entry: Fix, ref: Evidence, requireCases = false) {
+  if (requireCases) requireCasePlan(root, entry, entry.plans.at(-1));
   const current = assess(root, entry);
   if (!current || current.report.state !== 'reviewPending') throw new Error('Complete confirmation and every required regression check before reviewing this fix.');
   const review = pinned<Review>(root, ref, 'fix disposition');
@@ -339,10 +346,10 @@ function verifyReview(root: string, entry: Fix, ref: Evidence) {
   return { review, assessmentDigest: current.assessmentDigest, approval: current.revision.approval };
 }
 
-export function recordFixReview(root: string, request: { fix: string; review: Evidence }) {
+export function recordFixReview(root: string, request: { fix: string; review: Evidence; requireCases?: boolean }) {
   return lock(root, () => {
     const current = ledger(root), entry = findFix(root, request.fix, true, current.value.fixes);
-    verifyReview(root, entry, request.review);
+    verifyReview(root, entry, request.review, request.requireCases);
     const revision = entry.plans.at(-1)!;
     if (!sameEvidence(revision.reviews.at(-1), request.review)) {
       revision.reviews.push(request.review);
@@ -352,16 +359,16 @@ export function recordFixReview(root: string, request: { fix: string; review: Ev
   });
 }
 
-export function requireVerifiedFix(root: string, key: string, defect: Assignment, approval?: Evidence) {
+export function requireVerifiedFix(root: string, key: string, defect: Assignment, approval?: Evidence, requireCases = false) {
   const entry = findFix(root, key);
   const review = entry.plans.at(-1)?.reviews.at(-1);
   if (!sameAssignment(entry.identity.defect, defect) || !review) throw new Error('Record the reviewed confirmation and regression results for this defect.');
-  const verified = verifyReview(root, entry, review);
+  const verified = verifyReview(root, entry, review, requireCases);
   if (approval && !sameEvidence(verified.approval, approval)) throw new Error('Use the same reviewed G4 scope for fix completion.');
   return { key, target: entry.identity.target, ...verified, evidence: review };
 }
 
-export function defectCompletion(root: string, defect: Assignment, ticketRevision: string, completion: DefectCompletion | undefined, approval?: Evidence, preview = false) {
+export function defectCompletion(root: string, defect: Assignment, ticketRevision: string, completion: DefectCompletion | undefined, approval?: Evidence, preview = false, requireCases = false) {
   if (!completion) throw new Error('Record separate confirmation and regression outcomes for the fix, or the reviewed no-change disposition.');
   if (completion.fix) {
     const entry = findFix(root, completion.fix), current = assess(root, entry);
@@ -369,8 +376,9 @@ export function defectCompletion(root: string, defect: Assignment, ticketRevisio
         approval && !sameEvidence(current.revision.approval, approval) || current.report.state !== 'reviewPending') {
       throw new Error('Complete confirmation and every required regression check for the current defect and G4 scope.');
     }
+    if (requireCases) requireCasePlan(root, entry, current.revision);
     if (!preview) {
-      const verified = requireVerifiedFix(root, completion.fix, defect, approval);
+      const verified = requireVerifiedFix(root, completion.fix, defect, approval, requireCases);
       if (verified.review.ticketRevision !== ticketRevision) throw new Error('The scoped fix disposition must cover this ticket revision.');
     }
     return current.assessmentDigest;
@@ -601,12 +609,12 @@ export function reconcileReleaseScope(root: string, assignment: Assignment, roun
 }
 
 export function releaseFixes(root: string, assignment: Assignment, round: Round, manifestRef: Evidence, board: ReleaseBoard,
-  handoff: { inventory?: Evidence; observedAt?: string }) {
+  handoff: { inventory?: Evidence; observedAt?: string; requireCases?: boolean }) {
   const { target } = round;
   const { manifest, relationships, all } = reconcileReleaseScope(root, assignment, round, manifestRef, board, handoff);
   const fixes = manifest.fixes.map(fix => {
     const key = fixKey({ ...fix, target });
-    const verified = requireVerifiedFix(root, key, fix.defect);
+    const verified = requireVerifiedFix(root, key, fix.defect, undefined, handoff.requireCases ?? !!round.caseBatches);
     if (verified.review.findings.some(finding => finding.impact === 'blocking')) throw new Error(`A reviewed regression finding blocks release for ${fix.defect.ticketId}.`);
     return { defect: fix.defect, fixRevision: fix.fixRevision, evidence: verified.evidence, findings: verified.review.findings };
   });

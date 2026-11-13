@@ -404,6 +404,7 @@ test('a live fix uses two batches under one G4, then closes only with reviewed r
   await assert.rejects(live.beginExecution(f.root, { ...regression, id: 'duplicate-regression' }, f.reader), /execution outcome|execution already|pending write/);
   live.settleExecution(f.root, { id: regression.id, state: 'completed', source: 'Fixture completion', evidence: [packet] });
   fix.retain('regression');
+  await assert.rejects(live.publicationPreview(f.root, { ...move, requireCases: true }, f.reader), /case batches/);
   const preview = await live.publicationPreview(f.root, move, f.reader);
   assert.equal(preview.release, undefined);
   const fixReview = fix.review();
@@ -417,7 +418,10 @@ test('a live fix uses two batches under one G4, then closes only with reviewed r
   assert.throws(() => live.reconcilePublication(f.root, confirmationOfMove), /native move observation/);
   const moveObservation = f.put('fix-move.json', { ticketId: claim.ticket.id, destinationId: 'done',
     publicationId: move.id, source: 'Synthetic native board readback' });
-  live.reconcilePublication(f.root, { ...confirmationOfMove, moveObservation });
+  const recovered = live.reconcilePublication(f.root, { ...confirmationOfMove, moveObservation, requireCases: true });
+  assert.match(recovered.reviewRequired ?? '', /case batches/);
+  assert.throws(() => live.closeClaim(f.root, { claimId: claim.id, source: 'Synthetic scoped closure',
+    evidence: [packet], disposition: 'completed', defect, requireCases: true }), /case batches/);
   const closed = live.closeClaim(f.root, { claimId: claim.id, source: 'Synthetic scoped closure', evidence: [packet], disposition: 'completed', defect });
   assert.equal(closed.terminal?.disposition, 'completed');
 });

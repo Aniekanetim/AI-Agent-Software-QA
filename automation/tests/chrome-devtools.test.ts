@@ -8,10 +8,11 @@ import * as registry from '../tools/registry.js';
 import { bindHarness } from '../tools/runtime.js';
 import { nodeCompatible, validateSettings, configurationObject, settingsHash, settingsPath, type ChromeSettings } from '../chrome-devtools/config.js';
 import { type Bridge, type Scope, startCliSession, stopCliSession, cliBridge, structured, responseMessage, decodeCliResponse, BridgeFailure } from '../chrome-devtools/transport.js';
-import { captureInventory, importHostInventory, assessInventory, execute, confirmOutcome, redacted, invocationOutcome, type Target, type Invocation } from '../chrome-devtools/webmcp.js';
+import { captureInventory, importHostInventory, assessInventory, rehearseInvocation as execute, execute as executeProduct, caseInputDigest, confirmOutcome, redacted, invocationOutcome, type Target, type Invocation } from '../chrome-devtools/webmcp.js';
 import { assessTaskTools, type TaskToolPlan } from '../tools/task.js';
 import { integrationStatus } from '../onboarding/integrations.js';
 import { permittedWrite } from '../onboarding/conversation.js';
+import { startCases, prepareCheckpoint, observeCheckpoint } from '../execution/cases.js';
 import { documentTreeHash, requireDocumentBinding } from '../chrome-devtools/document-context.js';
 
 function put(root: string, path: string, value: unknown) { const file = store.contained(root, path); mkdirSync(dirname(file), { recursive: true }); writeFileSync(file, typeof value === 'string' ? value : JSON.stringify(value)); return store.evidence(root, path); }
@@ -164,6 +165,41 @@ test('sensitive fields cannot enter CLI process arguments', async () => {
   const f = fixture(), first = await request(f); first.input = { password: 'synthetic-sensitive-value' };
   await assert.rejects(execute(f.root, f.bridge, f.settings, first), /CLI process arguments/); assert.equal(f.writes(), 0);
 });
+test('WebMCP invokes the approved action once after observing the starting state', async () => {
+  const f = fixture();
+  f.target.build = 'fixture-build';
+  const invocation = await request(f);
+  const assignment = { source: 'local', ticketId: 'QA-001' };
+  const target = { buildId: f.target.build, environment: 'synthetic' };
+  const observedTarget = put(f.root, 'target.json', { ...target, observedAt: new Date().toISOString(), source: 'Synthetic' });
+  const definition = f.scope.authorization[0]!;
+  const understanding = put(f.root, 'understanding.json', { schemaVersion: 1, assignment,
+    sources: [{ id: 'fixture-rule', authority: 'Fixture rule', accepted: definition, current: definition }],
+    flows: [{ id: 'draft', featureId: 'drafts', relationshipIds: [], actor: 'QA', startingState: 'Empty fixture',
+      expectedFlow: 'Create a synthetic draft.', criteria: ['fixture-rule'] }] });
+  const batch = put(f.root, 'batch.json', { schemaVersion: 1, assignment, target, understanding, cases: [{
+    id: 'draft', flowId: 'draft', checkId: 'draft', conditionId: 'empty', criteria: ['fixture-rule'], definition, dependsOn: [],
+    checkpoints: [{ id: 'precondition', action: 'Inspect fixture', expected: 'Empty fixture' },
+      { id: 'create', action: 'Create a synthetic draft', expected: 'Draft saved',
+        runner: { kind: 'webmcp', inputDigest: caseInputDigest(invocation) } }],
+  }] });
+  const review = { assignment, understanding, decision: 'Approved', reviewer: 'Synthetic reviewer', source: 'Synthetic approval', packet: definition };
+  const scopeReview = put(f.root, 'g1.json', { ...review, gate: 'G1' });
+  const approval = put(f.root, 'g2.json', { ...review, gate: 'G2', scopeReview, caseBatch: batch });
+  startCases(f.root, { id: 'draft-batch', batch, approval, target: observedTarget });
+  const step = { id: 'draft-batch', caseId: 'draft', target: observedTarget };
+  invocation.caseCheckpoint = { id: step.id, caseId: step.caseId, checkpoint: 'create', environment: target.environment };
+  await assert.rejects(executeProduct(f.root, f.bridge, f.settings, invocation), /Reserve/);
+  prepareCheckpoint(f.root, step);
+  observeCheckpoint(f.root, { ...step, checkpoint: 'precondition', outcome: 'matched', source: 'Synthetic', evidence: [observedTarget] });
+  prepareCheckpoint(f.root, step);
+  await assert.rejects(executeProduct(f.root, f.bridge, f.settings, { ...invocation, input: { name: 'Changed draft' } }), /exact runner and inputs/);
+  assert.equal(f.writes(), 0);
+  assert.equal((await executeProduct(f.root, f.bridge, f.settings, invocation)).invocation, 'reportedCompleted');
+  await assert.rejects(executeProduct(f.root, f.bridge, f.settings, { ...invocation, id: 'duplicate' }), /already has a runner invocation/);
+  assert.equal(f.writes(), 1);
+});
+
 test('same invocation IDs never repeat actions, including lost-response and interrupted records', async () => {
   const f = fixture(), first = await request(f); f.loseResponse();
   const result = await execute(f.root, f.bridge, f.settings, first); assert.equal(result.invocation, 'unknown');
