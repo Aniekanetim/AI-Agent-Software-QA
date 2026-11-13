@@ -1,6 +1,10 @@
 # Package notes
 
-**Version:** 1.15.1. **Created:** 22 October 2026. **Updated:** 13 November 2026. **State:** reusable workflow package.
+**Version:** 1.15.2. **Created:** 22 October 2026. **Updated:** 13 November 2026. **State:** reusable workflow package.
+
+## Version 1.15.2 - reconcile interrupted actions and verify case outcomes
+
+Case execution preserves applicable prerequisite evidence while other cases resume. An interrupted runner action holds the affected case until reconciliation. Conclusive Postman and WebMCP verdicts require matching case-level outcome evidence. Current parent release preparation enforces the same included-fix evidence as G5. [Upgrade guidance](../SETUP.md)
 
 ## Version 1.15.1 — enforce checkpoints and open-fix evidence
 

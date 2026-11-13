@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { caseResult, claimCaseCheckpoint, finishCases, inspectCases, observeCheckpoint, prepareCheckpoint, runApprovedCases, startCases, verifyCaseAuthorization, verifyCaseCheckpoint, type CaseDefinition } from '../execution/cases.js';
+import { caseResult, claimCaseCheckpoint, finishCases, inspectCases, observeCheckpoint, prepareCheckpoint, reconcileCaseRunner, runApprovedCases, startCases, verifyCaseAuthorization, verifyCaseCheckpoint, type CaseDefinition } from '../execution/cases.js';
 import { recordAssessment, retainRun, verifyAssessment } from '../release/round.js';
 import { releaseFixture } from './release-fixture.js';
 import { pinned } from '../release/library.js';
@@ -225,15 +225,47 @@ test('a reserved runner action cannot be substituted or sent twice under differe
   const original = finishCases(f.root, checkpoint.id);
   assert.equal(original.session.attempts[0]?.status, 'Partial');
   assert.equal(original.session.attempts[0]?.observations[1]?.invocation?.id, 'original');
+  startCases(f.root, { ...auth, id: 'resumed-runner', target: f.base.targetEvidence, previous: original.receipt });
+  const resumed = { id: 'resumed-runner', caseId: 'first', target: f.base.targetEvidence };
+  assert.deepEqual(prepareCheckpoint(f.root, resumed), { state: 'Blocked', issue: 'runner-original' });
+  const reapproval = f.authorize([{ ...first, checkpoints: [first.checkpoints[0]!, { ...first.checkpoints[1]!, runner: { kind: 'postman', inputDigest } }] }], 'reapproval');
+  startCases(f.root, { ...reapproval, id: 'fresh-approval', target: f.base.targetEvidence });
+  assert.deepEqual(prepareCheckpoint(f.root, { ...resumed, id: 'fresh-approval' }), { state: 'Blocked', issue: 'runner-original' });
+  finishCases(f.root, 'fresh-approval');
+  const runnerPath = '.local/postman/runs/original.json';
+  const evidence = [f.base.put('independent-state.json', { actionApplied: false, originalRunnerStopped: true })];
+  const reconciliation = { ...checkpoint, invocationId: 'original', source: 'Fixture inspection', detail: 'Original runner stopped without applying the action', outcome: 'notApplied' as const, evidence };
+  assert.throws(() => reconcileCaseRunner(f.root, reconciliation), /runner may still be active/);
+  f.base.put(runnerPath, { state: 'completed', outcome: 'incomplete', caseCheckpoint: checkpoint });
+  reconcileCaseRunner(f.root, reconciliation);
+  assert.equal(prepareCheckpoint(f.root, resumed).state, 'ready');
+  observeCheckpoint(f.root, { ...f.observation, ...resumed, checkpoint: 'precondition', outcome: 'matched' });
+  prepareCheckpoint(f.root, resumed);
+  const retry = { id: resumed.id, caseId: resumed.caseId, checkpoint: 'result' };
+  claimCaseCheckpoint(f.root, retry, [f.definition], f.base.target, { kind: 'postman', id: 'retried', inputDigest });
+  const result = { state: 'completed', outcome: 'incomplete', assertions: { total: 0, failed: 0 },
+    requests: { total: 1, failed: 0 }, caseCheckpoint: retry };
+  const incomplete = f.base.put('.local/postman/runs/retried.json', result);
+  assert.throws(() => observeCheckpoint(f.root, { ...f.observation, ...retry, outcome: 'matched', evidence: [incomplete] }),
+    /does not establish this checkpoint verdict/);
+  const passed = f.base.put(incomplete.path, { ...result, outcome: 'passed', assertions: { total: 1, failed: 0 } });
+  assert.throws(() => observeCheckpoint(f.root, { ...f.observation, ...retry, outcome: 'matched' }), /matching Postman result/);
+  observeCheckpoint(f.root, { ...f.observation, ...retry, outcome: 'matched', detail: 'Expected fixture state observed', evidence: [passed, evidence[0]!] });
+  const { receipt } = finishCases(f.root, resumed.id);
+  assert.equal(caseResult(f.root, receipt, 'first', { ...first, target: f.base.target, outcome: 'Pass' }, true).design.id, 'first');
 });
 
 test('resuming an interrupted dependent case reuses a valid prerequisite and rechecks starting state', async () => {
-  const f = fixture(), auth = f.authorize(f.cases.slice(0, 2));
-  startCases(f.root, { ...auth, id: 'original', target: f.base.targetEvidence });
+  const f = fixture(), auth = f.authorize([f.cases[0]!, f.cases[1]!, f.cases[3]!]);
+  startCases(f.root, { ...auth, id: 'original', caseIds: ['first', 'dependent'], target: f.base.targetEvidence });
   const result = await runApprovedCases(f.root, 'original', { target: () => f.base.targetEvidence, execute: step =>
     ({ ...f.observation, outcome: step.caseId === 'dependent' && step.checkpoint.id === 'result' ? 'interrupted' : 'matched' }) });
   assert.deepEqual(result.session.attempts.map(item => item.status), ['Pass', 'Partial']);
-  startCases(f.root, { ...auth, id: 'resumed', target: f.base.targetEvidence, previous: result.receipt, caseIds: ['dependent'] });
+  startCases(f.root, { ...auth, id: 'independent-first', target: f.base.targetEvidence, previous: result.receipt, caseIds: ['independent'] });
+  const independent = await runApprovedCases(f.root, 'independent-first', { target: () => f.base.targetEvidence,
+    execute: () => ({ ...f.observation, outcome: 'matched' }) });
+  assert.equal(independent.session.attempts[0]?.status, 'Pass');
+  startCases(f.root, { ...auth, id: 'resumed', target: f.base.targetEvidence, previous: independent.receipt, caseIds: ['dependent'] });
   const interrupted = await runApprovedCases(f.root, 'resumed', { target: () => f.base.targetEvidence, execute: step =>
     ({ ...f.observation, outcome: step.checkpoint.id === 'result' ? 'interrupted' : 'matched' }) });
   assert.equal(interrupted.session.attempts[0]?.status, 'Partial');

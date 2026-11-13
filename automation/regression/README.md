@@ -50,6 +50,8 @@ After confirmation passes and the regression outcomes are accounted for, prepare
 npm run qa -- regression record-review --input .local/fix-review-input.json
 ```
 
+Current parent release preparation through `regression release` checks the same case evidence as G5. Resolve missing G4 case batches before presenting an included fix as verified.
+
 `record-review` takes `{ fix, review }` and requires the current G4 plan with confirmation and regression case batches. Historical review records remain readable. Reuse matching checkpoint evidence for an updated open plan and run any missing checks. A local Tested-Ok move includes `defect: { fix }`. A live preview and move use the existing G4 `defect` reference and `completion: { fix }`. The publication's G5 decision links the recorded scoped decision as `fixReview`. For a human-managed board, use the same `defect` and `completion` with `task-source observe-completion` after readback. The actual move and QA verification have separate evidence.
 
 For a refutation that genuinely requires no product change, retain the requirements owner's decision and reviewed QA disposition. The local move uses `defect: { refutation }`; the native move uses `completion: { refutation }` and binds the same reference as `fixReview`. The pinned refutation includes G5 Approved, assignment, ticket revision, reviewer, source, original defect report, and `ownerDecision`. The pinned owner decision identifies the assignment, `decision: "noProductChange"`, and actual source.
