@@ -103,7 +103,7 @@ After deliberately adopting the updated workflow files, follow [the lifecycle up
 
 When updating to 1.13.0, apply the [release upgrade guidance](automation/release/README.md#upgrade-open-assignments) to open parent assignments at their next G5. Keep existing onboarding, source records and historical approvals. Link traceable results for the current scope and build, and reconcile any interrupted release move before attempting another.
 
-For open work in 1.15.0, attach the [reviewed understanding and case batch](automation/execution/README.md) before the next execution, retest or release decision. Connect project runner commands to checkpoint evidence before using an updated regression policy. Settle interrupted attempts from actual observations. Preserve completed historical records and reuse earlier evidence where it supports the current case.
+For open work in 1.15.1, attach the [reviewed understanding and case batch](automation/execution/README.md) before the next execution, retest or release decision. Pin Postman and WebMCP runner inputs in the reviewed action checkpoints. Settle uncertain invocations from actual observations. An open fix with an older plan needs the applicable G4 review before current scoped G5, board closure, or parent release verification. Reuse earlier evidence where it supports the approved checkpoints and preserve completed historical records.
 
 ## Optional blocker notifications
 

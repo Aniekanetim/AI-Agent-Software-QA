@@ -106,6 +106,14 @@ test('scope preview and binding catch an omitted fix through the canonical board
   assert.throws(() => reviewHandoff(root, approved, assessment, route, parent), /G5 must review the current regression/);
 });
 
+test('a current parent release cannot use a legacy included fix as verified evidence', () => {
+  const { root, parent, defect, base, fix } = fixture();
+  fix.approve(); fix.retain('confirmation'); fix.retain('regression'); fix.review();
+  base.bind('local', base.round, base.roundRef, 'included', [{ defect, fixRevision: 'r1' }]);
+  assert.throws(() => currentReleaseRegression(root, parent, undefined, { requireCases: true }), /case batches for BUG-001/);
+  assert.equal(fixStatus(root, fix.key).state, 'reviewed');
+});
+
 test('linked defects outside the target need reviewed exclusions and same-build exclusions are rejected', () => {
   const { root, parent, defect, base } = fixture(false);
   const target = { ...base.target, buildId: 'build-2' };

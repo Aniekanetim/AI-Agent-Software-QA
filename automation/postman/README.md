@@ -60,13 +60,14 @@ Resource selection and identity are distinct. After verifying identity, the chec
 
 ## Execute an authorized collection
 
-Prepare the collection and its assertions against the agreed contract. Capture full-file evidence for each local collection, environment and data file after review, using `evidence --path`. Bind those hashes to the actual scoped execution authorization. Create the request privately:
+Prepare the collection and its assertions against the agreed contract. Use `evidence --path` to capture each local input and the approved case definition. Compute the input digest before G2 or G4 review, pin it on the action checkpoint, then add the reserved `caseCheckpoint` to the private run request after verifying the starting state.
 
 ```json
 {
   "id": "API-RUN-001",
   "source": "QA-ticket-and-reviewed-test-design-reference",
   "authorizationReference": "actual-execution-approval-reference",
+  "caseCheckpoint": { "id": "approved-execution-id", "caseId": "api-case-id", "checkpoint": "reviewed-action-id" },
   "collection": {
     "kind": "file",
     "reference": "QA/api/approved.collection.json",
@@ -76,12 +77,13 @@ Prepare the collection and its assertions against the agreed contract. Capture f
     {
       "path": "QA/api/approved.collection.json",
       "sha256": "replace-with-actual-full-file-sha256"
-    }
+    },
+    { "path": "QA/api/case-definition.json", "sha256": "actual-case-definition-sha256" }
   ],
   "target": {
     "environment": "staging",
     "baseUrl": "https://staging.example.test",
-    "build": "actual-build-identity-or-Unknown",
+    "build": "actual-observed-build-identity",
     "source": "actual-target-observation-reference"
   },
   "workingDirectory": ".",
@@ -90,6 +92,7 @@ Prepare the collection and its assertions against the agreed contract. Capture f
 ```
 
 ```shell
+npm run qa -- postman case-input-digest --input .local/api-run-request.json
 npm run qa -- postman run --input .local/api-run-request.json
 ```
 
@@ -101,7 +104,7 @@ Changed local inputs invalidate their approved evidence. Each execution ID retai
 
 Use `npm run qa -- postman run-status --id <execution-id>` to inspect the retained summary for a completed or interrupted attempt. A recorded `running` state has an unconfirmed outcome. Inspect the original attempt and target before authorizing a new run. The lookup reads the saved summary independently of current tool access or changes to the collection.
 
-The adapter distinguishes passed assertions, failed assertions, execution errors and incomplete evidence. Zero exit status without a supported assertion summary is not a pass. For v2.1 HTTP collections, the adapter uses JSON reporting when the detected CLI exposes it. The pinned 1.79.0 CLI instead exposes a CLI table; a strict version-specific reader extracts its request/assertion counts and rejects missing or ambiguous tables. Its YAML export requires sign-in, so it is not requested for account-free local runs. v3 YAML and other unsupported protocol/reporter combinations stay incomplete when a supported assertion summary is unavailable. Exit status alone never establishes a pass.
+The adapter distinguishes passed assertions, failed assertions, execution errors and incomplete evidence. Collection totals describe the run. Use the approved case checkpoint and its observed evidence for a case verdict. Zero exit status without a supported assertion summary is not a pass. For v2.1 HTTP collections, the adapter uses JSON reporting when the detected CLI exposes it. The pinned 1.79.0 CLI instead exposes a CLI table; a strict version-specific reader extracts its request/assertion counts and rejects missing or ambiguous tables. Its YAML export requires sign-in, so it is not requested for account-free local runs. v3 YAML and other unsupported protocol/reporter combinations stay incomplete when a supported assertion summary is unavailable. Exit status alone never establishes a pass.
 
 Local runs remove Postman credentials from the child environment, use a separate private home/profile and execute a byte-for-byte v2.1 copy. They preserve approved scripts/metadata, the source file and the user's session. The requested working directory preserves relative test-file resolution. Cloud runs require explicit reporting scope because results can upload automatically. Disabling API Catalog events does not by itself disable cloud run-result uploads.
 

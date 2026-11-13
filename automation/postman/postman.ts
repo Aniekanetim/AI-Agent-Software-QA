@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { contained, privatePath, load, save, revision, requireText, digest, evidence, verifyEvidence, assertNonsecret, type Evidence } from '../shared/store.js';
 import { probe, selectedCommand, runProcess, readRecord, saveRecord, readinessIssues, isolatedPostmanEnvironment, type Runner, type ToolRecord, type Command } from '../tools/registry.js';
 import { currentHarness, harnessKey } from '../tools/runtime.js';
-import { verifyCaseCheckpoint } from '../execution/cases.js';
+import { claimCaseCheckpoint, verifyCaseCheckpoint, type CaseCheckpoint } from '../execution/cases.js';
 
 export const settingsPath = '.local/postman-settings.json';
 export interface PostmanSettings {
@@ -153,7 +153,7 @@ export interface RunRequest {
   workingDirectory?: string;
   target: { environment: string; baseUrl: string; build: string; source: string };
   timeoutMs: number; cloudReportingAuthorization?: string;
-  caseCheckpoint?: { id: string; caseId: string; checkpoint: string };
+  caseCheckpoint?: CaseCheckpoint;
 }
 export interface RunResult {
   schemaVersion: 1; id: string; requestDigest: string; state: 'running' | 'completed'; outcome: 'passed' | 'failed' | 'executionError' | 'incomplete';
@@ -244,14 +244,38 @@ export function cliSummary(text: string): unknown {
   const counts = (name: string) => ({ total: Number(find(name)[0]![2]), failed: Number(find(name)[0]![3]) });
   return { run: { stats: { requests: counts('requests'), assertions: counts('assertions') }, failures: rows.some(row => row[1]!.toLowerCase() !== 'assertions' && Number(row[3]) > 0) ? [{ type: 'ExecutionFailure' }] : [] } };
 }
-export async function runCollection(root: string, request: RunRequest, runner: Runner = runProcess): Promise<RunResult> {
-  validateRun(root, request); const identity = currentHarness(root), requestDigest = digest(JSON.stringify(request));
+export function caseInputDigest(request: RunRequest) {
+  return digest(JSON.stringify([
+    request.target.environment, request.target.build, request.target.baseUrl,
+    [request.collection.kind, request.collection.reference, request.collection.format],
+    request.environment ? [request.environment.kind, request.environment.reference] : null, request.dataFile ?? null,
+    request.workingDirectory ?? '.', request.timeoutMs, request.approvedInputs.map(ref => JSON.stringify([ref.path, ref.sha256, ref.pointer ?? null])).sort(),
+    !!request.cloudReportingAuthorization,
+  ]));
+}
+
+export async function runCollection(root: string, request: RunRequest, runner: Runner = runProcess) {
+  if (!request.caseCheckpoint) throw new Error('Reserve the approved case checkpoint before running a product collection.');
+  return executeCollection(root, request, runner);
+}
+
+export function rehearseCollection(root: string, request: RunRequest, runner: Runner) {
+  if (request.caseCheckpoint || request.collection.kind !== 'file' || request.environment?.kind === 'cloud' ||
+      new URL(request.target.baseUrl).hostname !== '127.0.0.1') throw new Error('Use a local synthetic fixture for this package rehearsal.');
+  return executeCollection(root, request, runner);
+}
+
+async function executeCollection(root: string, request: RunRequest, runner: Runner): Promise<RunResult> {
+  runRecordPath(request?.id);
+  assertNonsecret(request);
+  const identity = currentHarness(root), requestDigest = digest(JSON.stringify(request));
   const path = runRecordPath(request.id), previous = load<RunResult | null>(root, path, () => null);
   if (previous.value) {
     if (previous.value.requestDigest !== requestDigest || harnessKey(previous.value.harness) !== harnessKey(identity)) throw new Error('This execution ID already belongs to different inputs or a different harness.');
     if (previous.value.state === 'running') throw new Error('This run is unfinished or uncertain. Inspect it before explicitly authorizing a new execution ID.');
     return previous.value;
   }
+  validateRun(root, request);
   const cloud = request.collection.kind === 'cloud' || request.environment?.kind === 'cloud';
   const record = await inspect(root, request.source, runner, cloud ? 'cloud' : 'local');
   const required = ['version', 'collectionRun'];
@@ -262,7 +286,7 @@ export async function runCollection(root: string, request: RunRequest, runner: R
   }
   const issues = capabilityIssues(root, record, required); if (issues.length) throw new Error(issues.join('; '));
   const command = selectedCommand(root, 'postman', false);
-  if (request.caseCheckpoint) validateRun(root, request);
+  validateRun(root, request);
   const work = privatePath(root, `.local/postman/work/${request.id}`); mkdirSync(work, { recursive: true });
   const reportFile = resolve(work, 'raw-report.json'), configuration = settings(root);
   const env = cloud ? cloudEnvironment(configuration!) : localEnvironment(root);
@@ -288,6 +312,9 @@ export async function runCollection(root: string, request: RunRequest, runner: R
   const result: RunResult = { schemaVersion: 1, id: request.id, requestDigest, state: 'running', outcome: 'incomplete', harness: identity, version: record.version, executable: command.executable,
     collection: request.collection, target: request.target, startedAt: new Date().toISOString(), source: request.source, authorizationReference: request.authorizationReference, inputs: request.approvedInputs,
     ...(request.caseCheckpoint ? { caseCheckpoint: request.caseCheckpoint } : {}), reporting: cloud ? 'cloudAllowed' : 'localOnly', exitCode: null };
+  if (request.caseCheckpoint) claimCaseCheckpoint(root, request.caseCheckpoint, request.approvedInputs,
+    { buildId: request.target.build, environment: request.target.environment },
+    { kind: 'postman', id: request.id, inputDigest: caseInputDigest(request) });
   save(root, path, result, null);
   try {
     const execution = await runner(command, args, { cwd: contained(root, request.workingDirectory ?? '.'), env, timeout: request.timeoutMs + 15_000 });

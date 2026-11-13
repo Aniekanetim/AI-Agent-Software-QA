@@ -5,7 +5,7 @@ import { readRecord, readinessIssues } from '../tools/registry.js';
 import { type ChromeSettings, validateSettings, settingsHash, webOrigin } from './config.js';
 import { type Bridge, type Provider, validateScope, structured, responseMessage, claimed, BridgeFailure } from './transport.js';
 import { documentContextScript, documentTreeHash, requireDocumentBinding, type BrowserDocument } from './document-context.js';
-import { verifyCaseCheckpoint } from '../execution/cases.js';
+import { claimCaseCheckpoint, type CaseCheckpoint } from '../execution/cases.js';
 
 export interface Target {
   pageId: number; url: string; role: string; accountState: string; build: string | null; contextEvidence: Evidence[];
@@ -166,7 +166,7 @@ export function assessInventory(root: string, reference: Evidence, target: Targe
 export interface Invocation {
   id: string; inventory: Evidence; target: Target; toolName: string; input: Record<string, unknown>;
   effect: 'read' | 'write' | 'unknown'; source: string; authorization: Evidence[];
-  caseCheckpoint?: { id: string; caseId: string; checkpoint: string; environment: string };
+  caseCheckpoint?: CaseCheckpoint & { environment: string };
 }
 export interface InvocationRecord {
   schemaVersion: 1; id: string; requestHash: string; inventory: Evidence; source: string; authorization: Evidence[];
@@ -175,6 +175,7 @@ export interface InvocationRecord {
   outputHash?: string; finishedAt?: string; reason?: string;
   applicationOutcome: 'notAssessed' | 'confirmed' | 'failed' | 'blocked'; verification?: { source: string; evidence: Evidence[]; summary: string };
   qaVerdict: 'Not established by this helper';
+  caseCheckpoint?: Invocation['caseCheckpoint'];
 }
 export function invocationOutcome(value: unknown): InvocationRecord['invocation'] {
   const message = responseMessage(value); let result: any;
@@ -185,7 +186,26 @@ export function invocationOutcome(value: unknown): InvocationRecord['invocation'
   if (['pending', 'inprogress', 'in_progress', 'awaitingsubmission'].includes(status)) return 'awaitingSubmission';
   return ['completed', 'success'].includes(status) ? 'reportedCompleted' : 'unknown';
 }
+export function caseInputDigest(request: Invocation) {
+  return digest(canonical({
+    tool: request.toolName, input: request.input, effect: request.effect, url: request.target.url,
+    role: request.target.role, state: request.target.accountState, build: request.target.build,
+  }));
+}
+
 export async function execute(root: string, bridge: Bridge, settings: ChromeSettings, request: Invocation): Promise<InvocationRecord> {
+  if (!request.caseCheckpoint) throw new Error('Reserve the approved case checkpoint before invoking a product tool.');
+  return invoke(root, bridge, settings, request);
+}
+
+export async function rehearseInvocation(root: string, bridge: Bridge, settings: ChromeSettings, request: Invocation): Promise<InvocationRecord> {
+  if (request.caseCheckpoint || new URL(request.target.url).hostname !== '127.0.0.1') {
+    throw new Error('Use a local synthetic fixture for this package rehearsal.');
+  }
+  return invoke(root, bridge, settings, request);
+}
+
+async function invoke(root: string, bridge: Bridge, settings: ChromeSettings, request: Invocation): Promise<InvocationRecord> {
   if (!/^[A-Za-z0-9_-]{1,100}$/.test(request.id)) throw new Error('Use a unique safe invocation ID.');
   return claimed(root, `invoke-${request.id}`, () => executeClaimed(root, bridge, settings, request));
 }
@@ -208,13 +228,15 @@ async function executeClaimed(root: string, bridge: Bridge, settings: ChromeSett
   if (digest(canonical(live.tools)) !== inventory.catalogueHash || live.documentId !== inventory.documentId || live.documentTreeHash !== inventory.documentTreeHash) throw new Error('The live document or tool catalogue changed (including iframe identity); refresh before execution.');
   if (request.caseCheckpoint) {
     requireText(request.target.build, 'Observed case build');
-    verifyCaseCheckpoint(root, request.caseCheckpoint, request.authorization,
-      { buildId: request.target.build, environment: request.caseCheckpoint.environment });
+    claimCaseCheckpoint(root, request.caseCheckpoint, request.authorization,
+      { buildId: request.target.build, environment: request.caseCheckpoint.environment },
+      { kind: 'webmcp', id: request.id, inputDigest: caseInputDigest(request) });
   }
   // Reserve before sending. A crash retains inProgress and cannot silently repeat a mutation.
   const record: InvocationRecord = { schemaVersion: 1, id: request.id, requestHash, inventory: request.inventory, source: request.source, authorization: request.authorization,
     provider: bridge.provider, toolName: request.toolName, effect: request.effect, inputHash: digest(canonical(request.input)), inputFields: Object.keys(request.input), startedAt: new Date().toISOString(),
-    invocation: 'inProgress', applicationOutcome: 'notAssessed', qaVerdict: 'Not established by this helper' };
+    invocation: 'inProgress', applicationOutcome: 'notAssessed', qaVerdict: 'Not established by this helper',
+    ...(request.caseCheckpoint ? { caseCheckpoint: request.caseCheckpoint } : {}) };
   save(root, path, record, null);
   try {
     const result = await bridge.call(inventory.channel === 'application' ? 'execute_webmcp_tool' : 'execute_3p_developer_tool', { pageId: request.target.pageId, toolName: request.toolName, input: JSON.stringify(request.input) });

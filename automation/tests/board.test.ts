@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, copyFileSync, unlinkSync, rmdirSync, renameSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import * as b from '../board/board.js';
 import * as s from '../shared/store.js';
 import * as gh from '../github/github.js';
@@ -183,6 +184,41 @@ test('a superseded fix cannot replay an interrupted move into Tested-Ok', () => 
   assert.equal(b.recoverTransition(f.root, prepared.id).state, 'superseded');
   assert.equal(b.findTicket(f.root, bug.id).status, 'Retest');
 });
+test('public review, closure and recovery enforce case evidence for an open fix', () => {
+  for (const legacy of [true, false]) {
+    const f = fixture();
+    put(f.root, `${b.boardRoot}/Retest/BUG-001.md`, '# BUG-001: Synthetic open fix\n\n| Type | Bug |\n');
+    const bug = b.findTicket(f.root, 'BUG-001');
+    const fix = regressionFixture(f.root, { source: 'local', ticketId: bug.id }, bug.revision, { cases: !legacy, interruptConfirmation: !legacy });
+    fix.approve(); fix.retain('confirmation');
+    const close = { id: 'public-close', ticketId: bug.id, expectedRevision: bug.revision,
+      to: 'Tested-Ok', decision: f.d, defect: { fix: fix.key } } as const;
+    assert.throws(() => b.transitionTicket(f.root, close, true), /every required regression/);
+    fix.retain('regression');
+    const review = fix.review([], legacy);
+    const cli = (args: string[], value?: unknown) => {
+      const ref = value === undefined ? undefined : put(f.root, '.local/strict-fixture-input.json', value);
+      return spawnSync(process.execPath, [resolve('.local/build/automation/cli.js'), '--root', f.root, ...args,
+        ...(ref ? ['--input', ref.path] : [])], { encoding: 'utf8' });
+    };
+    const recorded = cli(['regression', 'record-review'], { fix: fix.key, review });
+    const moved = cli(['board', 'transition'], close);
+    assert.equal(recorded.status, legacy ? 1 : 0, recorded.stderr);
+    assert.equal(moved.status, legacy ? 1 : 0, moved.stderr);
+    assert.equal(b.findTicket(f.root, bug.id).status, legacy ? 'Retest' : 'Tested-Ok');
+    if (legacy) {
+      assert.match(recorded.stderr, /case batches/);
+      assert.match(moved.stderr, /case batches/);
+      const prepared = b.prepareTransition(f.root, { ...close, id: 'legacy-pending' });
+      put(f.root, prepared.to, prepared.content);
+      const recovered = cli(['board', 'recover', '--id', prepared.id]);
+      assert.equal(recovered.status, 0, recovered.stderr);
+      assert.match(JSON.parse(recovered.stdout).releaseReviewRequired, /case batches/);
+      assert.equal(b.findTicket(f.root, bug.id).status, 'Tested-Ok');
+    }
+  }
+});
+
 test('a reviewed owner refutation can close without creating a product-fix record', () => {
   const f = fixture();
   put(f.root, `${b.boardRoot}/Retest/BUG-001.md`, '# BUG-001: Synthetic report\n\n| Type | Bug |\n');

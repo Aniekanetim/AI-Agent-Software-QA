@@ -11,6 +11,7 @@ import * as postman from '../postman/postman.js';
 import { selectBinding, readConnections, type Binding, type Inventory } from '../email/email.js';
 import { packageHarness } from './context.js';
 import { integrationIssues } from '../onboarding/integrations.js';
+import { finishCases, observeCheckpoint, prepareCheckpoint, startCases } from '../execution/cases.js';
 
 function fixture() {
   const root = resolve('output/toolchain-fixtures', randomUUID()); mkdirSync(root, { recursive: true });
@@ -140,13 +141,13 @@ test('local Postman execution retains assertion outcomes, removes raw secrets an
     if (args[0] === 'collection' && !args.includes('--help')) assert.equal(store.digest(readFileSync(args[2]!)), first.approvedInputs[0]!.sha256);
     return fakeRunner()(command, args, options);
   };
-  const pass = await postman.runCollection(f.root, first, preservingRunner); assert.equal(pass.outcome, 'passed');
-  const fail = await postman.runCollection(f.root, request(f.root), fakeRunner(1)); assert.equal(fail.outcome, 'failed'); assert.equal(fail.exitCode, 1);
+  const pass = await postman.rehearseCollection(f.root, first, preservingRunner); assert.equal(pass.outcome, 'passed');
+  const fail = await postman.rehearseCollection(f.root, request(f.root), fakeRunner(1)); assert.equal(fail.outcome, 'failed'); assert.equal(fail.exitCode, 1);
   assert.equal(store.revision(f.root, first.collection.reference), before);
   const result = readFileSync(store.contained(f.root, `.local/postman/runs/${first.id}.json`), 'utf8'); assert(!result.includes('PMAK-'));
   assert(!existsSync(store.contained(f.root, `.local/postman/work/${first.id}/raw-report.json`)));
   assert(registry.status(f.root, 'postman', ['localCollectionRun']).reusable);
-  let calls = 0; const same = await postman.runCollection(f.root, first, async () => { calls++; throw new Error(); }); assert.equal(same.outcome, 'passed'); assert.equal(calls, 0);
+  let calls = 0; const same = await postman.rehearseCollection(f.root, first, async () => { calls++; throw new Error(); }); assert.equal(same.outcome, 'passed'); assert.equal(calls, 0);
 
   put(f.root, first.collection.reference, 'Changed after the attempt');
   put(f.root, postman.settingsPath, '{ invalid current settings');
@@ -160,6 +161,40 @@ test('local Postman execution retains assertion outcomes, removes raw secrets an
   assert.deepEqual(status.assertions, { total: 2, failed: 0 });
   assert.deepEqual(status.evidence, { path, sha256: retained });
   assert.equal(store.revision(f.root, path), retained);
+});
+
+test('Postman runs the reserved reviewed collection once and retains its outcome after case settlement', async () => {
+  const f = await prepared(), run = request(f.root);
+  const assignment = { source: 'local', ticketId: 'QA-001' };
+  const target = { buildId: run.target.build, environment: run.target.environment };
+  const definition = run.approvedInputs[0]!;
+  const targetEvidence = put(f.root, 'target.json', { ...target, observedAt: new Date().toISOString(), source: 'Synthetic observation' });
+  const understanding = put(f.root, 'understanding.json', { schemaVersion: 1, assignment,
+    sources: [{ id: 'api-rule', authority: 'Synthetic API contract', accepted: definition, current: definition }],
+    flows: [{ id: 'api', featureId: 'api', relationshipIds: [], actor: 'QA', startingState: 'Empty fixture',
+      expectedFlow: 'Run the reviewed collection.', criteria: ['api-rule'] }] });
+  const batch = put(f.root, 'batch.json', { schemaVersion: 1, assignment, target, understanding, cases: [{
+    id: 'api', flowId: 'api', checkId: 'api', conditionId: 'empty', definition, criteria: ['api-rule'], dependsOn: [],
+    checkpoints: [{ id: 'precondition', action: 'Inspect fixture', expected: 'Empty fixture' },
+      { id: 'run', action: 'Run the reviewed collection', expected: 'Assertions pass',
+        runner: { kind: 'postman', inputDigest: postman.caseInputDigest(run) } }],
+  }] });
+  const review = { assignment, understanding, decision: 'Approved', reviewer: 'Synthetic reviewer', source: 'Synthetic approval', packet: definition };
+  const scopeReview = put(f.root, 'g1.json', { ...review, gate: 'G1' });
+  const approval = put(f.root, 'g2.json', { ...review, gate: 'G2', scopeReview, caseBatch: batch });
+  startCases(f.root, { id: 'api-batch', batch, approval, target: targetEvidence });
+  const step = { id: 'api-batch', caseId: 'api', target: targetEvidence };
+  prepareCheckpoint(f.root, step);
+  observeCheckpoint(f.root, { ...step, checkpoint: 'precondition', outcome: 'matched', source: 'Synthetic', evidence: [targetEvidence] });
+  prepareCheckpoint(f.root, step);
+  run.caseCheckpoint = { id: step.id, caseId: step.caseId, checkpoint: 'run' };
+  await assert.rejects(postman.runCollection(f.root, { ...run, timeoutMs: 2000 }, fakeRunner()), /exact runner and inputs/);
+  assert.equal((await postman.runCollection(f.root, run, fakeRunner())).outcome, 'passed');
+  await assert.rejects(postman.runCollection(f.root, { ...run, id: 'another-run' }, fakeRunner()), /already has a runner invocation/);
+  const report = postman.runStatus(f.root, run.id);
+  observeCheckpoint(f.root, { ...run.caseCheckpoint, outcome: 'matched', source: 'Synthetic runner evidence', evidence: [report.evidence] });
+  finishCases(f.root, step.id);
+  assert.equal((await postman.runCollection(f.root, run, async () => assert.fail('Repeated runner call'))).outcome, 'passed');
 });
 
 test('execution errors and missing assertions are not reported as passing API tests', () => {
@@ -178,11 +213,11 @@ test('version-specific CLI tables retain assertion failures and reject missing o
 
 test('changed approved inputs block execution and an interrupted run is not repeated automatically', async () => {
   const f = await prepared(), r = request(f.root);
-  put(f.root, r.collection.reference, 'Changed collection'); await assert.rejects(postman.runCollection(f.root, r, fakeRunner()), /evidence/);
+  put(f.root, r.collection.reference, 'Changed collection'); await assert.rejects(postman.rehearseCollection(f.root, r, fakeRunner()), /evidence/);
   const g = await prepared(), valid = request(g.root); let executions = 0;
   const interrupted: registry.Runner = async (command, args) => { if (args[0] === 'collection' && !args.includes('--help')) { executions++; throw new Error('Synthetic interruption'); } return fakeRunner()(command, args); };
-  await assert.rejects(postman.runCollection(g.root, valid, interrupted), /interruption/);
-  await assert.rejects(postman.runCollection(g.root, valid, interrupted), /unfinished/); assert.equal(executions, 1);
+  await assert.rejects(postman.rehearseCollection(g.root, valid, interrupted), /interruption/);
+  await assert.rejects(postman.rehearseCollection(g.root, valid, interrupted), /unfinished/); assert.equal(executions, 1);
   const path = `.local/postman/runs/${valid.id}.json`;
   const retained = store.revision(g.root, path);
   const status = postman.runStatus(g.root, valid.id);
@@ -213,7 +248,7 @@ test('cloud mode requires selected resources, exact identity and separate report
   assert.equal((await postman.inspect(f.root, 'Synthetic non-resource response', misleading)).capabilities[`collection:${r.collection.reference}`]?.status, 'unverified');
   const wrong: registry.Runner = async (command, args) => args[0] === 'whoami' && !args.includes('--help') ? { code: 0, stdout: '{"user":{"id":"different-account"}}', stderr: '' } : fakeRunner()(command, args);
   assert.equal((await postman.inspect(f.root, 'Synthetic mismatched account', wrong)).authentication, 'denied');
-  const local = await postman.runCollection(f.root, request(f.root), fakeRunner()); assert.equal(local.outcome, 'passed'); assert.equal(local.reporting, 'localOnly');
+  const local = await postman.rehearseCollection(f.root, request(f.root), fakeRunner()); assert.equal(local.outcome, 'passed'); assert.equal(local.reporting, 'localOnly');
 });
 
 test('older identity commands require targeted access work, not installation', async () => {

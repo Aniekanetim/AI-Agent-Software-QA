@@ -31,6 +31,13 @@ interface Checkpoint {
   id: string;
   action: string;
   expected: string;
+  runner?: { kind: 'postman' | 'webmcp'; inputDigest: string };
+}
+
+export interface CaseCheckpoint {
+  id: string;
+  caseId: string;
+  checkpoint: string;
 }
 export interface CaseDefinition {
   id: string;
@@ -86,7 +93,8 @@ interface Attempt {
   issue?: string;
   reviewRequired?: boolean;
   checkpoint?: string;
-  observations: (CheckpointObservation & { checkpoint: string })[];
+  invocation?: { checkpoint: string; id: string; kind: 'postman' | 'webmcp' };
+  observations: (CheckpointObservation & { checkpoint: string; invocation?: Attempt['invocation'] })[];
 }
 interface FlowIssue {
   id: string;
@@ -176,6 +184,10 @@ export function readCaseBatch(root: string, ref: Evidence) {
     for (const checkpoint of checkpoints.values()) {
       requireText(checkpoint.action, 'Reviewed action');
       requireText(checkpoint.expected, 'Reviewed expected result');
+      if (checkpoint.runner && (checkpoint.id === 'precondition' || !['postman', 'webmcp'].includes(checkpoint.runner.kind) ||
+          !/^[a-f0-9]{64}$/.test(checkpoint.runner.inputDigest))) {
+        throw new Error('Pin the supported runner and its input digest on the reviewed action checkpoint.');
+      }
     }
   }
   const remaining = new Set(cases.keys());
@@ -234,7 +246,7 @@ export function caseBasis(design: Design, item: CaseDefinition) {
     feature: flow.featureId, relationships: flow.relationshipIds, actor: flow.actor, startingState: flow.startingState,
     flow: flow.expectedFlow, map: flow.map?.sha256, criteria: flow.criteria.map(id => [id, design.sources.get(id)!.accepted.sha256]),
     caseCriteria: item.criteria,
-    prerequisites: item.prerequisiteKeys ?? [], checkpoints: item.checkpoints,
+    prerequisites: item.prerequisiteKeys ?? [], dependencies: item.dependsOn, checkpoints: item.checkpoints,
   }));
 }
 
@@ -255,7 +267,7 @@ export function startCases(root: string, request: CaseAuthorization & { id: stri
   if (request.previous) {
     const previous = pinned<Session>(root, request.previous, 'previous case execution');
     const priorDesign = verifyCaseAuthorization(root, previous);
-    if (!previous.finished || !sameAssignment(priorDesign.batch.assignment, design.batch.assignment)) throw new Error('Settle the earlier execution before resuming the same assignment.');
+    if (request.previous.path !== sessionPath(previous.id) || !previous.finished || !sameAssignment(priorDesign.batch.assignment, design.batch.assignment)) throw new Error('Settle the earlier execution before resuming the same assignment.');
     for (const id of cases) {
       const old = previous.attempts.find(item => item.caseId === id);
       const oldCase = priorDesign.cases.get(id);
@@ -268,12 +280,28 @@ export function startCases(root: string, request: CaseAuthorization & { id: stri
       }
     }
     if (sameTarget(priorDesign.batch.target, design.batch.target)) {
-      for (const old of previous.attempts.filter(item => item.status === 'Pass')) {
-        const item = design.cases.get(old.caseId);
-        if (!item || cases.includes(item.id) || ![...design.cases.values()].some(row => row.dependsOn.includes(item.id))) continue;
+      const receipts = new Map(previous.verifiedPrerequisites?.map(item => [item.caseId, item.receipt]));
+      for (const attempt of previous.attempts) {
+        if (attempt.status === 'Pass') receipts.set(attempt.caseId, request.previous);
+        else if (attempt.status || attempt.observations.length) receipts.delete(attempt.caseId);
+      }
+      const needed = new Set<string>();
+      const collect = (id: string) => {
+        for (const dependency of design.cases.get(id)!.dependsOn) {
+          if (needed.has(dependency)) continue;
+          needed.add(dependency);
+          collect(dependency);
+        }
+      };
+      cases.forEach(collect);
+      for (const [id, receipt] of receipts) {
+        if (!needed.has(id) || cases.includes(id)) continue;
+        const item = design.cases.get(id)!;
+        if (previous.flowIssues?.some(issue => issue.flowId === item.flowId) ||
+            previous.prerequisiteIssues?.some(issue => item.prerequisiteKeys?.includes(issue.key))) continue;
         try {
-          const checked = caseResult(root, request.previous, item.id, { ...item, target: design.batch.target, outcome: 'Pass' }, true);
-          if (checked.basis === caseBasis(design, item)) verifiedPrerequisites.push({ caseId: item.id, basis: checked.basis, receipt: request.previous });
+          const checked = caseResult(root, receipt, id, { ...item, target: design.batch.target, outcome: 'Pass' }, true);
+          if (checked.basis === caseBasis(design, item)) verifiedPrerequisites.push({ caseId: id, basis: checked.basis, receipt });
         } catch { /* Stale prerequisites remain blocked. Independent cases can resume. */ }
       }
     }
@@ -310,10 +338,8 @@ export function assertCaseInputs(root: string, id: string, refs: Evidence[], tar
   return design;
 }
 
-export function verifyCaseCheckpoint(root: string, request: { id: string; caseId: string; checkpoint: string }, refs: Evidence[], target: Target) {
-  const session = inspectCases(root, request.id);
-  if (session.finished) throw new Error('The case execution is already settled.');
-  const design = verifyCaseAuthorization(root, session, { target });
+function checkCaseCheckpoint(root: string, session: Session, design: Design, request: CaseCheckpoint, refs: Evidence[], target: Target) {
+  if (!sameTarget(design.batch.target, target)) throw new Error('Use the exact approved case target.');
   const item = design.cases.get(request.caseId);
   const attempt = session.attempts.find(item => item.caseId === request.caseId);
   if (!attempt?.checkpoint || attempt.checkpoint !== request.checkpoint) throw new Error('Reserve the reviewed case checkpoint before invoking its runner.');
@@ -324,6 +350,26 @@ export function verifyCaseCheckpoint(root: string, request: { id: string; caseId
       session.prerequisiteIssues?.some(issue => item.prerequisiteKeys?.includes(issue.key))) {
     throw new Error('A prerequisite or flow for this case changed or is blocked.');
   }
+  return { item, attempt };
+}
+
+export function verifyCaseCheckpoint(root: string, request: CaseCheckpoint, refs: Evidence[], target: Target) {
+  const session = inspectCases(root, request.id);
+  if (session.finished) throw new Error('The case execution is already settled.');
+  checkCaseCheckpoint(root, session, verifyCaseAuthorization(root, session), request, refs, target);
+}
+
+export function claimCaseCheckpoint(root: string, request: CaseCheckpoint, refs: Evidence[], target: Target,
+  invocation: { kind: 'postman' | 'webmcp'; id: string; inputDigest: string }) {
+  return updateSession(root, request.id, (session, design) => {
+    const { item, attempt } = checkCaseCheckpoint(root, session, design, request, refs, target);
+    const runner = item.checkpoints[attempt.observations.length]?.runner;
+    if (runner?.kind !== invocation.kind || runner.inputDigest !== invocation.inputDigest) {
+      throw new Error('Use the exact runner and inputs approved for this checkpoint.');
+    }
+    if (attempt.invocation) throw new Error('This checkpoint already has a runner invocation. Reconcile its actual outcome before retrying.');
+    attempt.invocation = { kind: invocation.kind, id: invocation.id, checkpoint: request.checkpoint };
+  });
 }
 
 function updateSession<T>(root: string, id: string, update: (session: Session, design: Design) => T) {
@@ -343,13 +389,15 @@ function dependencyHold(root: string, session: Session, design: Design, item: Ca
     const prerequisite = design.cases.get(id)!;
     const attempt = session.attempts.find(row => row.caseId === id);
     const retained = session.verifiedPrerequisites?.find(row => row.caseId === id);
+    const disputed = session.flowIssues?.find(issue => issue.flowId === prerequisite.flowId);
+    const shared = session.prerequisiteIssues?.find(issue => prerequisite.prerequisiteKeys?.includes(issue.key));
+    if (disputed || shared) return disputed?.id ?? shared!.issue;
     if (attempt?.status !== 'Pass' && !retained) return attempt?.issue ?? id;
     if (retained) {
       try {
         const result = caseResult(root, retained.receipt, id, { ...prerequisite, target: design.batch.target, outcome: 'Pass' }, true);
-        if (result.basis !== retained.basis || result.basis !== caseBasis(design, prerequisite)) return id;
+        if (result.basis !== caseBasis(design, prerequisite)) return id;
       } catch { return id; }
-      continue;
     }
     try { verifyCurrentCase(root, design, prerequisite); }
     catch { return `flow-${prerequisite.flowId}`; }
@@ -402,8 +450,23 @@ export function observeCheckpoint(root: string, request: CheckpointObservation &
     if (observation.prerequisite && (!['invalid', 'needsReview'].includes(observation.outcome) || !item.prerequisiteKeys?.includes(observation.prerequisite))) {
       throw new Error('Use a reviewed shared prerequisite ID for an invalid or disputed starting condition.');
     }
-    attempt.observations.push({ ...observation, checkpoint });
+    if (item.checkpoints[attempt.observations.length]?.runner && !attempt.invocation &&
+        ['matched', 'deviation'].includes(observation.outcome)) {
+      throw new Error('Run the approved checkpoint through its recorded runner before retaining a conclusive observation.');
+    }
+    if (attempt.invocation && ['matched', 'deviation'].includes(observation.outcome)) {
+      const { kind, id: invocationId } = attempt.invocation;
+      const path = kind === 'postman' ? `.local/postman/runs/${invocationId}.json` : `.local/chrome-devtools/invocations/${invocationId}.json`;
+      const record = load<{ state?: string; invocation?: string; caseCheckpoint?: CaseCheckpoint } | null>(root, path, () => null).value;
+      const settled = kind === 'postman' ? record?.state === 'completed' : !!record?.invocation && record.invocation !== 'inProgress';
+      if (!settled || record?.caseCheckpoint?.id !== id || record.caseCheckpoint.caseId !== caseId ||
+          record.caseCheckpoint.checkpoint !== checkpoint) {
+        throw new Error('Reconcile the unsettled runner invocation before retaining a conclusive observation.');
+      }
+    }
+    attempt.observations.push({ ...observation, checkpoint, invocation: attempt.invocation });
     delete attempt.checkpoint;
+    delete attempt.invocation;
     let stale = false;
     try { verifyCurrentCase(root, design, item); } catch { stale = true; }
     const dependency = dependencyHold(root, session, design, item);
