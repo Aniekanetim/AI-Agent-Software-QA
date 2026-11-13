@@ -1,6 +1,10 @@
 # Package notes
 
-**Version:** 1.14.3. **Created:** 22 October 2026. **Updated:** 12 November 2026. **State:** reusable workflow package.
+**Version:** 1.15.0. **Created:** 22 October 2026. **Updated:** 13 November 2026. **State:** reusable workflow package.
+
+## Version 1.15.0 — verify cases during execution
+
+G2 or G4 approves the batch, including its source-linked understanding and case checkpoints. The case journal records actual conditions and verdict evidence, preserves interrupted work and groups flow disputes. Current release rounds require settled case evidence for conclusive verdicts. [Case execution](../automation/execution/README.md)
 
 ## Version 1.14.3 — G5 binding and fresh inventory checks
 

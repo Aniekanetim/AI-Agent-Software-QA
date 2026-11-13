@@ -138,6 +138,8 @@ When work needs a human input or decision, record the actual remaining blocker a
 
 During execution, report planned versus completed checks, Pass/Fail/Blocked outcomes, requirement coverage, anomalies and any changed risk. Record unexpected harness or environment errors separately; an error that prevents valid observation is not evidence of a product failure.
 
+Use the [case execution record](../../automation/execution/README.md) to carry one G2 or G4 batch approval into the actual checkpoints. Verify the starting state before the first dependent action and compare each observed result to the approved expectation. A product failure can leave independent cases eligible. An ambiguous flow or invalid prerequisite holds the cases that depend on it. Use the stop and resume boundaries the runner actually supports.
+
 Suspend the affected checks if the build differs, data are invalid, the harness cannot test the intended rule, or an action exceeds the approved scope. Preserve the attempt and explain its impact. Repair within the approved preparation scope; obtain a revised decision when requirements, scope, method or risk materially change. Resume only when prerequisites are restored. Record any rerun separately; do not silently retry until green.
 
 Keep these statuses distinct:
@@ -171,6 +173,8 @@ Use the [coverage definitions](../../QA%20Process%20Context/Coverage%20and%20Tra
 Read [Application Flow Map](../../Application%20Flow%20Map/README.md) during ticket preparation/resumption. Identify changed feature/relationship IDs, map/source revisions and served identity separately. Assess prerequisites, consumers, shared components and relevant indirect paths by transferred behavior, conditions and risk. Missing or stale paths are unknown; consider broader regression rather than infer independence.
 
 Use the [impact briefing](../../QA%20Process%20Context/Regression%20Management/impact-analysis.md) at G1/G2: explain each proposed check/pass criterion, connection rationale, exclusions, unknowns and exact authorization. The helper returns candidates; it does not choose final scope or bypass review. At G3/G4/G5 distinguish paths considered, actual conditions/paths exercised and residual gaps. A diagram or structurally valid map does not establish tested behavior. Preserve actual human corrections, source authority and original historical results.
+
+At G1 review the agent's source-linked flow interpretation. At G2 and G4 bind it to the approved cases and checkpoints. At G3 link the interpretation and actual case evidence for each finding. At G5 cite the versions behind the release claims and retain unresolved scope. When execution reveals a disputed flow, use the case journal to identify the affected map entries, open one clarification for the shared issue and flag dependent results for reassessment.
 
 ## Reusable records
 

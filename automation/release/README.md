@@ -36,6 +36,7 @@ In the G1 record, pin the [release change manifest](../regression/README.md#carr
 | `schemaVersion`, `id` | `1` and the round ID |
 | `library`, `scope`, `changes` | Evidence references for the pinned library, actual reviewed scope, and release change record |
 | `target` | Observed `buildId` and `environment` |
+| `caseBatches` | Pinned [case batch references](../execution/README.md) covering required checks and conditions for current release scope |
 | `assignmentIds`, `moduleIds` | Local or native assignment IDs and included module IDs |
 | `obligations` | Entries with `id`, `moduleId`, `testTypeId`, `conditionId`, `state`, and `checkIds` |
 
@@ -60,6 +61,8 @@ npm run qa -- release invalidate-scope --input .local/changed-round.json
 ## Retain runs and assess the round
 
 A version 1 run contains `id`, `round` evidence, `target`, `observedAt` with timezone, `targetEvidence`, and `observations`. The target observation JSON records `buildId`, `environment`, `observedAt`, and the actual `source`. Each observation identifies `checkId`, `conditionId`, `outcome`, and `evidence`. Use Pass, Fail, Partial, Blocked, or Not run. Retain a `note` for Partial, Blocked, and Not run. Link actual observations for Pass, Fail, and Partial. Match the tested build and environment to the pinned round.
+
+For a current round, link each Pass or Fail to its settled `caseExecution: { receipt, caseId }`. Record the reviewed understanding references as `handoff.understandings` at G5. Historical assessments retain their original evidence.
 
 Retain the original run before recording its retest. Use `previousRunId` to link to the earlier run for that check and condition in the same round. A conclusive linked retest can replace the earlier outcome in the current assessment. Both attempts remain visible. For a changed build or scope, pin a new round and link the earlier round and failure from its reviewed scope or change record. Reassess the obligations against the new build.
 

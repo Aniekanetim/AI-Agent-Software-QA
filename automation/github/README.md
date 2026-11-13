@@ -61,6 +61,8 @@ Run `npm run qa -- github pending-comments` to find outstanding publication keys
 
 [qa-regression.example.yml](examples/qa-regression.example.yml) is an **inactive adoption template**, outside `.github/workflows`. It requires a reviewed policy, actual bot settings and project-owned current-board and preview-identity adapters. The default-deny variable and missing project-specific files prevent accidental execution. Review/replace the placeholders in your project before enabling it. It runs trusted base-branch QA code, excludes forks and uses read-only permissions; never switch to privileged `pull_request_target` while executing untrusted PR code with secrets.
 
+Bind the [reviewed case batch](../execution/README.md#use-scripted-runners-and-ci) to the policy and connect the project runner to its checkpoint journal before authorizing execution. For dispatch, pin the receiver and verify the received batch digest.
+
 The portable repo's own [package checks](../../.github/workflows/package-checks.yml) only compile/test these helpers and rehearse a synthetic loopback fixture. They do not monitor another project's PRs, run its product tests or approve its releases.
 
 [GitHub CLI authentication](https://cli.github.com/manual/gh_auth_login), [workflow dispatch](https://cli.github.com/manual/gh_workflow_run), [PR events](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request)

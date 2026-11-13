@@ -103,7 +103,7 @@ After deliberately adopting the updated workflow files, follow [the lifecycle up
 
 When updating to 1.13.0, apply the [release upgrade guidance](automation/release/README.md#upgrade-open-assignments) to open parent assignments at their next G5. Keep existing onboarding, source records and historical approvals. Link traceable results for the current scope and build, and reconcile any interrupted release move before attempting another.
 
-In 1.14.3, apply [post-fix verification](automation/regression/README.md) to open Retest work and preview the manifest before binding new release scope. For open parent releases, recompute the current digest and review it at G5 before handoff. For connected releases, retain the actual G5 approval time and a fresh authoritative inventory for each publication and closure action. Reuse traceable results, reconcile interrupted moves using current evidence and retain completed historical records.
+For open work in 1.15.0, attach the [reviewed understanding and case batch](automation/execution/README.md) before the next execution, retest or release decision. Connect project runner commands to checkpoint evidence before using an updated regression policy. Settle interrupted attempts from actual observations. Preserve completed historical records and reuse earlier evidence where it supports the current case.
 
 ## Optional blocker notifications
 

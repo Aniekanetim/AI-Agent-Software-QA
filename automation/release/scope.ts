@@ -3,6 +3,7 @@ import { indexById, pinned } from './library.js';
 import { readRound } from './round.js';
 import { localReleaseBoard, type ReleaseBoard } from '../regression/board.js';
 import { reconcileReleaseScope } from '../regression/fix.js';
+import { verifyCaseAuthorization } from '../execution/cases.js';
 
 export { sameEvidence } from '../shared/store.js';
 
@@ -20,7 +21,7 @@ interface CoverageReview extends Review {
     state: 'required' | 'excluded' | 'unresolved'; checkIds?: string[]; exceptionAllowed?: boolean;
   }[];
 }
-interface ReadinessReview extends Review { round: Evidence; scopeReview: Evidence }
+interface ReadinessReview extends Review { round: Evidence; scopeReview: Evidence; caseBatch?: Evidence }
 interface Binding {
   schemaVersion: 1; assignment: Assignment;
   history: ({ round: Evidence; approval: Evidence } | { invalidation: Evidence })[];
@@ -62,6 +63,12 @@ function matchCoverage(root: string, assignment: Assignment, round: Evidence, ap
   if (!sameEvidence(readiness.round, round)) throw new Error('G2 must identify the exact reviewed round.');
   const coverage = readReview<CoverageReview>(root, readiness.scopeReview, 'G1', assignment);
   const { round: plan } = readRound(root, round);
+  if (plan.caseBatches) {
+    if (!readiness.caseBatch || !plan.caseBatches.some(ref => sameEvidence(ref, readiness.caseBatch))) {
+      throw new Error('G2 must identify an approved case batch in this round.');
+    }
+    verifyCaseAuthorization(root, { batch: readiness.caseBatch, approval }, { assignment, target: plan.target, gate: 'G2' });
+  }
   if (!plan.assignmentIds.includes(assignment.ticketId) || !sameEvidence(coverage.packet, plan.scope) || !sameEvidence(coverage.library, plan.library) ||
       !Array.isArray(coverage.modules) || coverage.modules.length !== plan.moduleIds.length ||
       new Set(coverage.modules).size !== coverage.modules.length || !coverage.modules.every(id => plan.moduleIds.includes(id))) {
@@ -104,13 +111,14 @@ export function previewReleaseScope(root: string, request: { assignment: Assignm
   return checkScope(root, assignment, readRound(root, round).round, changeManifest, liveBoard);
 }
 
-export function bindReleaseScope(root: string, request: { assignment: Assignment; expectedRevision: string | null; round: Evidence; approval: Evidence }, liveBoard?: ReleaseBoard) {
+export function bindReleaseScope(root: string, request: { assignment: Assignment; expectedRevision: string | null; round: Evidence; approval: Evidence; requireCases?: boolean }, liveBoard?: ReleaseBoard) {
   return withLock(root, 'qa-board', () => {
     const { assignment, expectedRevision, round, approval } = request;
     const record = scopeRecord(root, assignment);
     const current = record.value.history.at(-1);
     if (current && 'round' in current && sameEvidence(current.round, round) && sameEvidence(current.approval, approval)) {
       const { plan, changeManifest } = matchCoverage(root, assignment, round, approval);
+      if (request.requireCases && !plan.caseBatches) throw new Error('Pin the reviewed case batches before binding current release scope.');
       checkScope(root, assignment, plan, changeManifest, liveBoard);
       return releaseScope(root, assignment);
     }
@@ -119,6 +127,7 @@ export function bindReleaseScope(root: string, request: { assignment: Assignment
       throw new Error('Record the actual renewed G2 decision before restoring a previous round.');
     }
     const { plan, changeManifest } = matchCoverage(root, assignment, round, approval);
+    if (request.requireCases && !plan.caseBatches) throw new Error('Pin the reviewed case batches before binding current release scope.');
     checkScope(root, assignment, plan, changeManifest, liveBoard);
     record.value.history.push({ round, approval });
     save(root, record.path, record.value, record.revision);

@@ -10,6 +10,8 @@
 | Request date / human reviewer | <actual values> |
 | Decision requested | <one specific scope, finding, execution or handoff decision> |
 | Supporting plan/results | <direct links> |
+| Feature understanding | <reviewed revision, flow and criterion IDs, material changes or open questions> |
+| Case evidence | <G2/G4 batch reference or G3/G5 settled checkpoint evidence as applicable> |
 
 ## Briefing supplied
 

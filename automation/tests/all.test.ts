@@ -5,6 +5,7 @@ import './coverage.test.js';
 import './release.test.js';
 import './regression.test.js';
 import './flow-map.test.js';
+import './case-execution.test.js';
 import './adaptive-tools.test.js';
 import './browser-access.test.js';
 import './data-preparation.test.js';

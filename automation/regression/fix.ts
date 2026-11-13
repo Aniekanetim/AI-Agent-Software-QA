@@ -3,6 +3,7 @@ import { indexById, pinned, readLibrary } from '../release/library.js';
 import { retainedRun, retainedRuns, sameTarget, type Round, type Target } from '../release/round.js';
 import type { Assignment } from '../release/scope.js';
 import type { ReleaseBoard } from './board.js';
+import { caseBasis, caseResult, verifyCaseAuthorization } from '../execution/cases.js';
 
 interface FixIdentity { defect: Assignment; fixRevision: string }
 interface Intake extends FixIdentity {
@@ -16,6 +17,7 @@ interface Batch { id: string; phase: 'confirmation' | 'regression'; checks: Plan
 interface Plan {
   schemaVersion: 1; fix: string; library: Evidence; policy: Evidence; impact: Evidence;
   coverage: 'targeted' | 'full'; rationale: string; batches: Batch[];
+  caseBatches?: { batchId: string; batch: Evidence }[];
 }
 interface Approval {
   gate: string; decision: string; reviewer: string; source: string; packet: Evidence;
@@ -29,6 +31,7 @@ interface Finding extends Coordinate { ticket: Assignment; impact: 'blocking' | 
 interface Review {
   gate: 'G5'; decision: 'Approved' | 'Approved with limits'; reviewer: string; source: string; packet: Evidence;
   fix: string; ticketRevision: string; assessmentDigest: string; targetObservation: Evidence; findings: Finding[];
+  understanding?: Evidence;
 }
 export type DefectCompletion = { fix: string; refutation?: never } | { fix?: never; refutation: Evidence };
 export interface ReworkDecision { fix: string; review: Evidence }
@@ -154,13 +157,33 @@ function readPlan(root: string, entry: Fix, revision: Pick<Revision, 'plan' | 'a
   for (const check of requiredChecks(root, plan.policy, plan.library, impact.affected, plan.coverage)) {
     if (!seen.has(coordinates(check))) throw new Error(`The required regression check ${coordinates(check)} is missing from the reviewed plan.`);
   }
-  return { plan, batches, catalogue };
+  const caseDesigns = new Map<string, ReturnType<typeof verifyCaseAuthorization>>();
+  if (plan.caseBatches) {
+    for (const record of plan.caseBatches) {
+      const batch = batches.get(record.batchId);
+      if (!batch || caseDesigns.has(record.batchId)) throw new Error('Pin one case batch per confirmation or regression batch.');
+      const design = verifyCaseAuthorization(root, { batch: record.batch, approval: revision.approval }, {
+        assignment: entry.identity.defect, target: entry.identity.target, gate: 'G4',
+      });
+      if (design.cases.size !== batch.checks.length || [...design.cases.values()].some(item =>
+        !batch.checks.some(check => coordinates(item) === coordinates(check) && sameEvidence(check.context, item.context)) ||
+        !sameEvidence(item.definition, catalogue.checks.get(item.checkId)?.definition))) {
+        throw new Error('Bind the exact G4 case definitions to each fix batch.');
+      }
+      caseDesigns.set(batch.id, design);
+    }
+    if (caseDesigns.size !== batches.size) throw new Error('Cover all confirmation and regression batches at G4.');
+  }
+  return { plan, batches, catalogue, caseDesigns };
 }
 
-export function approveFixPlan(root: string, request: { fix: string; plan: Evidence; approval: Evidence; previousPlan?: Evidence }) {
+export function approveFixPlan(root: string, request: { fix: string; plan: Evidence; approval: Evidence; previousPlan?: Evidence; requireCases?: boolean }) {
   return lock(root, () => {
     const current = ledger(root);
     const entry = findFix(root, request.fix, true, current.value.fixes), previous = entry.plans.at(-1);
+    if (request.requireCases && !pinned<Plan>(root, request.plan, 'fix plan').caseBatches?.length) {
+      throw new Error('Approve the feature understanding and exact confirmation and regression cases at G4.');
+    }
     if (previous && sameEvidence(previous.plan, request.plan) && sameEvidence(previous.approval, request.approval)) return fixStatus(root, entry.key);
     if (previous ? !sameEvidence(previous.plan, request.previousPlan) : request.previousPlan !== undefined) throw new Error('Review the current fix plan before replacing it.');
     if (entry.plans.some(row => row.approval.sha256 === request.approval?.sha256)) throw new Error('Record a renewed G4 decision for a revised plan.');
@@ -176,12 +199,22 @@ function matches(root: string, entry: Fix, design: ReturnType<typeof readPlan>, 
   const batch = design.batches.get(receipt.batchId);
   if (!batch) throw new Error('Select a batch from the approved fix plan.');
   const { run, catalogue } = retainedRun(root, receipt.round, receipt.run);
+  const caseDesign = design.caseDesigns.get(batch.id);
   if (!sameTarget(run.target, entry.identity.target)) throw new Error('Use results from the same observed build and environment.');
   const observations = run.observations.filter(observation => {
     const check = batch.checks.find(item => coordinates(item) === coordinates(observation));
-    return !!check && sameContent(check.context, observation.context) &&
-      sameContent(design.catalogue.checks.get(check.checkId)?.definition, catalogue.checks.get(check.checkId)?.definition) &&
-      sameContent(design.catalogue.conditions.get(check.conditionId)?.basis, catalogue.conditions.get(check.conditionId)?.basis);
+    if (!check || !sameContent(check.context, observation.context) ||
+        !sameContent(design.catalogue.checks.get(check.checkId)?.definition, catalogue.checks.get(check.checkId)?.definition) ||
+        !sameContent(design.catalogue.conditions.get(check.conditionId)?.basis, catalogue.conditions.get(check.conditionId)?.basis)) return false;
+    if (caseDesign && ['Pass', 'Fail'].includes(observation.outcome)) {
+      const observed = observation.caseExecution;
+      const planned = [...caseDesign.cases.values()].find(item => coordinates(item) === coordinates(check))!;
+      if (!observed) return false;
+      try {
+        return caseResult(root, observed.receipt, observed.caseId, { ...observation, target: run.target }, true).basis === caseBasis(caseDesign, planned);
+      } catch { return false; }
+    }
+    return true;
   });
   if (!observations.length && !allowUnmatched) throw new Error('No matching check revision, condition and test context were observed in this retained run.');
   return { runId: run.id, observedAt: run.observedAt, observations };
@@ -278,6 +311,10 @@ function verifyReview(root: string, entry: Fix, ref: Evidence) {
   requireText(review.source, 'Actual fix disposition source');
   requireText(review.ticketRevision, 'Reviewed defect ticket revision');
   verifyEvidence(root, review.packet);
+  const firstCaseBatch = readPlan(root, entry, current.revision).caseDesigns.values().next().value;
+  if (firstCaseBatch && !sameEvidence(review.understanding, firstCaseBatch.batch.understanding)) {
+    throw new Error('Review the feature understanding used for the confirmation and regression verdicts.');
+  }
   const observed = observeTarget(root, entry.identity, review.targetObservation);
   if (current.report.batches.some(batch => batch.checks.some(check =>
     check.attempts.some(attempt => Date.parse(attempt.observedAt) > Date.parse(observed.observedAt))))) {
@@ -366,7 +403,9 @@ export function requireFixBatch(root: string, defect: Assignment, target: Target
   if (batch.checks.every(check => ['Pass', 'Fail'].includes(check.outcome)) && !batch.retryReason) {
     throw new Error('This batch already has eligible outcomes. Reuse the evidence or obtain a reviewed retry.');
   }
-  return { fix: entry.key, batchId: batch.id, phase: batch.phase, plan: revision.plan, checks: batch.checks.map(coordinates) };
+  const cases = readPlan(root, entry, revision).plan.caseBatches?.find(item => item.batchId === batch.id)?.batch;
+  return { fix: entry.key, batchId: batch.id, phase: batch.phase, plan: revision.plan, checks: batch.checks.map(coordinates),
+    ...(cases ? { caseBatch: cases } : {}) };
 }
 
 export function failedConfirmation(root: string, defect: Assignment, fix: string) {

@@ -258,7 +258,7 @@ function prepare(root: string, request: Transition): Journal {
     ...(request.to === 'Rework' && request.rework ? { rework: request.rework } : {}) };
   save(root, path, journal, null); return journal;
 }
-function complete(root: string, journal: Journal) {
+function complete(root: string, journal: Journal, requireCases = false) {
   const validTicketPath = (path: string) => { const parts = path.split('/'); return parts.length === 3 && parts[0] === boardRoot && statuses.includes(parts[1] as Status) && !!parts[2]?.endsWith('.md') && !path.includes('\\'); };
   const forbiddenPatch = (path: string) => {
     const normalized = path.replaceAll('\\', '/').replace(/^(?:\.\/)+/, '').toLowerCase();
@@ -290,7 +290,7 @@ function complete(root: string, journal: Journal) {
       } else if (releaseRequired || journal.release) {
         if (!journal.release || [journal.release.decision, journal.release.delivery, journal.release.acknowledgement]
           .some(ref => ref && !entry.evidence.some(e => sameEvidence(e, ref)))) throw new Error('Record the reviewed G5 release and delivery for this assignment.');
-        verifyLocalHandoff(root, journal.ticketId, journal.before, journal.release);
+        verifyLocalHandoff(root, journal.ticketId, journal.before, { ...journal.release, requireCases: requireCases || journal.release.requireCases });
       }
       if (entry.to === 'Tested-Ok' && !releaseRequired) {
         const checked = defectCompletion(root, { source: 'local', ticketId: journal.ticketId }, journal.before, journal.defect);
@@ -325,12 +325,12 @@ function complete(root: string, journal: Journal) {
   for (const patch of journal.patches) if (revision(root, patch.path) !== digest(patch.content)) replace(root, patch.path, patch.content, patch.before);
   journal.state = 'completed'; save(root, path, journal, revision(root, path)); return journal;
 }
-function finish(root: string, journal: Journal) {
+function finish(root: string, journal: Journal, requireCases = false) {
   return journal.state === 'prepared' && ['Tested-Ok', 'Rework'].includes(journal.to.split('/')[1]!)
-    ? withLock(root, 'release-records', () => complete(root, journal)) : complete(root, journal);
+    ? withLock(root, 'release-records', () => complete(root, journal, requireCases)) : complete(root, journal, requireCases);
 }
 export function prepareTransition(root: string, request: Transition) { return withLock(root, 'qa-board', () => prepare(root, request)); }
-export function recoverTransition(root: string, id: string) { return withLock(root, 'qa-board', () => finish(root, load<Journal>(root, `.local/board-transitions/${safeKey(id)}.json`, () => { throw new Error('Unknown transition journal.'); }).value)); }
+export function recoverTransition(root: string, id: string, requireCases = false) { return withLock(root, 'qa-board', () => finish(root, load<Journal>(root, `.local/board-transitions/${safeKey(id)}.json`, () => { throw new Error('Unknown transition journal.'); }).value, requireCases)); }
 export function transitionTicket(root: string, request: Transition) { return withLock(root, 'qa-board', () => finish(root, prepare(root, request))); }
 export function reviews(root: string, now = new Date().toISOString(), trigger?: string) {
   if (!zonedTime(now)) throw new Error('Use the actual review-check time with timezone.');

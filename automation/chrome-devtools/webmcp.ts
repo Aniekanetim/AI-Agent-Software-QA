@@ -5,6 +5,7 @@ import { readRecord, readinessIssues } from '../tools/registry.js';
 import { type ChromeSettings, validateSettings, settingsHash, webOrigin } from './config.js';
 import { type Bridge, type Provider, validateScope, structured, responseMessage, claimed, BridgeFailure } from './transport.js';
 import { documentContextScript, documentTreeHash, requireDocumentBinding, type BrowserDocument } from './document-context.js';
+import { verifyCaseCheckpoint } from '../execution/cases.js';
 
 export interface Target {
   pageId: number; url: string; role: string; accountState: string; build: string | null; contextEvidence: Evidence[];
@@ -165,6 +166,7 @@ export function assessInventory(root: string, reference: Evidence, target: Targe
 export interface Invocation {
   id: string; inventory: Evidence; target: Target; toolName: string; input: Record<string, unknown>;
   effect: 'read' | 'write' | 'unknown'; source: string; authorization: Evidence[];
+  caseCheckpoint?: { id: string; caseId: string; checkpoint: string; environment: string };
 }
 export interface InvocationRecord {
   schemaVersion: 1; id: string; requestHash: string; inventory: Evidence; source: string; authorization: Evidence[];
@@ -204,6 +206,11 @@ async function executeClaimed(root: string, bridge: Bridge, settings: ChromeSett
   const live = await inspect(root, bridge, settings, request.target, inventory.channel);
   requireDocumentBinding(live);
   if (digest(canonical(live.tools)) !== inventory.catalogueHash || live.documentId !== inventory.documentId || live.documentTreeHash !== inventory.documentTreeHash) throw new Error('The live document or tool catalogue changed (including iframe identity); refresh before execution.');
+  if (request.caseCheckpoint) {
+    requireText(request.target.build, 'Observed case build');
+    verifyCaseCheckpoint(root, request.caseCheckpoint, request.authorization,
+      { buildId: request.target.build, environment: request.caseCheckpoint.environment });
+  }
   // Reserve before sending. A crash retains inProgress and cannot silently repeat a mutation.
   const record: InvocationRecord = { schemaVersion: 1, id: request.id, requestHash, inventory: request.inventory, source: request.source, authorization: request.authorization,
     provider: bridge.provider, toolName: request.toolName, effect: request.effect, inputHash: digest(canonical(request.input)), inputFields: Object.keys(request.input), startedAt: new Date().toISOString(),
