@@ -99,6 +99,7 @@ interface Session extends CaseAuthorization {
   id: string;
   target: Evidence;
   previous?: Evidence;
+  verifiedPrerequisites?: { caseId: string; basis: string; receipt: Evidence }[];
   local?: { ticketId: string; generation: string };
   cases: string[];
   attempts: Attempt[];
@@ -248,6 +249,7 @@ export function startCases(root: string, request: CaseAuthorization & { id: stri
   const design = verifyCaseAuthorization(root, request);
   targetObservation(root, request.target, design.batch.target);
   const cases = request.caseIds ?? [...design.cases.keys()];
+  const verifiedPrerequisites: NonNullable<Session['verifiedPrerequisites']> = [];
   names(cases, 'selected case IDs');
   if (cases.some(id => !design.cases.has(id))) throw new Error('Select cases from the approved batch.');
   if (request.previous) {
@@ -263,6 +265,16 @@ export function startCases(root: string, request: CaseAuthorization & { id: stri
       if (oldCase && (old?.reviewRequired || disputed || shared) && (sameEvidence(previous.approval, request.approval) ||
           caseBasis(priorDesign, oldCase) === caseBasis(design, design.cases.get(id)!))) {
         throw new Error(`Resolve ${old?.issue ?? disputed?.id ?? shared?.issue} in a revised case or feature understanding before resuming ${id}.`);
+      }
+    }
+    if (sameTarget(priorDesign.batch.target, design.batch.target)) {
+      for (const old of previous.attempts.filter(item => item.status === 'Pass')) {
+        const item = design.cases.get(old.caseId);
+        if (!item || cases.includes(item.id) || ![...design.cases.values()].some(row => row.dependsOn.includes(item.id))) continue;
+        try {
+          const checked = caseResult(root, request.previous, item.id, { ...item, target: design.batch.target, outcome: 'Pass' }, true);
+          if (checked.basis === caseBasis(design, item)) verifiedPrerequisites.push({ caseId: item.id, basis: checked.basis, receipt: request.previous });
+        } catch { /* Stale prerequisites remain blocked. Independent cases can resume. */ }
       }
     }
   }
@@ -281,7 +293,8 @@ export function startCases(root: string, request: CaseAuthorization & { id: stri
     if (request.previous && !sameEvidence(request.previous, evidence(root, request.previous.path))) throw new Error('The previous case receipt changed.');
     rejectConcurrent(root, design, request);
     const session: Session = { schemaVersion: 1, id: request.id, batch: request.batch, approval: request.approval, target: request.target,
-      previous: request.previous, local: request.local, cases, attempts: [] };
+      previous: request.previous, local: request.local, cases, attempts: [],
+      ...(verifiedPrerequisites.length ? { verifiedPrerequisites } : {}) };
     save(root, path, session, null);
     return session;
   });
@@ -329,7 +342,15 @@ function dependencyHold(root: string, session: Session, design: Design, item: Ca
     seen.add(id);
     const prerequisite = design.cases.get(id)!;
     const attempt = session.attempts.find(row => row.caseId === id);
-    if (attempt?.status !== 'Pass') return attempt?.issue ?? id;
+    const retained = session.verifiedPrerequisites?.find(row => row.caseId === id);
+    if (attempt?.status !== 'Pass' && !retained) return attempt?.issue ?? id;
+    if (retained) {
+      try {
+        const result = caseResult(root, retained.receipt, id, { ...prerequisite, target: design.batch.target, outcome: 'Pass' }, true);
+        if (result.basis !== retained.basis || result.basis !== caseBasis(design, prerequisite)) return id;
+      } catch { return id; }
+      continue;
+    }
     try { verifyCurrentCase(root, design, prerequisite); }
     catch { return `flow-${prerequisite.flowId}`; }
     const inherited = dependencyHold(root, session, design, prerequisite, seen);

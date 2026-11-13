@@ -181,3 +181,19 @@ test('a runner can invoke only the reserved action after preconditions and sourc
   f.base.put(f.current.path, { requirement: 'Changed before invocation' });
   assert.throws(invoke, /evidence is missing or changed/);
 });
+
+test('resuming an interrupted dependent case reuses a valid prerequisite and rechecks starting state', async () => {
+  const f = fixture(), auth = f.authorize(f.cases.slice(0, 2));
+  startCases(f.root, { ...auth, id: 'original', target: f.base.targetEvidence });
+  const result = await runApprovedCases(f.root, 'original', { target: () => f.base.targetEvidence, execute: step =>
+    ({ ...f.observation, outcome: step.caseId === 'dependent' && step.checkpoint.id === 'result' ? 'interrupted' : 'matched' }) });
+  assert.deepEqual(result.session.attempts.map(item => item.status), ['Pass', 'Partial']);
+  startCases(f.root, { ...auth, id: 'resumed', target: f.base.targetEvidence, previous: result.receipt, caseIds: ['dependent'] });
+  const checkpoints: string[] = [];
+  const resumed = await runApprovedCases(f.root, 'resumed', { target: () => f.base.targetEvidence, execute: step => {
+    checkpoints.push(step.checkpoint.id);
+    return { ...f.observation, outcome: 'matched' };
+  } });
+  assert.deepEqual(checkpoints, ['precondition', 'result']);
+  assert.equal(resumed.session.attempts[0]?.status, 'Pass');
+});
