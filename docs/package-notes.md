@@ -2,7 +2,7 @@
 
 **Version:** 1.15.1. **Created:** 22 October 2026. **Updated:** 13 November 2026. **State:** reusable workflow package.
 
-## Version 1.15.1 â€” enforce checkpoints and open-fix evidence
+## Version 1.15.1 — enforce checkpoints and open-fix evidence
 
 Product Postman and WebMCP runs require a reserved action with reviewed inputs. Valid prerequisite receipts carry across repeated resumes. Current fix disposition, recovery and parent release verification enforce the reviewed confirmation and regression case evidence. [Upgrade guidance](../SETUP.md)
 
