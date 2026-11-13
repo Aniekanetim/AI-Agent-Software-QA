@@ -192,7 +192,9 @@ test('Postman runs the reserved reviewed collection once and retains its outcome
   assert.equal((await postman.runCollection(f.root, run, fakeRunner())).outcome, 'passed');
   await assert.rejects(postman.runCollection(f.root, { ...run, id: 'another-run' }, fakeRunner()), /already has a runner invocation/);
   const report = postman.runStatus(f.root, run.id);
-  observeCheckpoint(f.root, { ...run.caseCheckpoint, outcome: 'matched', source: 'Synthetic runner evidence', evidence: [report.evidence] });
+  assert.throws(() => observeCheckpoint(f.root, { ...run.caseCheckpoint!, outcome: 'matched', source: 'Synthetic', detail: 'Only a total', evidence: [report.evidence] }), /case-level outcome evidence/);
+  const assertion = put(f.root, 'observed-assertion.json', { assertion: 'Fixture response status', actual: 200, expected: 200 });
+  observeCheckpoint(f.root, { ...run.caseCheckpoint, outcome: 'matched', source: 'Synthetic runner evidence', detail: 'Fixture returned HTTP 200', evidence: [report.evidence, assertion] });
   finishCases(f.root, step.id);
   assert.equal((await postman.runCollection(f.root, run, async () => assert.fail('Repeated runner call'))).outcome, 'passed');
 });

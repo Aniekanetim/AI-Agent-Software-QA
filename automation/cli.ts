@@ -67,7 +67,7 @@ async function currentPr(repository: string, number: number) {
   const raw = JSON.parse(await github.runGh(['api', `repos/${repository}/pulls/${number}`])); return github.normalizePr(repository, raw);
 }
 const help = {
-  cases: 'validate --input | start --input | next --input | observe --input | status --id | finish --id',
+  cases: 'validate --input | start --input | next --input | observe --input | reconcile-runner --input | status --id | finish --id',
   regression: 'register --input | approve-plan --input | status --fix | retain-results --input | record-review --input | release --input',
   release: 'library --input | scope --input | preview-scope --input | bind-scope --input | invalidate-scope --input | retain-run --input | runs --input | assess --input | record-assessment --input | verify-assessment --input | route [--ticket-url]',
   attention: 'status | proposal/configure --input | record --input | list --recipient [--offset N --limit N --snapshot hash --all] | index | update-index --input | preview --recipient --notifier [--at ISO] | reserve --input | preflight --id --notifier | receipt --input | respond --input : optional blocker reminders; no task execution, lifecycle move or approval',
@@ -110,6 +110,7 @@ async function main() {
         ? prepareLocalCase(root, request)
         : await taskSource.prepareLiveCase(root, request));
     } else if (action === 'observe') output(caseExecution.observeCheckpoint(root, input()));
+    else if (action === 'reconcile-runner') output(caseExecution.reconcileCaseRunner(root, input()));
     else if (action === 'status') output(caseExecution.inspectCases(root, option('id')));
     else if (action === 'finish') { requireLocalSource(root); output(caseExecution.finishCases(root, option('id'))); }
     else throw new Error('Run cases help to see the available commands.');
@@ -246,7 +247,7 @@ async function main() {
     else if (action === 'status') output(fixStatus(root, option('fix')));
     else if (action === 'retain-results') output(retainFixResults(root, input()));
     else if (action === 'record-review') output(recordFixReview(root, { ...input<Parameters<typeof recordFixReview>[1]>(), requireCases: true }));
-    else if (action === 'release') output(await taskSource.reconcileReleaseBoard(root, input()));
+    else if (action === 'release') output(await taskSource.reconcileReleaseBoard(root, { ...input<Parameters<typeof taskSource.reconcileReleaseBoard>[1]>(), requireCases: true }));
     else throw new Error('Run regression help to see the available commands.');
     return;
   }

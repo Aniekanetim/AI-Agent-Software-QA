@@ -144,10 +144,10 @@ export async function previewCurrentReleaseScope(root: string, request: Paramete
 export async function bindCurrentReleaseScope(root: string, request: Parameters<typeof bindReleaseScope>[1], reader: BoardReader = readBoard) {
   return bindReleaseScope(root, request, await readReleaseBoard(root, request.assignment, reader));
 }
-export async function reconcileReleaseBoard(root: string, request: Assignment & { boardInventory?: Evidence }, reader: BoardReader = readBoard) {
+export async function reconcileReleaseBoard(root: string, request: Assignment & { boardInventory?: Evidence; requireCases?: boolean }, reader: BoardReader = readBoard) {
   const { source, ticketId, boardInventory } = request;
   const assignment = { source, ticketId };
-  return currentReleaseRegression(root, assignment, await readReleaseBoard(root, assignment, reader), { inventory: boardInventory });
+  return currentReleaseRegression(root, assignment, await readReleaseBoard(root, assignment, reader), { inventory: boardInventory, requireCases: request.requireCases });
 }
 function alreadyClaimed(work: Journal, key: string, ticket: Ticket, queue: Queue | null) {
   return work.claims.some(claim => {

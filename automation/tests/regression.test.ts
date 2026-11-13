@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { appendFileSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { approveFixPlan, fixStatus, registerFix, requireVerifiedFix, retainFixResults } from '../regression/fix.js';
 import { currentReleaseRegression, reviewHandoff, type Route } from '../release/handoff.js';
 import { recordAssessment, retainRun } from '../release/round.js';
@@ -111,6 +112,10 @@ test('a current parent release cannot use a legacy included fix as verified evid
   fix.approve(); fix.retain('confirmation'); fix.retain('regression'); fix.review();
   base.bind('local', base.round, base.roundRef, 'included', [{ defect, fixRevision: 'r1' }]);
   assert.throws(() => currentReleaseRegression(root, parent, undefined, { requireCases: true }), /case batches for BUG-001/);
+  const input = base.put('.local/release-preparation.json', parent);
+  const result = spawnSync(process.execPath, [resolve('.local/build/automation/cli.js'), '--root', root, 'regression', 'release', '--input', input.path], { encoding: 'utf8' });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /case batches for BUG-001/);
   assert.equal(fixStatus(root, fix.key).state, 'reviewed');
 });
 

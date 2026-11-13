@@ -198,6 +198,12 @@ test('WebMCP invokes the approved action once after observing the starting state
   assert.equal((await executeProduct(f.root, f.bridge, f.settings, invocation)).invocation, 'reportedCompleted');
   await assert.rejects(executeProduct(f.root, f.bridge, f.settings, { ...invocation, id: 'duplicate' }), /already has a runner invocation/);
   assert.equal(f.writes(), 1);
+  const checkpoint = { ...invocation.caseCheckpoint, outcome: 'matched' as const, source: 'Synthetic', evidence: [observedTarget] };
+  assert.throws(() => observeCheckpoint(f.root, checkpoint), /independently verified WebMCP/);
+  const persisted = put(f.root, 'draft-state.json', { actual: 'Draft saved' });
+  confirmOutcome(f.root, invocation.id, { outcome: 'confirmed', source: 'Fixture readback', evidence: [persisted], summary: 'Draft saved' });
+  assert.throws(() => observeCheckpoint(f.root, checkpoint), /independently verified WebMCP/);
+  assert.equal(observeCheckpoint(f.root, { ...checkpoint, evidence: [persisted] }).status, 'Pass');
 });
 
 test('same invocation IDs never repeat actions, including lost-response and interrupted records', async () => {
