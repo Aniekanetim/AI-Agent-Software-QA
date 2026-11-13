@@ -8,6 +8,7 @@ import { contained, load, save, revision, replace, digest, requireText, verifyEv
 
 import { requireLocalSource } from '../task-source/config.js';
 import { assertDataReady, dataScopeDigest, type DataReceipt, type DataScope } from '../data/readiness.js';
+import { assertCaseInputs, inspectCases, startCases, verifyCaseAuthorization, type CaseAuthorization } from '../execution/cases.js';
 
 const exec = promisify(execFile);
 export type GhRunner = (args: string[]) => Promise<string>;
@@ -92,7 +93,8 @@ export interface RegressionPolicy {
   allowForks: boolean; allowMergeCommit: boolean; suiteId: string; suiteEvidence: Evidence[];
   command: { executable: string; args: string[] }; timeoutMs: number; targetId: string;
   dataScope?: DataScope;
-  dispatch?: { workflow: string; ref: string; dataReceiver?: Evidence };
+  caseAuthorization?: CaseAuthorization;
+  dispatch?: { workflow: string; ref: string; dataReceiver?: Evidence; caseReceiver?: Evidence };
 }
 export interface ObservedTarget { id: string; commit: string; buildId: string; evidence: Evidence }
 export function policyDigest(policy: RegressionPolicy): string { const { approval: _approval, ...scope } = policy; return digest(JSON.stringify(scope)); }
@@ -110,28 +112,41 @@ export function assertRegression(root: string, policy: RegressionPolicy, pr: Pul
   if (!policy.command.executable || !Array.isArray(policy.command.args) || policy.command.args.some(a => typeof a !== 'string') || /[\r\n\0]/.test(policy.command.executable)) throw new Error('Use an explicit executable and argument array without a shell.');
   return digest(JSON.stringify({ repository: pr.repository, pr: pr.number, head: pr.head, tested: target.commit, build: target.buildId, policy: policy.id, revision: policy.revision, scopeDigest: policyDigest(policy), suite: policy.suiteId, evidence: policy.suiteEvidence, target: target.id }));
 }
-interface RunRecord { schemaVersion: 1; key: string; head: string; testedCommit: string; buildId: string; status: 'running' | 'completed' | 'uncertain'; startedAt: string; completedAt?: string; exitCode?: number; productVerdict: 'Not assessed'; source: string; ticketId: string; generation: string; operationId: string; lifecycleStopRequested?: boolean; data?: DataReceipt }
-interface RegressionData { observations?: Evidence[]; expectedDigest?: string }
+interface RunRecord { schemaVersion: 1; key: string; head: string; testedCommit: string; buildId: string; status: 'running' | 'completed' | 'uncertain'; startedAt: string; completedAt?: string; exitCode?: number; productVerdict: 'Not assessed'; source: string; ticketId: string; generation: string; operationId: string; lifecycleStopRequested?: boolean; data?: DataReceipt; caseExecution?: string }
+interface RegressionData { observations?: Evidence[]; expectedDigest?: string; expectedCaseDigest?: string; requireCaseBatch?: boolean }
 
 function checkDataRequest(policy: RegressionPolicy, input: RegressionData) {
   if (policy.dataScope === undefined && (input.observations !== undefined || input.expectedDigest !== undefined)) throw new Error('Data arguments need a reviewed regression data scope.');
   if (input.expectedDigest !== undefined && (!policy.dataScope || input.expectedDigest !== dataScopeDigest(policy.dataScope))) throw new Error('The dispatched data scope must match the runner policy.');
+  if (input.requireCaseBatch && !policy.caseAuthorization) throw new Error('Bind the reviewed feature understanding and case batch to the regression policy.');
+  if (input.expectedCaseDigest !== undefined && input.expectedCaseDigest !== policy.caseAuthorization?.batch.sha256) {
+    throw new Error('The dispatched case batch must match the reviewed regression policy.');
+  }
 }
 function regressionData(root: string, policy: RegressionPolicy, target: ObservedTarget, input: RegressionData) {
   return policy.dataScope === undefined ? undefined : assertDataReady(root, policy.dataScope, { environment: target.id, buildId: target.buildId }, input.observations);
 }
 
-async function verifyDataReceiver(root: string, dispatch: NonNullable<RegressionPolicy['dispatch']>, repository: string, runner: GhRunner) {
+async function verifyReceiver(root: string, dispatch: NonNullable<RegressionPolicy['dispatch']>, receiver: Evidence | undefined, repository: string, runner: GhRunner) {
   validateRepository(repository);
-  const receiver = dispatch.dataReceiver;
   if (!receiver || receiver.pointer !== undefined || !/^[\w.-]+\.ya?ml$/.test(dispatch.workflow) || receiver.path !== `.github/workflows/${dispatch.workflow}`) {
-    throw new Error('Data-aware dispatch needs the reviewed receiver workflow and its full-file hash.');
+    throw new Error('Dispatch needs the reviewed receiver workflow and its full-file hash.');
   }
   verifyEvidence(root, receiver);
   const remote = JSON.parse(await runner(['api', `repos/${repository}/contents/${receiver.path}?ref=${encodeURIComponent(dispatch.ref)}`]));
   if (remote?.type !== 'file' || remote.encoding !== 'base64' || typeof remote.content !== 'string' ||
       digest(Buffer.from(remote.content, 'base64')) !== receiver.sha256) {
-    throw new Error('The workflow at the dispatch ref differs from the reviewed data receiver.');
+    throw new Error('The workflow at the dispatch ref differs from the reviewed receiver.');
+  }
+}
+function verifyRegressionCases(root: string, policy: RegressionPolicy, ticket: Ticket, target: ObservedTarget) {
+  if (!policy.caseAuthorization) return;
+  const design = verifyCaseAuthorization(root, policy.caseAuthorization, {
+    assignment: { source: 'local', ticketId: ticket.id }, target: { buildId: target.buildId, environment: target.id },
+    gate: ticket.status === 'Retest' ? 'G4' : 'G2',
+  });
+  if ([...design.cases.values()].some(item => !policy.suiteEvidence.some(ref => ref.sha256 === item.definition.sha256 && ref.path === item.definition.path && ref.pointer === item.definition.pointer))) {
+    throw new Error('The reviewed suite must include the exact case definitions.');
   }
 }
 export type RegressionRunner = (command: { executable: string; args: string[] }, options: { cwd: string; windowsHide: boolean; timeout: number; maxBuffer: number; env: NodeJS.ProcessEnv; signal: AbortSignal }) => Promise<unknown>;
@@ -247,11 +262,21 @@ export async function executeRegression(root: string, policy: RegressionPolicy, 
       assertLegacyStart(root, binding);
       const data = regressionData(root, policy, target, dataInput);
       if (data) record.data = data;
+      if (policy.caseAuthorization) {
+        verifyRegressionCases(root, policy, ticket, target);
+        const caseExecution = `ci-${key.slice(0, 64)}`;
+        startCases(root, { ...policy.caseAuthorization, id: caseExecution, target: target.evidence,
+          local: { ticketId: ticket.id, generation: ticket.generation } });
+        assertCaseInputs(root, caseExecution, policy.suiteEvidence);
+        record.caseExecution = caseExecution;
+      }
       startOperation(root, ticket, { id: operationId, source, kind: 'localRegression', resultPath: path });
       save(root, path, record, null);
       monitor = watchTicket(root, ticket, operationId, () => controller.abort());
       const dataEnv = data ? { QA_DATA_SCOPE_DIGEST: data.scopeDigest, QA_DATA_CHECK_IDS: JSON.stringify(data.checks.map(check => check.id)), QA_DATA_PLAN_PATH: data.plan?.path ?? '', QA_DATA_PLAN_SHA256: data.plan?.sha256 ?? '' } : {};
-      return runner(policy.command, { cwd: root, windowsHide: true, signal: controller.signal, timeout: policy.timeoutMs, maxBuffer: 8_000_000, env: { ...process.env, QA_PR_HEAD: pr.head, QA_TESTED_COMMIT: target.commit, QA_BUILD_ID: target.buildId, QA_RUN_KEY: key, QA_RESULT_DIR: resultFolder, ...dataEnv } });
+      const caseEnv = record.caseExecution ? { QA_CASE_EXECUTION_ID: record.caseExecution, QA_CASE_TARGET_PATH: target.evidence.path,
+        QA_CASE_TARGET_SHA256: target.evidence.sha256 } : {};
+      return runner(policy.command, { cwd: root, windowsHide: true, signal: controller.signal, timeout: policy.timeoutMs, maxBuffer: 8_000_000, env: { ...process.env, QA_PR_HEAD: pr.head, QA_TESTED_COMMIT: target.commit, QA_BUILD_ID: target.buildId, QA_RUN_KEY: key, QA_RESULT_DIR: resultFolder, ...dataEnv, ...caseEnv } });
     });
     await work;
   }
@@ -282,9 +307,15 @@ export async function dispatchRegression(root: string, policy: RegressionPolicy,
   }
   const retained = retainLegacy(root, binding);
   if (retained) return { key, action: 'unchanged', retained, result: 'Original dispatch and terminal observation retained; suite results and QA verdict require their actual evidence.' };
+  if (policy.dataScope !== undefined) regressionData(root, policy, target, dataInput);
+  if (policy.caseAuthorization) verifyRegressionCases(root, policy, ticket, target);
   if (policy.dataScope !== undefined) {
-    regressionData(root, policy, target, dataInput);
-    await verifyDataReceiver(root, policy.dispatch, pr.repository, runner);
+    try { await verifyReceiver(root, policy.dispatch, policy.dispatch.dataReceiver, pr.repository, runner); }
+    catch { throw new Error('The workflow at the dispatch ref differs from the reviewed data receiver or its full-file hash is unavailable.'); }
+  }
+  if (policy.caseAuthorization && (!policy.dataScope || policy.dispatch.caseReceiver?.sha256 !== policy.dispatch.dataReceiver?.sha256 ||
+      policy.dispatch.caseReceiver?.path !== policy.dispatch.dataReceiver?.path)) {
+    await verifyReceiver(root, policy.dispatch, policy.dispatch.caseReceiver, pr.repository, runner);
   }
   const operationId = `dispatch-${key}`;
   let data: DataReceipt | undefined;
@@ -306,8 +337,10 @@ export async function dispatchRegression(root: string, policy: RegressionPolicy,
     const work = withLock(root, 'qa-board', () => {
       assertExecutable(root, ticket.id, ticket.generation);
       regressionData(root, policy, target, dataInput);
+      verifyRegressionCases(root, policy, ticket, target);
       sent = true;
-      return runner(['workflow', 'run', policy.dispatch!.workflow, '--repo', pr.repository, '--ref', policy.dispatch!.ref, '-f', `qa_run_key=${key}`, '-f', `pr_head=${pr.head}`, '-f', `tested_commit=${target.commit}`, ...(data ? ['-f', `qa_data_scope=${data.scopeDigest}`] : [])]);
+      return runner(['workflow', 'run', policy.dispatch!.workflow, '--repo', pr.repository, '--ref', policy.dispatch!.ref, '-f', `qa_run_key=${key}`, '-f', `pr_head=${pr.head}`, '-f', `tested_commit=${target.commit}`, ...(data ? ['-f', `qa_data_scope=${data.scopeDigest}`] : []),
+        ...(policy.caseAuthorization ? ['-f', `qa_case_batch=${policy.caseAuthorization.batch.sha256}`] : [])]);
     });
     const observed = await work;
     const requested = monitor.finish();

@@ -75,6 +75,8 @@ Record the gate decision as private JSON after the actual conversation. Use `cla
 
 For a [data-aware scope](../data/README.md#bind-readiness-to-execution), include the approved `dataScope` in G2 and, on retest, the matching G4 decision. Supply any refreshed `dataObservations` to preflight and begin. Run preflight again before resumed actions. Begin checks the binding before reservation and retains it with the run. Use the original ticket question for a blocked dependency and approve an independent batch separately.
 
+Use [case checkpoints](../execution/README.md) after `task-source begin` opens the approved batch. Use `task-source settle` to retain its case receipt alongside the terminal execution observation.
+
 ## Publish reviewed results
 
 Prepare `{ id, claimId, action, ... }` for `task-source publication-preview --input`. For `comment`, include the reviewed `body`. For `createDefect`, include `title` and `body`. The helper links the originating native ticket. For `move`, use `to: "testedOk"` after G5 or `to: "rework"` with `failedFix` for a [G3-reviewed failure of original confirmation](../regression/README.md#return-the-original-failure-to-rework). Review the exact preview with the human. Include its `publicationDigest` in the actual decision record. When one decision covers several exact previews, record their digests in `publicationDigests`.

@@ -1,6 +1,6 @@
 import { assertNonsecret, digest, load, requireText, verifyEvidence, type Evidence } from '../shared/store.js';
 import { pinned } from './library.js';
-import { sameTarget, verifyAssessment, type Target } from './round.js';
+import { sameTarget, verifyAssessment, verifyCurrentCaseEvidence, type Target } from './round.js';
 import { releaseBoard, requireCurrentScope, sameEvidence, type Assignment } from './scope.js';
 import { releaseFixes } from '../regression/fix.js';
 import type { ReleaseBoard } from '../regression/board.js';
@@ -13,6 +13,7 @@ export interface HandoffApproval {
   assessment: Evidence; route: Route; targetObservation: Evidence;
   regressionDigest?: string;
   boardInventory?: Evidence;
+  understandings?: Evidence[];
   exceptions?: { gapId: string; owner: string; reason: string; decision: Evidence }[];
 }
 interface ReleaseDecision {
@@ -25,7 +26,7 @@ export interface InventoryRecheck {
 }
 const inventoryRecheckMaxAgeMs = 5 * 60_000;
 export interface DeliveryEvidence { delivery?: Evidence; acknowledgement?: Evidence }
-export interface LocalHandoff extends DeliveryEvidence { decision: Evidence }
+export interface LocalHandoff extends DeliveryEvidence { decision: Evidence; requireCases?: boolean }
 
 export function reportingPreference(root: string) {
   const { value } = load<{ releaseHandoff?: Preferences }>(root, '.local/reporting-settings.json', () => ({}));
@@ -113,8 +114,18 @@ function verifyInventoryRecheck(root: string, decision: ReleaseDecision, assignm
   }
 }
 
+export function verifyHandoffCases(root: string, decision: ReleaseDecision) {
+  if (!decision.handoff) throw new Error('Record the current handoff with its reviewed case evidence.');
+  const current = verifyCurrentCaseEvidence(root, decision.handoff.assessment);
+  if (!Array.isArray(decision.handoff.understandings) ||
+      current.some(ref => !decision.handoff!.understandings!.some(approved => sameEvidence(approved, ref))) ||
+      decision.handoff.understandings.some(ref => !current.some(used => sameEvidence(used, ref)))) {
+    throw new Error('G5 must identify the current reviewed feature understanding for the release cases.');
+  }
+}
+
 export function reviewHandoff(root: string, decision: ReleaseDecision, assessment: Evidence, route: Route, assignment: Assignment,
-  liveBoard?: ReleaseBoard, recheck?: InventoryRecheck) {
+  liveBoard?: ReleaseBoard, recheck?: InventoryRecheck, requireCases = false) {
   if (decision.gate !== 'G5' || !['Approved', 'Approved with limits'].includes(decision.decision)) throw new Error('Record the actual G5 decision for this handoff.');
   requireText(decision.reviewer, 'Actual reviewer');
   requireText(decision.source, 'Actual G5 decision source');
@@ -124,6 +135,7 @@ export function reviewHandoff(root: string, decision: ReleaseDecision, assessmen
     throw new Error('G5 must review this release assessment and handoff destination.');
   }
   const report = currentAssessment(root, assessment, assignment);
+  if (requireCases || requireCurrentScope(root, assignment).plan.caseBatches) verifyHandoffCases(root, decision);
   if (!sameTarget(decision.target, report.target)) throw new Error('G5 must match the assessed release build and environment.');
   const observed = pinned<Target & { observedAt: string; source: string }>(root, reviewed.targetObservation, 'G5 target observation');
   if (!sameTarget(observed, report.target) || !Number.isFinite(Date.parse(observed.observedAt)) || !/(Z|[+-]\d\d:\d\d)$/.test(observed.observedAt)) {
@@ -184,7 +196,7 @@ export function verifyLocalHandoff(root: string, ticketId: string, ticketRevisio
     throw new Error('Record G5 for this local ticket revision and its release assessment.');
   }
   const route = resolveHandoffRoute(root, decision.handoff.route);
-  const report = reviewHandoff(root, decision, decision.handoff.assessment, route, { source: 'local', ticketId });
+  const report = reviewHandoff(root, decision, decision.handoff.assessment, route, { source: 'local', ticketId }, undefined, undefined, request.requireCases);
   verifyDelivery(root, request.decision, route, request);
   return report;
 }

@@ -35,7 +35,8 @@ import { validateFlowMap, traceFlowMap, type FlowMapSnapshot, type Direction } f
 import { assessTaskTools, assessLiveTaskTools, type TaskToolPlan } from './tools/task.js';
 import { assessData, type DataPreparation } from './data/preparation.js';
 import { datasetDirectory, inspectDatasets, type DatasetIndex } from './data/datasets.js';
-import { preflightLocalData } from './data/local.js';
+import { preflightLocalData, prepareLocalCase } from './data/local.js';
+import * as caseExecution from './execution/cases.js';
 import { inspectSource, type SourceFormat } from './data/source-inspection.js';
 import { dataStatus, listIntake, noteCandidate, previewIntake, registerIntake, type CandidateRequest, type IntakeRequest } from './data/intake.js';
 import * as chromeConfig from './chrome-devtools/config.js';
@@ -66,6 +67,7 @@ async function currentPr(repository: string, number: number) {
   const raw = JSON.parse(await github.runGh(['api', `repos/${repository}/pulls/${number}`])); return github.normalizePr(repository, raw);
 }
 const help = {
+  cases: 'validate --input | start --input | next --input | observe --input | status --id | finish --id',
   regression: 'register --input | approve-plan --input | status --fix | retain-results --input | record-review --input | release --input',
   release: 'library --input | scope --input | preview-scope --input | bind-scope --input | invalidate-scope --input | retain-run --input | runs --input | assess --input | record-assessment --input | verify-assessment --input | route [--ticket-url]',
   attention: 'status | proposal/configure --input | record --input | list --recipient [--offset N --limit N --snapshot hash --all] | index | update-index --input | preview --recipient --notifier [--at ISO] | reserve --input | preflight --id --notifier | receipt --input | respond --input : optional blocker reminders; no task execution, lifecycle move or approval',
@@ -82,7 +84,7 @@ const help = {
   browser: 'versions | install | mcp-config | check --provider library/cli/mcpServer [--headless] [--context interactive/scheduled/ci] | import-report --input | fixture',
   'browser-access': 'targets | status | ensure-standard --input | prepare --input | apply --input | native-plan --input | native-apply --input | record --input : prepare the project browser and verify target access',
   email: 'policy | account --input | accounts | options --input | plan --input | discover --provider gmailApi/agentmail --source | create-inbox --input | select --input | verify --input | begin --input | outcome --input',
-  github: 'pending-comments | reconcile-comment --input | reconcile-legacy --input --repository --number --policy --target --source | install --source | check --repository | check-in --source | event --repository --number --source | policy-digest --policy | run/dispatch --policy --target --repository --number --source [--data-observations] [--data-scope-digest] | comment --policy --target --repository --number --body --source',
+  github: 'pending-comments | reconcile-comment --input | reconcile-legacy --input --repository --number --policy --target --source | install --source | check --repository | check-in --source | event --repository --number --source | policy-digest --policy | run/dispatch --policy --target --repository --number --source [--data-observations] [--data-scope-digest] [--case-batch-digest] | comment --policy --target --repository --number --body --source',
   evidence: '--path [--pointer] : calculate an evidence reference; no product verdict is inferred',
   note: 'Use project-private JSON under .local/ for inputs. The agent presents questions and performs authorized host connections. CLI output is a model, not an actual human conversation or approval. See Onboarding/README.md.',
 };
@@ -93,6 +95,26 @@ async function main() {
     output({ area, commands: help[area as keyof typeof help] }); return;
   }
   if (area === 'evidence') { output(store.evidence(root, option('path'), options.get('pointer'))); return; }
+  if (area === 'cases') {
+    if (action === 'validate') {
+      const { batch, cases } = caseExecution.verifyCaseAuthorization(root, input());
+      output({ assignment: batch.assignment, target: batch.target, cases: [...cases.keys()] });
+    } else if (action === 'start') {
+      requireLocalSource(root);
+      const request = input<Parameters<typeof preflightLocalData>[1]>();
+      if (!request.caseExecution) throw new Error('Include the case execution ID in the local preflight request.');
+      output(preflightLocalData(root, request));
+    } else if (action === 'next') {
+      const request = input<Parameters<typeof caseExecution.prepareCheckpoint>[1]>();
+      output(activeSource(root).value.choice.kind === 'local'
+        ? prepareLocalCase(root, request)
+        : await taskSource.prepareLiveCase(root, request));
+    } else if (action === 'observe') output(caseExecution.observeCheckpoint(root, input()));
+    else if (action === 'status') output(caseExecution.inspectCases(root, option('id')));
+    else if (action === 'finish') { requireLocalSource(root); output(caseExecution.finishCases(root, option('id'))); }
+    else throw new Error('Run cases help to see the available commands.');
+    return;
+  }
   if (area === 'attention') {
     if (action === 'status') output(attention.status(root));
     else if (action === 'proposal') output(attentionPreferences.proposal(root, input()));
@@ -121,13 +143,13 @@ async function main() {
     else if (action === 'history') output(taskSource.claimHistory(root, option('claim')));
     else if (action === 'recheck') { const { claim } = await taskSource.recheck(root, option('claim')); output(claim); }
     else if (action === 'preflight') output(await taskSource.preflight(root, input()));
-    else if (action === 'begin') output(await taskSource.beginExecution(root, input()));
+    else if (action === 'begin') output(await taskSource.beginExecution(root, { ...input<Parameters<typeof taskSource.beginExecution>[1]>(), requireCaseBatch: true }));
     else if (action === 'settle') output(taskSource.settleExecution(root, input()));
     else if (action === 'publication-preview') output(await taskSource.publicationPreview(root, input()));
-    else if (action === 'publish') output(await taskSource.publish(root, input()));
+    else if (action === 'publish') output(await taskSource.publish(root, { ...input<Parameters<typeof taskSource.publish>[1]>(), requireCases: true }));
     else if (action === 'reconcile-publication') output(await taskSource.reconcileCurrentPublication(root, input()));
-    else if (action === 'observe-completion') output(await taskSource.observeReleaseCompletion(root, input()));
-    else if (action === 'close') output(await taskSource.closeCurrentClaim(root, input()));
+    else if (action === 'observe-completion') output(await taskSource.observeReleaseCompletion(root, { ...input<Parameters<typeof taskSource.observeReleaseCompletion>[1]>(), requireCases: true }));
+    else if (action === 'close') output(await taskSource.closeCurrentClaim(root, { ...input<Parameters<typeof taskSource.closeCurrentClaim>[1]>(), requireCases: true }));
     else throw new Error('Unknown task-source operation; use help.');
     return;
   }
@@ -153,7 +175,12 @@ async function main() {
         output({ tickets, authorization: 'Use the reviewed task scope before execution.', next });
       }
     } else if (action === 'transition' || action === 'recover') {
-      const record = action === 'transition' ? board.transitionTicket(root, input<board.Transition>()) : board.recoverTransition(root, option('id'));
+      let record;
+      if (action === 'transition') {
+        const request = input<board.Transition>();
+        if (request.release) request.release.requireCases = true;
+        record = board.transitionTicket(root, request);
+      } else record = board.recoverTransition(root, option('id'), true);
       output({ id: record.id, ticketId: record.ticketId, state: record.state, recordedDestination: record.to, ownerUpdates: record.ownerUpdates, linkUpdates: record.linkUpdates ?? [],
         ...(record.releaseReviewRequired ? { releaseReviewRequired: record.releaseReviewRequired } : {}) });
     }
@@ -215,7 +242,7 @@ async function main() {
   }
   if (area === 'regression') {
     if (action === 'register') output(registerFix(root, input()));
-    else if (action === 'approve-plan') output(approveFixPlan(root, input()));
+    else if (action === 'approve-plan') output(approveFixPlan(root, { ...input<Parameters<typeof approveFixPlan>[1]>(), requireCases: true }));
     else if (action === 'status') output(fixStatus(root, option('fix')));
     else if (action === 'retain-results') output(retainFixResults(root, input()));
     else if (action === 'record-review') output(recordFixReview(root, input()));
@@ -227,7 +254,7 @@ async function main() {
     if (action === 'library') output(browseLibrary(root, input()));
     else if (action === 'scope') output(releaseScope(root, input()));
     else if (action === 'preview-scope') output(await taskSource.previewCurrentReleaseScope(root, input()));
-    else if (action === 'bind-scope') output(await taskSource.bindCurrentReleaseScope(root, input()));
+    else if (action === 'bind-scope') output(await taskSource.bindCurrentReleaseScope(root, { ...input<Parameters<typeof taskSource.bindCurrentReleaseScope>[1]>(), requireCases: true }));
     else if (action === 'invalidate-scope') output(invalidateReleaseScope(root, input()));
     else if (action === 'retain-run') output(retainRun(root, input()));
     else if (action === 'runs') output(retainedRuns(root, input<{ round: store.Evidence }>().round));
@@ -412,6 +439,8 @@ async function main() {
       const data = {
         observations: options.has('data-observations') ? store.readInput<store.Evidence[]>(root, option('data-observations')) : undefined,
         expectedDigest: options.get('data-scope-digest'),
+        expectedCaseDigest: options.get('case-batch-digest'),
+        requireCaseBatch: true,
       };
       output(action === 'run' ? await github.executeRegression(root, policy, pr, target, source, undefined, data) : await github.dispatchRegression(root, policy, pr, target, undefined, data));
     }

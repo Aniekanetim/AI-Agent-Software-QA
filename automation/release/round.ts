@@ -1,5 +1,6 @@
-import { digest, evidence, load, requireText, save, verifyEvidence, withLock, type Evidence } from '../shared/store.js';
+import { digest, evidence, load, requireText, sameEvidence, save, verifyEvidence, withLock, type Evidence } from '../shared/store.js';
 import { identifier, indexById, pinned, readLibrary, references } from './library.js';
+import { caseResult, readCaseBatch } from '../execution/cases.js';
 
 export interface Target { buildId: string; environment: string }
 interface Obligation {
@@ -10,11 +11,13 @@ interface Obligation {
 export interface Round {
   schemaVersion: 1; id: string; library: Evidence; scope: Evidence; changes: Evidence;
   target: Target; assignmentIds: string[]; moduleIds: string[]; obligations: Obligation[];
+  caseBatches?: Evidence[];
 }
 type Outcome = 'Pass' | 'Fail' | 'Blocked' | 'Partial' | 'Not run';
 interface Observation {
   checkId: string; conditionId: string; outcome: Outcome; evidence: Evidence[];
   note?: string; previousRunId?: string; context?: Evidence;
+  caseExecution?: { receipt: Evidence; caseId: string };
 }
 export interface Run {
   schemaVersion: 1; id: string; round: Evidence; target: Target;
@@ -70,10 +73,28 @@ export function readRound(root: string, ref: Evidence) {
       required.add(`${checkId}/${conditionId}`);
     }
   }
+  if (round.caseBatches) {
+    if (!Array.isArray(round.caseBatches) || !round.caseBatches.length) throw new Error('Pin the case batches covering this round.');
+    const covered = new Set<string>();
+    for (const ref of round.caseBatches) {
+      const { batch, cases } = readCaseBatch(root, ref);
+      if (!sameTarget(batch.target, round.target) || !round.assignmentIds.includes(batch.assignment.ticketId)) {
+        throw new Error('Case batches must cover the approved round assignments and target.');
+      }
+      for (const item of cases.values()) {
+        const key = `${item.checkId}/${item.conditionId}`;
+        if (!required.has(key) || !sameEvidence(item.definition, catalogue.checks.get(item.checkId)?.definition)) {
+          throw new Error('Match approved cases to the round check definitions and conditions.');
+        }
+        covered.add(key);
+      }
+    }
+    if ([...required].some(key => !covered.has(key))) throw new Error('Every required check and condition needs an approved case in the round.');
+  }
   return { round, catalogue, required };
 }
 
-function readRun(root: string, ref: Evidence, scope: ReturnType<typeof readRound>, roundRef: Evidence) {
+function readRun(root: string, ref: Evidence, scope: ReturnType<typeof readRound>, roundRef: Evidence, current = false) {
   const run = pinned<Run>(root, ref, 'test run');
   if (run?.schemaVersion !== 1) throw new Error('Use a version 1 test run.');
   identifier(run.id, 'run');
@@ -97,6 +118,20 @@ function readRun(root: string, ref: Evidence, scope: ReturnType<typeof readRound
     if (['Partial', 'Blocked', 'Not run'].includes(observation.outcome)) requireText(observation.note, 'Outcome reason');
     for (const item of observation.evidence) verifyEvidence(root, item);
     if (observation.context) verifyEvidence(root, observation.context);
+    const execution = observation.caseExecution;
+    if (scope.round.caseBatches && ['Pass', 'Fail'].includes(observation.outcome) && !execution) {
+      throw new Error('Retain the settled case checkpoint evidence for each conclusive verdict. Aggregate runner output cannot support it.');
+    }
+    if (execution) {
+      const result = caseResult(root, execution.receipt, execution.caseId, { ...observation, target: run.target }, current);
+      if (scope.round.caseBatches && !scope.round.caseBatches.some(batch => sameEvidence(batch, result.batch))) {
+        throw new Error('The case verdict came from a different approved batch.');
+      }
+      if (!scope.round.assignmentIds.includes(result.assignment.ticketId) ||
+          !sameEvidence(result.design.definition, scope.catalogue.checks.get(observation.checkId)?.definition)) {
+        throw new Error('The case result must cover the exact assignment and check definition.');
+      }
+    }
   }
   return run;
 }
@@ -261,9 +296,20 @@ export function verifyAssessment(root: string, ref: Evidence, currentRunSet = fa
   if (expectedRound && (record.input.round.path !== expectedRound.path || record.input.round.sha256 !== expectedRound.sha256)) {
     throw new Error('Use the assessment for this assignment’s current reviewed release round.');
   }
-  if (currentRunSet) verifyRunSet(root, record.input);
+  if (currentRunSet) {
+    verifyRunSet(root, record.input);
+    const scope = readRound(root, record.input.round);
+    if (scope.round.caseBatches) for (const run of record.input.runs) readRun(root, run, scope, record.input.round, true);
+  }
   const actual = assessRound(root, record.input, record.schemaVersion);
   if (JSON.stringify(record.report) !== JSON.stringify(actual)) throw new Error('The release evidence changed. Review the assessment again.');
   if (currentRunSet && actual.ineligible.length) throw new Error('Reconcile the ineligible retained run evidence before sign-off.');
   return actual;
+}
+
+export function verifyCurrentCaseEvidence(root: string, assessment: Evidence) {
+  const { input } = pinned<{ input: AssessmentInput }>(root, assessment, 'current release assessment');
+  const scope = readRound(root, input.round);
+  if (!scope.round.caseBatches) throw new Error('Current sign-off needs a reviewed case batch and case-level evidence.');
+  return scope.round.caseBatches.map(ref => readCaseBatch(root, ref).batch.understanding);
 }

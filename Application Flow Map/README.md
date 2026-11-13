@@ -42,6 +42,8 @@ On a correction, preserve the original statement, actual reply and question refe
 
 Review affected entries after changes to requirements, interfaces, shared components, configuration, observed behavior or evidence availability. Link the original request/ticket and actual source revisions. Mark affected entries Needs review, retain historical observations/build identity and identify what can still be used. A changed file calls for impact review, not a full automatic crawl or rerun.
 
+Use the [case journal's grouped flow reviews](../automation/execution/README.md#carry-the-evidence-through-findings-and-sign-off) to identify feature and relationship IDs that need attention. Link the triggering evidence and the affected cases. Ask the responsible owner about disputed intent and keep the original observations and results traceable.
+
 Keep stable IDs through display-name changes. Retire obsolete entries with a reason, revision and replacement link where applicable; never reuse their IDs. Preserve prior versions through Git or dated snapshots. Retired nodes/relationships remain historical, not automatically redirected into current paths. Distinguish a valid runtime cycle from an invalid replacement-history cycle.
 
 Unmapped connections and unvisited roles/states are unknown. Missing, conditional or stale relationships may justify broader regression. The agent must reason about transferred data/state and risk; following every reachable arrow does not determine the final scope. Retain selection explanations, map/source revisions and actual coverage on the ticket and G5 packet.

@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { contained, privatePath, load, save, revision, requireText, digest, evidence, verifyEvidence, assertNonsecret, type Evidence } from '../shared/store.js';
 import { probe, selectedCommand, runProcess, readRecord, saveRecord, readinessIssues, isolatedPostmanEnvironment, type Runner, type ToolRecord, type Command } from '../tools/registry.js';
 import { currentHarness, harnessKey } from '../tools/runtime.js';
+import { verifyCaseCheckpoint } from '../execution/cases.js';
 
 export const settingsPath = '.local/postman-settings.json';
 export interface PostmanSettings {
@@ -152,6 +153,7 @@ export interface RunRequest {
   workingDirectory?: string;
   target: { environment: string; baseUrl: string; build: string; source: string };
   timeoutMs: number; cloudReportingAuthorization?: string;
+  caseCheckpoint?: { id: string; caseId: string; checkpoint: string };
 }
 export interface RunResult {
   schemaVersion: 1; id: string; requestDigest: string; state: 'running' | 'completed'; outcome: 'passed' | 'failed' | 'executionError' | 'incomplete';
@@ -160,6 +162,7 @@ export interface RunResult {
   reporting: 'localOnly' | 'cloudAllowed'; exitCode: number | null;
   reportFormat?: 'json' | 'cli-summary' | 'unavailable';
   assertions?: { total: number; failed: number }; requests?: { total: number; failed: number }; reason?: string;
+  caseCheckpoint?: RunRequest['caseCheckpoint'];
 }
 function runRecordPath(id: unknown) {
   if (typeof id !== 'string' || !/^[A-Za-z0-9_-]{1,80}$/.test(id)) throw new Error('Use a unique, simple execution ID.');
@@ -216,6 +219,8 @@ export function validateRun(root: string, request: RunRequest): void {
     if (request.environment?.kind === 'cloud' && !configuration!.environments.includes(request.environment.reference)) throw new Error('Select this cloud environment first.');
   }
   for (const ref of request.approvedInputs ?? []) verifyEvidence(root, ref);
+  if (request.caseCheckpoint) verifyCaseCheckpoint(root, request.caseCheckpoint, request.approvedInputs,
+    { buildId: request.target.build, environment: request.target.environment });
   for (const file of [request.collection.kind === 'file' ? request.collection.reference : null, request.environment?.kind === 'file' ? request.environment.reference : null, request.dataFile]) {
     if (file && !request.approvedInputs.some(ref => ref.path === file && !ref.pointer)) throw new Error('Every local collection, environment and data file needs its approved full-file evidence.');
   }
@@ -257,6 +262,7 @@ export async function runCollection(root: string, request: RunRequest, runner: R
   }
   const issues = capabilityIssues(root, record, required); if (issues.length) throw new Error(issues.join('; '));
   const command = selectedCommand(root, 'postman', false);
+  if (request.caseCheckpoint) validateRun(root, request);
   const work = privatePath(root, `.local/postman/work/${request.id}`); mkdirSync(work, { recursive: true });
   const reportFile = resolve(work, 'raw-report.json'), configuration = settings(root);
   const env = cloud ? cloudEnvironment(configuration!) : localEnvironment(root);
@@ -280,7 +286,8 @@ export async function runCollection(root: string, request: RunRequest, runner: R
   if (request.environment) args.push('--environment', request.environment.kind === 'file' ? contained(root, request.environment.reference) : request.environment.reference);
   if (request.dataFile) args.push('--iteration-data', contained(root, request.dataFile));
   const result: RunResult = { schemaVersion: 1, id: request.id, requestDigest, state: 'running', outcome: 'incomplete', harness: identity, version: record.version, executable: command.executable,
-    collection: request.collection, target: request.target, startedAt: new Date().toISOString(), source: request.source, authorizationReference: request.authorizationReference, inputs: request.approvedInputs, reporting: cloud ? 'cloudAllowed' : 'localOnly', exitCode: null };
+    collection: request.collection, target: request.target, startedAt: new Date().toISOString(), source: request.source, authorizationReference: request.authorizationReference, inputs: request.approvedInputs,
+    ...(request.caseCheckpoint ? { caseCheckpoint: request.caseCheckpoint } : {}), reporting: cloud ? 'cloudAllowed' : 'localOnly', exitCode: null };
   save(root, path, result, null);
   try {
     const execution = await runner(command, args, { cwd: contained(root, request.workingDirectory ?? '.'), env, timeout: request.timeoutMs + 15_000 });
