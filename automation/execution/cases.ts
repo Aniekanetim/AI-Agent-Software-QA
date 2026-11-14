@@ -616,7 +616,10 @@ function appliedCheckpoint(root: string, session: Session, design: Design, item:
     if (!conclusive(row.outcome) && reviewed?.outcome !== 'applied') continue;
     const priorDesign = readCaseBatch(root, prior.batch);
     const priorCase = priorDesign.cases.get(item.id);
-    const compatible = priorCase && sameTarget(priorDesign.batch.target, design.batch.target) &&
+    const previousData = prior.dataBinding?.scope, currentData = session.dataBinding?.scope;
+    const sameData = previousData?.mode === currentData?.mode &&
+      (currentData?.mode !== 'required' || sameEvidence(previousData?.plan, currentData.plan));
+    const compatible = priorCase && sameData && sameTarget(priorDesign.batch.target, design.batch.target) &&
       caseBasis(priorDesign, priorCase) === caseBasis(design, item);
     return { prior, receipt, row, reviewed, reconciliation: reviewed ? evidence(root, path) : undefined, compatible };
   }

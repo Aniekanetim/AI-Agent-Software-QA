@@ -393,7 +393,7 @@ function actionInventory(action: InventoryRecheck['action'], id: string, decisio
 }
 
 interface CloseClaimRequest { claimId: string; source: string; evidence: Evidence[]; disposition?: 'completed' | 'released'; defect?: Evidence; inventoryRecheck?: Evidence; requireCases?: boolean }
-export function closeClaim(root: string, request: CloseClaimRequest, board?: ReleaseBoard) {
+export function closeClaim(root: string, request: CloseClaimRequest, board?: ReleaseBoard, observedMove?: { sourceRevision: string; publicationId: string }) {
   requireText(request.source, 'Actual claim disposition and reason');
   if (!request.evidence?.length) throw new Error('Link the actual disposition evidence before closing the claim.');
   for (const evidence of request.evidence) verifyEvidence(root, evidence);
@@ -414,7 +414,10 @@ export function closeClaim(root: string, request: CloseClaimRequest, board?: Rel
           JSON.stringify(scopedCompletion(root, claim, moved.fixProof.defect, moved.fixProof.completion, false, request.requireCases)) !== JSON.stringify(moved.fixProof)) {
         throw new Error('Verify the actual scoped defect completion with confirmation and regression evidence.');
       }
-      if (!board) throw new Error('Read the current native destination before closing this verified defect.');
+      if (observedMove?.publicationId !== moved.id || observedMove.sourceRevision !== claim.sourceRevision ||
+          activeSource(root).revision !== observedMove.sourceRevision) {
+        throw new Error('Read the current native destination before closing this verified defect.');
+      }
     } else if (request.disposition !== 'released') {
       const returned = publications.filter(item => item.destination?.queue === 'rework').at(-1);
       if (request.disposition !== undefined || !returned?.rework || returned.remoteId !== claim.ticket.id) {
@@ -449,7 +452,9 @@ export async function closeCurrentClaim(root: string, request: CloseClaimRequest
       claim.descriptionRevision !== digest(JSON.stringify(connection.descriptions?.[observed.id] ?? null))) {
     throw new Error('The native assignment scope changed. Reconcile the actual ticket revision and release decision.');
   }
-  return closeClaim(root, request, nativeReleaseBoard(assignmentFor(claim), connection));
+  return completion.handoff?.kind === 'completion'
+    ? closeClaim(root, request, nativeReleaseBoard(assignmentFor(claim), connection))
+    : closeClaim(root, request, undefined, { sourceRevision: revision, publicationId: completion.id });
 }
 
 type Proposal = { id: string; claimId: string; assessment?: Evidence; route?: Route; defect?: Evidence; completion?: DefectCompletion; failedFix?: string; boardInventory?: Evidence } & (
