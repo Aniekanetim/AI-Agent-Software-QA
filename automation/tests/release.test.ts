@@ -134,3 +134,12 @@ test('scope requires the regression baseline and zero executions still cannot su
     packet: f.round.scope, target: f.target, handoff: { assessment: legacy, route, targetObservation: f.g5Target } };
   assert.throws(() => reviewHandoff(f.root, decision, legacy, route, assignment), /Zero executed checks/);
 });
+
+test('assessment exposes a required applicability coordinate omitted from the reviewed round', () => {
+  const f = fixture();
+  const round = { ...f.round, applicability: f.applicability, obligations: f.round.obligations.slice(0, 1) };
+  const roundRef = f.put('coverage-omission.json', round);
+  const { report } = recordAssessment(f.root, { round: roundRef, runs: [] });
+  assert.equal(report.state, 'gaps');
+  assert(report.gaps.some(gap => gap.id === 'reporting/api/route' && !gap.exceptionAllowed));
+});

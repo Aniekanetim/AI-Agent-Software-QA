@@ -12,6 +12,7 @@ import { selectBinding, readConnections, type Binding, type Inventory } from '..
 import { packageHarness } from './context.js';
 import { integrationIssues } from '../onboarding/integrations.js';
 import { finishCases, observeCheckpoint, prepareCheckpoint, startCases } from '../execution/cases.js';
+import { boardRoot, upgradeBoard, findTicket, transitionTicket } from '../board/board.js';
 
 function fixture() {
   const root = resolve('output/toolchain-fixtures', randomUUID()); mkdirSync(root, { recursive: true });
@@ -182,7 +183,13 @@ test('Postman runs the reserved reviewed collection once and retains its outcome
   const review = { assignment, understanding, decision: 'Approved', reviewer: 'Synthetic reviewer', source: 'Synthetic approval', packet: definition };
   const scopeReview = put(f.root, 'g1.json', { ...review, gate: 'G1' });
   const approval = put(f.root, 'g2.json', { ...review, gate: 'G2', scopeReview, caseBatch: batch });
-  startCases(f.root, { id: 'api-batch', batch, approval, target: targetEvidence });
+  upgradeBoard(f.root, 'Synthetic local QA context');
+  put(f.root, `${boardRoot}/Ready for QA/QA-001.md`, '# QA-001: Fixture authorization');
+  const ticket = findTicket(f.root, 'QA-001');
+  const dataBinding = { scope: { schemaVersion: 1 as const, mode: 'none' as const,
+    checks: [{ id: 'api', conditionIds: ['empty'], dataItemIds: [] }] }, observations: [] };
+  startCases(f.root, { id: 'api-batch', batch, approval, target: targetEvidence, dataBinding,
+    local: { ticketId: ticket.id, generation: ticket.generation } });
   const step = { id: 'api-batch', caseId: 'api', target: targetEvidence };
   prepareCheckpoint(f.root, step);
   observeCheckpoint(f.root, { ...step, checkpoint: 'precondition', outcome: 'matched', source: 'Synthetic', evidence: [targetEvidence] });
@@ -197,6 +204,25 @@ test('Postman runs the reserved reviewed collection once and retains its outcome
   observeCheckpoint(f.root, { ...run.caseCheckpoint, outcome: 'matched', source: 'Synthetic runner evidence', detail: 'Fixture returned HTTP 200', evidence: [report.evidence, assertion] });
   finishCases(f.root, step.id);
   assert.equal((await postman.runCollection(f.root, run, async () => assert.fail('Repeated runner call'))).outcome, 'passed');
+
+  const currentReview = put(f.root, 'second-g2.json', { ...review, source: 'Distinct reviewed operation', gate: 'G2', scopeReview, caseBatch: batch });
+  const second = { ...step, id: 'before-cancellation' };
+  startCases(f.root, { id: second.id, batch, approval: currentReview, target: targetEvidence, dataBinding,
+    local: { ticketId: ticket.id, generation: ticket.generation } });
+  prepareCheckpoint(f.root, second);
+  observeCheckpoint(f.root, { ...second, checkpoint: 'precondition', outcome: 'matched', source: 'Synthetic', evidence: [targetEvidence] });
+  prepareCheckpoint(f.root, second);
+  transitionTicket(f.root, { id: 'cancel', ticketId: ticket.id, expectedRevision: ticket.revision, to: 'Canceled',
+    decision: { actor: 'Fixture owner', source: 'Synthetic decision', reason: 'Stop fixture activity', evidence: [targetEvidence],
+      scope: { kind: 'assignment' }, checkpoint: 'Before dispatch', nextOwner: 'Fixture', nextAction: 'Retain history', handoff: 'Synthetic' } });
+  let productCalls = 0;
+  const probe: registry.Runner = (...args) => {
+    if (args[1][0] === 'collection' && !args[1].includes('--help')) productCalls++;
+    return fakeRunner()(...args);
+  };
+  await assert.rejects(postman.runCollection(f.root, { ...run, id: 'canceled-run',
+    caseCheckpoint: { id: second.id, caseId: second.caseId, checkpoint: 'run' } }, probe), /lifecycle changed|no longer eligible/);
+  assert.equal(productCalls, 0);
 });
 
 test('execution errors and missing assertions are not reported as passing API tests', () => {

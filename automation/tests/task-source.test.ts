@@ -422,7 +422,12 @@ test('a live fix uses two batches under one G4, then closes only with reviewed r
   assert.match(recovered.reviewRequired ?? '', /case batches/);
   assert.throws(() => live.closeClaim(f.root, { claimId: claim.id, source: 'Synthetic scoped closure',
     evidence: [packet], disposition: 'completed', defect, requireCases: true }), /case batches/);
-  const closed = live.closeClaim(f.root, { claimId: claim.id, source: 'Synthetic scoped closure', evidence: [packet], disposition: 'completed', defect });
+  const requestClose = { claimId: claim.id, source: 'Synthetic scoped closure', evidence: [packet], disposition: 'completed' as const, defect };
+  f.board.tickets[0]!.state = 'retest';
+  await assert.rejects(live.closeCurrentClaim(f.root, requestClose, f.reader), /current ticket.*Tested-Ok/);
+  assert.equal(live.claimHistory(f.root, claim.id).claim.state, 'open');
+  f.board.tickets[0]!.state = 'done';
+  const closed = await live.closeCurrentClaim(f.root, requestClose, f.reader);
   assert.equal(closed.terminal?.disposition, 'completed');
 });
 test('Preview leaves the old source active; save binds the reviewed account and never falls back', async () => {
@@ -762,4 +767,41 @@ test('a manually handed-off native Retest stays resumable and cannot be marked v
   assert.throws(() => live.closeClaim(f.root, { claimId: second.id, source: 'Synthetic second disposition',
     evidence: [f.put('.local/second-handoff.json', { state: 'Tested-Ok' })], defect: reviewedDefect(second.id), disposition: 'completed' }), /confirmation and regression evidence/);
   assert.equal((await live.checkIn(f.root, f.reader)).resume?.[0]?.claim.id, second.id);
+});
+
+test('connected execution refuses a data decision for a different case and rechecks the queue at runner admission', async () => {
+  const f = fixture(); await f.select(); const claim = await f.claim();
+  const base = releaseFixture(f.root, claim.ticket.id);
+  const assignment = { source: claim.sourceKey, ticketId: claim.ticket.id };
+  const packet = base.round.scope, definition = base.library.checks[0]!.definition;
+  const understanding = f.put('.local/understanding.json', { schemaVersion: 1, assignment,
+    sources: [{ id: 'rule', authority: 'Fixture', accepted: packet, current: packet }],
+    flows: [{ id: 'flow', featureId: 'fixture', actor: 'QA', startingState: 'Ready', expectedFlow: 'Run one case', criteria: ['rule'], relationshipIds: [] }],
+  });
+  const inputDigest = digest('fixture case inputs');
+  const batch = f.put('.local/case-batch.json', { schemaVersion: 1, assignment, understanding, target: base.target,
+    cases: [{ id: 'case', flowId: 'flow', checkId: 'shared', conditionId: 'route', definition, criteria: ['rule'], dependsOn: [],
+      checkpoints: [{ id: 'precondition', action: 'Observe state', expected: 'Ready' },
+        { id: 'result', action: 'Run case', expected: 'Expected state', runner: { kind: 'postman', inputDigest } }] }],
+  });
+  const basis = { assignment, claimId: claim.id, ticketRevision: claim.ticket.revision, decision: 'Approved', reviewer: 'Fixture QA',
+    source: 'Fixture reply', packet, understanding };
+  const G1 = f.put('.local/scope.json', { ...basis, gate: 'G1' });
+  const design = (id: string, checkId: string) => f.put(`.local/${id}.json`, { ...basis, gate: 'G2', target: base.target, caseBatch: batch, scopeReview: G1,
+    dataScope: { schemaVersion: 1, mode: 'none', checks: [{ id: checkId, conditionIds: ['route'], dataItemIds: [] }] } });
+  const target = f.put('.local/case-target.json', { ...base.target, claimId: claim.id, ticketRevision: claim.ticket.revision, source: 'Fixture build', observedAt: time });
+  const request = { id: 'execution', claimId: claim.id, buildId: base.target.buildId, target, requireCaseBatch: true };
+  await assert.rejects(live.beginExecution(f.root, { ...request, gates: { G1, G2: design('wrong', 'unrelated') } }, f.reader), /case case.*shared.route/);
+  await live.beginExecution(f.root, { ...request, gates: { G1, G2: design('actual', 'shared') } }, f.reader);
+  const next = { id: request.id, caseId: 'case', target };
+  const { claimCaseCheckpoint, observeCheckpoint } = await import('../execution/cases.js');
+  assert.equal((await live.prepareLiveCase(f.root, next, f.reader)).state, 'ready');
+  observeCheckpoint(f.root, { ...next, checkpoint: 'precondition', outcome: 'matched', source: 'Fixture', evidence: [packet] });
+  assert.equal((await live.prepareLiveCase(f.root, next, f.reader)).state, 'ready');
+  f.board.tickets[0]!.state = 'retest';
+  let calls = 0;
+  const fresh = await live.readConnectedCase(f.root, request.id, f.reader);
+  assert.throws(() => claimCaseCheckpoint(f.root, { ...next, checkpoint: 'result' }, [definition], base.target,
+    { kind: 'postman', id: 'should-not-run', inputDigest }, fresh, () => ++calls), /connected assignment/);
+  assert.equal(calls, 0);
 });

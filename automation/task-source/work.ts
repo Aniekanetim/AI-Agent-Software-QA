@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { assertDataReady, dataScopeDigest, type DataReceipt, type DataScope } from '../data/readiness.js';
+import { assertDataReady, dataScopeDigest, requireCaseData, type DataReceipt, type DataScope } from '../data/readiness.js';
 import { assertNonsecret, digest, load, requireText, save, verifyEvidence, withLock, type Evidence } from '../shared/store.js';
 import { pendingCommentPublications } from '../github/github.js';
 import { pendingPresentation } from '../attention/notifications.js';
@@ -12,7 +12,7 @@ import { bindReleaseScope, previewReleaseScope, releaseScope, sameEvidence } fro
 import { currentFixes, defectCompletion, failedConfirmation, fixStatus, requireFixBatch, verifyRework, type DefectCompletion, type ReworkDecision } from '../regression/fix.js';
 import { nativeReleaseBoard, type ReleaseBoard } from '../regression/board.js';
 import type { Assignment } from '../release/scope.js';
-import { finishCases, prepareCheckpoint, readCaseBatch, startCases, verifyCaseAuthorization, verifyUnderstandingReview } from '../execution/cases.js';
+import { finishCases, inspectCases, prepareCheckpoint, readCaseBatch, startCases, verifyCaseAuthorization, verifyUnderstandingReview } from '../execution/cases.js';
 
 interface Claim {
   id: string; sourceKey: string; sourceRevision: string; identity: Identity; ticket: Ticket; queue: 'ready' | 'retest'; source: string;
@@ -184,12 +184,12 @@ type ResumeReason = keyof typeof resumeActions;
 type Hold = { reasonCode: Exclude<ResumeReason, 'eligible'>; relatedId?: string };
 
 function bindingHold(claim: Claim, { choice, revision, connection }: Awaited<ReturnType<typeof liveBoard>>): Hold | null {
-  if (claim.sourceRevision !== revision) return { reasonCode: 'sourceChanged' };
+  if (claim.sourceRevision !== revision || sourceKey(choice, connection.identity) !== claim.sourceKey) return { reasonCode: 'sourceChanged' };
   const ticket = connection.tickets.find(item => item.id === claim.ticket.id);
   if (!ticket) return { reasonCode: 'ticketMissing' };
   const blockedBy = routeBlocker(ticket, mappedQueue(choice, ticket), connection.identity);
   if (blockedBy) return { reasonCode: blockedBy };
-  return ticket.revision === claim.ticket.revision ? null : { reasonCode: 'revisionChanged' };
+  return ticket.revision === claim.ticket.revision && mappedQueue(choice, ticket) === claim.queue ? null : { reasonCode: 'revisionChanged' };
 }
 function publicationHold(publications: Publication[], claimId: string) {
   const pending = publications.find(p => p.claimId === claimId && p.state === 'pending');
@@ -297,7 +297,7 @@ export function approvedGate(root: string, claim: Claim, ref: Evidence, gate: Ga
   verifyEvidence(root, decision.packet);
   return decision;
 }
-async function checkExecution(root: string, request: { claimId: string; gates: Partial<Record<Gate['gate'], Evidence>>; target: Evidence; buildId: string; dataObservations?: Evidence[]; fixBatch?: { fix: string; batchId: string }; caseBatch?: Evidence }, reader: BoardReader) {
+async function checkExecution(root: string, request: { claimId: string; gates: Partial<Record<Gate['gate'], Evidence>>; target: Evidence; buildId: string; dataObservations?: Evidence[]; fixBatch?: { fix: string; batchId: string }; caseBatch?: Evidence; caseIds?: string[] }, reader: BoardReader) {
   const { claim } = await recheck(root, request.claimId, reader);
   const required = claim.queue === 'retest' ? ['G1', 'G2', 'G4'] as const : ['G1', 'G2'] as const;
   const decisions = required.map(gate => {
@@ -324,7 +324,7 @@ async function checkExecution(root: string, request: { claimId: string; gates: P
     throw new Error('The G2 and G4 decisions must agree on the execution data scope.');
   }
   if (scope === undefined && request.dataObservations !== undefined) throw new Error('Data observations require a reviewed data scope.');
-  const data = scope === undefined ? undefined : assertDataReady(root, scope, observation, request.dataObservations);
+  let selectedCases: ReturnType<typeof readCaseBatch>['batch']['cases'] | undefined;
   const executionGate = claim.queue === 'retest' ? 'G4' : 'G2';
   const gate = decisions.find(decision => decision.gate === executionGate)!;
   const batch = request.caseBatch ?? fixBatch?.caseBatch ?? gate.caseBatch;
@@ -332,13 +332,16 @@ async function checkExecution(root: string, request: { claimId: string; gates: P
   const caseAuthorization = batch ? { batch, approval: request.gates[executionGate]! } : undefined;
   if (caseAuthorization) {
     const design = verifyCaseAuthorization(root, caseAuthorization, { assignment: assignmentFor(claim), target: observation, gate: executionGate });
+    selectedCases = [...design.cases.values()].filter(item => !request.caseIds || request.caseIds.includes(item.id));
+    requireCaseData(scope, selectedCases);
     if (fixBatch && (fixBatch.caseBatch && !sameEvidence(fixBatch.caseBatch, batch) || design.cases.size !== fixBatch.checks.length ||
         [...design.cases.values()].some(item => !fixBatch.checks.includes(`${item.checkId}/${item.conditionId}`)))) {
       throw new Error('Bind the case batch to the selected confirmation or regression checks.');
     }
   }
+  const data = scope === undefined ? undefined : assertDataReady(root, scope, observation, request.dataObservations, Date.now(), selectedCases);
   return { result: { claim, buildId: request.buildId, target: request.target, gates: request.gates, checkedAt: new Date().toISOString(),
-    ...(data ? { data } : {}), ...(fixBatch ? { fixBatch } : {}), ...(caseAuthorization ? { caseAuthorization } : {}) }, scope, observation };
+    ...(data ? { data } : {}), ...(fixBatch ? { fixBatch } : {}), ...(caseAuthorization ? { caseAuthorization } : {}) }, scope, observation, selectedCases };
 }
 export async function preflight(root: string, request: Parameters<typeof checkExecution>[1], reader: BoardReader = readBoard) {
   return (await checkExecution(root, request, reader)).result;
@@ -390,7 +393,7 @@ function actionInventory(action: InventoryRecheck['action'], id: string, decisio
 }
 
 interface CloseClaimRequest { claimId: string; source: string; evidence: Evidence[]; disposition?: 'completed' | 'released'; defect?: Evidence; inventoryRecheck?: Evidence; requireCases?: boolean }
-export function closeClaim(root: string, request: CloseClaimRequest, board?: ReleaseBoard) {
+export function closeClaim(root: string, request: CloseClaimRequest, board?: ReleaseBoard, observedMove?: { sourceRevision: string; publicationId: string }) {
   requireText(request.source, 'Actual claim disposition and reason');
   if (!request.evidence?.length) throw new Error('Link the actual disposition evidence before closing the claim.');
   for (const evidence of request.evidence) verifyEvidence(root, evidence);
@@ -411,6 +414,10 @@ export function closeClaim(root: string, request: CloseClaimRequest, board?: Rel
           JSON.stringify(scopedCompletion(root, claim, moved.fixProof.defect, moved.fixProof.completion, false, request.requireCases)) !== JSON.stringify(moved.fixProof)) {
         throw new Error('Verify the actual scoped defect completion with confirmation and regression evidence.');
       }
+      if (observedMove?.publicationId !== moved.id || observedMove.sourceRevision !== claim.sourceRevision ||
+          activeSource(root).revision !== observedMove.sourceRevision) {
+        throw new Error('Read the current native destination before closing this verified defect.');
+      }
     } else if (request.disposition !== 'released') {
       const returned = publications.filter(item => item.destination?.queue === 'rework').at(-1);
       if (request.disposition !== undefined || !returned?.rework || returned.remoteId !== claim.ticket.id) {
@@ -429,21 +436,25 @@ export function closeClaim(root: string, request: CloseClaimRequest, board?: Rel
 
 export async function closeCurrentClaim(root: string, request: CloseClaimRequest, reader: BoardReader = readBoard) {
   const claim = openClaim(root, request.claimId);
-  const completion = journal(root).value.publications.some(item =>
-    item.claimId === claim.id && item.state === 'confirmed' && item.handoff?.kind === 'completion');
+  const completion = journal(root).value.publications.filter(item =>
+    item.claimId === claim.id && item.state === 'confirmed' &&
+    (item.handoff?.kind === 'completion' || item.destination?.queue === 'testedOk')).at(-1);
   if (request.disposition !== 'completed' || !completion) return closeClaim(root, request);
   const { choice, connection, revision } = await liveBoard(root, reader);
   if (claim.sourceRevision !== revision || sourceKey(choice, connection.identity) !== claim.sourceKey) throw new Error('Recheck the original release task source.');
   const destination = choice.queues.testedOk;
   const observed = connection.tickets.find(ticket => ticket.id === claim.ticket.id && ticket.url === claim.ticket.url);
-  if (destination?.length !== 1 || !observed || observed.state !== destination[0]) {
-    throw new Error('Observe the release assignment at the configured Tested-Ok destination before closing.');
+  if (destination?.length !== 1 || !observed || observed.state !== destination[0] ||
+      (completion.destination && completion.destination.id !== observed.state)) {
+    throw new Error('Observe the current ticket at the reviewed Tested-Ok destination before closing.');
   }
   if (observed.title !== claim.ticket.title || claim.descriptionRevision &&
       claim.descriptionRevision !== digest(JSON.stringify(connection.descriptions?.[observed.id] ?? null))) {
     throw new Error('The native assignment scope changed. Reconcile the actual ticket revision and release decision.');
   }
-  return closeClaim(root, request, nativeReleaseBoard(assignmentFor(claim), connection));
+  return completion.handoff?.kind === 'completion'
+    ? closeClaim(root, request, nativeReleaseBoard(assignmentFor(claim), connection))
+    : closeClaim(root, request, undefined, { sourceRevision: revision, publicationId: completion.id });
 }
 
 type Proposal = { id: string; claimId: string; assessment?: Evidence; route?: Route; defect?: Evidence; completion?: DefectCompletion; failedFix?: string; boardInventory?: Evidence } & (
@@ -787,14 +798,14 @@ export async function observeReleaseCompletion(root: string, request: { id: stri
 
 export async function beginExecution(root: string, request: Parameters<typeof preflight>[1] & { id: string; caseIds?: string[]; previousCases?: Evidence; requireCaseBatch?: boolean }, reader: BoardReader = readBoard) {
   id(request.id);
-  const { result: { claim, buildId, target, gates, checkedAt, caseAuthorization }, scope, observation } = await checkExecution(root, request, reader);
+  const { result: { claim, buildId, target, gates, checkedAt, caseAuthorization }, scope, observation, selectedCases } = await checkExecution(root, request, reader);
   if (request.requireCaseBatch && !caseAuthorization) throw new Error('Bind the reviewed feature understanding and case batch to this execution approval.');
   return withLock(root, 'qa-board', () => withLock(root, 'release-records', () => {
     if (activeSource(root).revision !== claim.sourceRevision) throw new Error('The task source changed before execution.');
     openClaim(root, claim.id);
     verifyEvidence(root, target);
     for (const gate of Object.values(gates)) if (gate) verifyEvidence(root, gate);
-    const data = scope === undefined ? undefined : assertDataReady(root, scope, observation, request.dataObservations);
+    const data = scope === undefined ? undefined : assertDataReady(root, scope, observation, request.dataObservations, Date.now(), selectedCases);
     const fixBatch = request.fixBatch ? requireFixBatch(root, assignmentFor(claim), observation, gates.G4!, request.fixBatch) : undefined;
     const current = journal(root);
     if (current.value.publications.some(p => p.claimId === claim.id && p.state === 'pending') || current.value.executions.some(run => run.id === request.id || run.claimId === claim.id && !run.terminal)) throw new Error('A pending write or execution already controls this claim.');
@@ -807,7 +818,8 @@ export async function beginExecution(root: string, request: Parameters<typeof pr
         run.terminal?.evidence.some(ref => sameEvidence(ref, request.previousCases)))) {
       throw new Error('Resume from the settled case receipt on this claim.');
     }
-    if (caseAuthorization) startCases(root, { ...caseAuthorization, id: request.id, target, caseIds: request.caseIds, previous: request.previousCases });
+    if (caseAuthorization) startCases(root, { ...caseAuthorization, id: request.id, target, caseIds: request.caseIds, previous: request.previousCases,
+      connected: { claimId: claim.id }, ...(scope && data ? { dataBinding: { scope, observations: data.observations } } : {}) });
     else if (request.previousCases || request.caseIds) throw new Error('Case selection needs a reviewed case batch.');
     const execution: Execution = { id: request.id, claimId: claim.id, buildId, target, gates, startedAt: checkedAt,
       ...(data ? { data } : {}), ...(fixBatch ? { fixBatch } : {}), ...(caseAuthorization ? { caseExecution: true } : {}) };
@@ -822,7 +834,14 @@ export function settleExecution(root: string, request: NonNullable<Execution['te
   for (const evidence of request.evidence) verifyEvidence(root, evidence);
   return withLock(root, 'qa-board', () => {
     const current = journal(root), run = current.value.executions.find(record => record.id === request.id);
-    if (!run || run.terminal) throw new Error('Select an unfinished execution record.');
+    if (!run) throw new Error('Select an unfinished execution record.');
+    if (run.terminal) {
+      const requested = run.caseExecution ? request.evidence.concat(finishCases(root, request.id).receipt) : request.evidence;
+      if (run.terminal.state === request.state && run.terminal.source === request.source &&
+          requested.length === run.terminal.evidence.length &&
+          requested.every((ref, index) => sameEvidence(ref, run.terminal!.evidence[index]))) return run;
+      throw new Error('Preserve the recorded terminal execution. Review any new observation against that record.');
+    }
     const receipt = run.caseExecution ? finishCases(root, request.id).receipt : undefined;
     run.terminal = { state: request.state, source: request.source, evidence: [...request.evidence, ...(receipt ? [receipt] : [])] };
     save(root, journalPath, current.value, current.revision);
@@ -830,15 +849,34 @@ export function settleExecution(root: string, request: NonNullable<Execution['te
   });
 }
 export async function prepareLiveCase(root: string, request: Parameters<typeof prepareCheckpoint>[1], reader: BoardReader = readBoard) {
-  const run = journal(root).value.executions.find(item => item.id === request.id);
+  const observed = await readConnectedCase(root, request.id, reader);
+  return withLock(root, 'qa-board', () => {
+    assertConnectedCase(root, request.id, observed.claimId, observed);
+    if (inspectCases(root, request.id).connected?.claimId !== observed.claimId) {
+      throw new Error('Settle the old case execution and resume it with its current reviewed claim and data.');
+    }
+    return prepareCheckpoint(root, request);
+  });
+}
+
+export async function readConnectedCase(root: string, executionId: string, reader: BoardReader = readBoard) {
+  const run = journal(root).value.executions.find(item => item.id === executionId);
   if (!run?.caseExecution || run.terminal) throw new Error('Select an active connected case execution.');
-  const claim = openClaim(root, run.claimId);
-  const board = await liveBoard(root, reader);
-  if (bindingHold(claim, board) || publicationHold(journal(root).value.publications, claim.id)) {
+  return { claimId: run.claimId, board: await liveBoard(root, reader) };
+}
+
+export function assertConnectedCase(root: string, executionId: string, claimId: string, observed: Awaited<ReturnType<typeof readConnectedCase>>) {
+  const current = journal(root).value;
+  const run = current.executions.find(item => item.id === executionId);
+  if (!run?.caseExecution || run.terminal || run.claimId !== claimId || observed.claimId !== claimId) {
+    throw new Error('Select an active connected case execution.');
+  }
+  const claim = openClaim(root, claimId);
+  if (activeSource(root).revision !== observed.board.revision || bindingHold(claim, observed.board) ||
+      publicationHold(current.publications, claim.id)) {
     throw new Error('The connected assignment or approval scope changed. Pause its affected work.');
   }
   for (const gate of Object.values(run.gates)) if (gate) verifyEvidence(root, gate);
-  return prepareCheckpoint(root, request);
 }
 export function claimHistory(root: string, claimId: string) {
   const current = journal(root).value;

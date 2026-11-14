@@ -47,6 +47,9 @@ export function releaseFixture(root: string, assignmentId: string) {
       conditionId: 'route', state: 'required', checkIds: ['shared'],
     })),
   };
+  const applicability = put('applicability.json', { schemaVersion: 1, library: round.library,
+    modules: library.modules.map(module => ({ id: module.id, owner: 'Synthetic product owner', decision: basis,
+      coordinates: round.obligations.filter(row => row.moduleId === module.id).map(row => ({ ...row, basis, reason: 'Fixture owner reviewed this combination' })) })) });
   const roundRef = put('round.json', round);
   const run = (id: string, outcome: 'Pass' | 'Fail', previousRunId?: string): Run => ({
     schemaVersion: 1, id, round: roundRef, target,
@@ -61,7 +64,7 @@ export function releaseFixture(root: string, assignmentId: string) {
       assignment, target: plan.target, changes: plan.changes, fixes, policy, coverage: 'targeted', affected: [], ...boardEvidence,
     });
     const scopeReview = put(`g1-${suffix}.json`, {
-      ...review, gate: 'G1', library: plan.library, modules: plan.moduleIds, obligations: plan.obligations, changeManifest,
+      ...review, gate: 'G1', library: plan.library, modules: plan.moduleIds, obligations: plan.obligations, changeManifest, applicability: plan.applicability,
     });
     return put(`g2-${suffix}.json`, { ...review, gate: 'G2', round: ref, scopeReview });
   };
@@ -83,5 +86,5 @@ export function releaseFixture(root: string, assignmentId: string) {
       boardReadbacks: options.boardReadbacks, observedAt, owner: 'Synthetic release owner', source: 'Synthetic unfiltered provider recheck',
       evidence: sourceEvidence, recheck: { action, id, decisionSha256: decision.sha256 } });
   };
-  return { put, library, round, roundRef, run, target, targetEvidence, g5Target, approvalFor, scopeRequest, bind, inventory, recheck };
+  return { put, library, round, roundRef, applicability, run, target, targetEvidence, g5Target, approvalFor, scopeRequest, bind, inventory, recheck };
 }

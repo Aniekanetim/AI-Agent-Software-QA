@@ -1,6 +1,6 @@
 import { assertExecutable } from '../board/board.js';
 import { assertNonsecret, load, requireText, verifyEvidence, type Evidence } from '../shared/store.js';
-import { assertDataReady, dataScopeDigest, type DataScope, type DataTarget } from './readiness.js';
+import { assertDataReady, dataScopeDigest, requireCaseData, type DataScope, type DataTarget } from './readiness.js';
 import { inspectCases, prepareCheckpoint, runApprovedCases, startCases, verifyCaseAuthorization } from '../execution/cases.js';
 
 interface LocalObservation extends DataTarget { ticketId: string; generation: string; observedAt: string; source: string }
@@ -47,21 +47,24 @@ export function preflightLocalData(root: string, request: LocalPreflight) {
   const scopes = decisions.map(decision => decision.dataScope);
   const scope = scopes[0]!;
   if (scopes.some(value => dataScopeDigest(value) !== dataScopeDigest(scope))) throw new Error('The G2 and G4 decisions must agree on the execution data scope.');
-  const data = assertDataReady(root, scope, target, request.dataObservations);
+  let data;
   const reviewed = decisions.at(-1)!;
   let cases;
   const batch = request.caseExecution?.batch ?? reviewed.caseBatch;
   if (reviewed.caseBatches?.length && !batch && request.caseExecution) throw new Error('Select a case batch from the execution decision.');
   if (batch) {
     const authorization = { batch, approval: request.gates[reviewed.gate]! };
-    verifyCaseAuthorization(root, authorization, { assignment: { source: 'local', ticketId: ticket.id }, target, gate: reviewed.gate });
+    const design = verifyCaseAuthorization(root, authorization, { assignment: { source: 'local', ticketId: ticket.id }, target, gate: reviewed.gate });
     if (!request.caseExecution) throw new Error('Identify the approved local case execution before starting.');
     const { id, caseIds, previous } = request.caseExecution;
+    requireCaseData(scope, [...design.cases.values()].filter(item => !caseIds || caseIds.includes(item.id)));
+    data = assertDataReady(root, scope, target, request.dataObservations, Date.now(), [...design.cases.values()].filter(item => !caseIds || caseIds.includes(item.id)));
     cases = startCases(root, { ...authorization, id, caseIds, previous, target: request.target,
-      local: { ticketId: ticket.id, generation: ticket.generation } });
+      local: { ticketId: ticket.id, generation: ticket.generation },
+      dataBinding: { scope, observations: data.observations } });
   } else if (request.caseExecution) throw new Error('Bind the case batch to the existing execution approval.');
   return { ticketId: ticket.id, generation: ticket.generation, target: request.target, gates: request.gates, checkedAt: new Date().toISOString(),
-    data, ...(cases ? { cases } : {}) };
+    data: data ?? assertDataReady(root, scope, target, request.dataObservations), ...(cases ? { cases } : {}) };
 }
 
 export function prepareLocalCase(root: string, request: Parameters<typeof prepareCheckpoint>[1]) {

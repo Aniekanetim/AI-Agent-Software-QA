@@ -135,10 +135,18 @@ export function settleOperation(root: string, request: { id: string; source: str
     save(root, path, record.value, record.revision); return record.value;
   });
 }
+function validateTicketDestination(ticketId: string, text: string, destination: Status) {
+  const assignment = requiresRelease(ticketId, text);
+  if (assignment && destination === 'Dev Todo' || !assignment && destination === 'Ready for QA') {
+    throw new Error(`Use the working queue for this ticket type. ${ticketId} cannot enter ${destination}.`);
+  }
+}
+
 function decisionValid(root: string, request: Transition, ticket: Ticket, requireCases: boolean) {
   const d = request.decision; assertNonsecret(request);
   if (ticket.issues.length) throw new Error(`Reconcile lifecycle for ${ticket.id}: ${ticket.issues.join(' ')}`);
   if (!statuses.includes(request.to) || request.expectedRevision !== ticket.revision) throw new Error('Reload the actual ticket revision and select a supported destination.');
+  validateTicketDestination(ticket.id, ticket.text, request.to);
   for (const value of [d.actor, d.source, d.reason, d.checkpoint, d.nextOwner, d.nextAction, d.handoff]) requireText(value, 'Actual lifecycle decision, checkpoint and handoff');
   if (!d.evidence?.length || !d.scope || !['assignment', 'revision'].includes(d.scope.kind)) throw new Error('Reference the actual decision and its assignment/revision scope.');
   d.evidence.forEach(e => { if (resolve(root, e.path).toLowerCase() === resolve(root, ticket.path).toLowerCase()) throw new Error('Keep decision evidence in an immutable source/snapshot, not the ticket this transition changes.'); verifyEvidence(root, e); });
@@ -279,15 +287,17 @@ function complete(root: string, journal: Journal, requireCases = false) {
   }
   const after = digest(journal.content), fromHash = revision(root, journal.from), toHash = revision(root, journal.to);
   const path = `.local/board-transitions/${journal.id}.json`;
-  if (entry.to === 'Tested-Ok' || entry.to === 'Rework') {
+  {
     try {
+      validateTicketDestination(journal.ticketId, journal.content, entry.to);
+      if (entry.from !== journal.from.split('/')[1]) throw new Error('Reconcile the original queue of this move.');
       const releaseRequired = requiresRelease(journal.ticketId, journal.content);
       if (entry.to === 'Rework') {
         if (releaseRequired || !journal.rework || !entry.evidence.some(ref => sameEvidence(ref, journal.rework!.review))) {
           throw new Error('Record the reviewed confirmation failure for this defect before moving it to Rework.');
         }
         verifyRework(root, { source: 'local', ticketId: journal.ticketId }, journal.before, journal.rework);
-      } else if (releaseRequired || journal.release) {
+      } else if (entry.to === 'Tested-Ok' && (releaseRequired || journal.release)) {
         if (!journal.release || [journal.release.decision, journal.release.delivery, journal.release.acknowledgement]
           .some(ref => ref && !entry.evidence.some(e => sameEvidence(e, ref)))) throw new Error('Record the reviewed G5 release and delivery for this assignment.');
         verifyLocalHandoff(root, journal.ticketId, journal.before, { ...journal.release, requireCases: requireCases || journal.release.requireCases });

@@ -31,9 +31,12 @@ At G1, record the expected coverage before observing results. Identify the affec
 
 In the G1 record, pin the [release change manifest](../regression/README.md#carry-regression-into-release-sign-off) as `changeManifest`. Preview the reconciliation before briefing the reviewer. Binding rechecks membership, fix intake and coverage for the exact target. G5 rechecks those relationships and requires current test results.
 
+Pin independent applicability as `applicability` in the round and G1 record. The version 1 applicability file contains the exact `library` reference and `modules`. Each module identifies `id`, the actual `owner`, hashed `decision`, and a `coordinates` list. Every reviewed coordinate carries `moduleId`, `testTypeId`, `conditionId`, `state` (required, excluded or unresolved), `reason` and hashed `basis`. Owners determine applicability from requirements, risk and the intended change. Review every applicable coordinate and record exclusions and gaps. A missing or differently classified coordinate stays visible and blocks positive sign-off.
+
 | Version 1 round field | Contents |
 | --- | --- |
 | `schemaVersion`, `id` | `1` and the round ID |
+| `applicability` | Full-file reference to independently reviewed module coverage for the pinned library |
 | `library`, `scope`, `changes` | Evidence references for the pinned library, actual reviewed scope, and release change record |
 | `target` | Observed `buildId` and `environment` |
 | `caseBatches` | Pinned [case batch references](../execution/README.md) covering required checks and conditions for current release scope |
@@ -62,7 +65,7 @@ npm run qa -- release invalidate-scope --input .local/changed-round.json
 
 A version 1 run contains `id`, `round` evidence, `target`, `observedAt` with timezone, `targetEvidence`, and `observations`. The target observation JSON records `buildId`, `environment`, `observedAt`, and the actual `source`. Each observation identifies `checkId`, `conditionId`, `outcome`, and `evidence`. Use Pass, Fail, Partial, Blocked, or Not run. Retain a `note` for Partial, Blocked, and Not run. Link actual observations for Pass, Fail, and Partial. Match the tested build and environment to the pinned round.
 
-For a current round, link each Pass or Fail to its settled `caseExecution: { receipt, caseId }`. Record the reviewed understanding references as `handoff.understandings` at G5. Historical assessments retain their original evidence.
+For a current round, link each Pass or Fail to its settled `caseExecution: { receipt, caseId }`. Record the reviewed understanding references as `handoff.understandings` at G5. Current assessment checks that the case target and available checkpoint times precede or match the run outcome, and counts a settled case occurrence once even if several import records reference it. A late CI import retains the original observed run time. A retest links a distinct execution. Historical assessments retain their original evidence and calculation.
 
 Retain the original run before recording its retest. Use `previousRunId` to link to the earlier run for that check and condition in the same round. A conclusive linked retest can replace the earlier outcome in the current assessment. Both attempts remain visible. For a changed build or scope, pin a new round and link the earlier round and failure from its reviewed scope or change record. Reassess the obligations against the new build.
 

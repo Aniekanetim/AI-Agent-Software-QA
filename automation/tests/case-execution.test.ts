@@ -126,7 +126,7 @@ test('an invalid shared prerequisite holds other affected cases across flow boun
 
 test('a reviewed round requires case evidence for verdicts and preserves historical assessment after source drift', async () => {
   const f = fixture(), auth = f.authorize([f.cases[0]!]);
-  const round = { ...f.base.round, caseBatches: [auth.batch] };
+  const round = { ...f.base.round, applicability: f.base.applicability, caseBatches: [auth.batch] };
   const roundRef = f.base.put('case-round.json', round);
   const scope = f.base.scopeRequest('local', round, roundRef, 'case-round');
   const oldG2 = pinned<{ scopeReview: Evidence }>(f.root, scope.approval, 'fixture G2');
@@ -138,11 +138,16 @@ test('a reviewed round requires case evidence for verdicts and preserves histori
   const aggregate = { ...f.base.run('aggregate', 'Pass'), round: roundRef };
   assert.throws(() => retainRun(f.root, { round: roundRef, run: f.base.put('aggregate.json', aggregate) }), /Aggregate runner output/);
   startCases(f.root, { batch: auth.batch, approval: g2, id: 'cases', target: f.base.targetEvidence });
-  const { receipt } = await runApprovedCases(f.root, 'cases', { target: () => f.base.targetEvidence, execute: () => ({ ...f.observation, outcome: 'matched' }) });
+  const { receipt } = await runApprovedCases(f.root, 'cases', { target: () => f.base.targetEvidence, execute: () => ({ ...f.observation, outcome: 'matched', observedAt: '2026-01-01T00:01:00Z' }) });
   assert.throws(() => caseResult(f.root, receipt, 'first', { target: f.base.target, checkId: 'shared', conditionId: 'route', outcome: 'Fail' }), /no matching/);
   const run = f.base.put('detailed.json', { ...aggregate, id: 'detailed', observations: [{ ...aggregate.observations[0],
     caseExecution: { receipt, caseId: 'first' } }] });
-  const { assessment } = recordAssessment(f.root, retainRun(f.root, { round: roundRef, run }));
+  assert.throws(() => retainRun(f.root, { round: roundRef, run: f.base.put('bad-time-run.json',
+    { ...pinned<object>(f.root, run, 'run'), observedAt: '2026-01-01T00:00:30Z' }) }), /observed after/);
+  retainRun(f.root, { round: roundRef, run });
+  const repeated = f.base.put('reimported.json', { ...pinned<object>(f.root, run, 'run'), id: 'reimported' });
+  const { assessment, report } = recordAssessment(f.root, retainRun(f.root, { round: roundRef, run: repeated }));
+  assert.equal(report.uniqueCheckExecutions, 1);
   assert.equal(currentAssessment(f.root, assessment, f.assignment).state, 'evidenceReady');
   const decision = { gate: 'G5', decision: 'Approved', reviewer: 'Synthetic QA', source: 'Synthetic G5', packet: f.base.round.scope,
     handoff: { assessment, route: { channel: 'recorded' as const, destination: 'Synthetic QA', recipient: 'Owner', acknowledgementRequired: false },
@@ -165,6 +170,11 @@ test('local preflight and scripted checkpoints use the current ticket generation
     dataScope: { schemaVersion: 1, mode: 'none', checks: [{ id: 'shared', conditionIds: ['route'], dataItemIds: [] }] } });
   const request = { ticketId: ticket.id, generation: ticket.generation, target, gates: { G2: g2 }, caseExecution: { id: 'local' } };
   assert.throws(() => verifyCaseAuthorization(f.root, { batch: auth.batch, approval: g2 }, { target: { ...f.base.target, buildId: 'other' } }), /exact case batch/);
+  const wrongData = f.base.put('.local/wrong-data.json', {
+    ...pinned<object>(f.root, g2, 'G2 fixture'),
+    dataScope: { schemaVersion: 1, mode: 'none', checks: [{ id: 'other', conditionIds: ['route'], dataItemIds: [] }] },
+  });
+  assert.throws(() => preflightLocalData(f.root, { ...request, gates: { G2: wrongData } }), /first.*shared.route/);
   assert.equal(preflightLocalData(f.root, request).cases?.id, 'local');
   assert.throws(() => prepareLocalCase(f.root, { id: 'local', caseId: 'other', target }), /outside the selected execution/);
   const result = await runLocalCases(f.root, 'local', { target: () => target, execute: () => ({ ...f.observation, outcome: 'matched' }) });
@@ -297,4 +307,48 @@ test('a stale carried prerequisite blocks its dependent but does not block unrel
   assert.equal(settled.session.verifiedPrerequisites, undefined);
   assert.equal(settled.session.attempts.find(item => item.caseId === 'dependent')?.observations.length, 0);
   assert.equal(settled.session.attempts.find(item => item.caseId === 'same-flow')?.status, 'Pass');
+});
+
+test('applied runner state survives repeated interruptions and never dispatches twice on resume', () => {
+  for (const actual of ['observed', 'reconciled']) {
+    const f = fixture(), first = f.cases[0]!, inputDigest = digest('reviewed runner');
+    const auth = f.authorize([{ ...first, checkpoints: [first.checkpoints[0]!,
+      { ...first.checkpoints[1]!, runner: { kind: 'postman', inputDigest } },
+      { id: 'readback', action: 'Observe the resulting state', expected: 'State reflects the applied action' }] }]);
+    const scope = { target: f.base.targetEvidence, caseId: 'first' };
+    const checkpoint = { id: 'initial', caseId: scope.caseId, checkpoint: 'result' };
+    startCases(f.root, { ...auth, id: checkpoint.id, target: scope.target });
+    prepareCheckpoint(f.root, { ...scope, id: checkpoint.id });
+    observeCheckpoint(f.root, { ...f.observation, ...checkpoint, checkpoint: 'precondition', outcome: 'matched' });
+    prepareCheckpoint(f.root, { ...scope, id: checkpoint.id });
+    let calls = 0;
+    claimCaseCheckpoint(f.root, checkpoint, [f.definition], f.base.target, { kind: 'postman', id: 'applied', inputDigest }, undefined, () => ++calls);
+    const tool = f.base.put('.local/postman/runs/applied.json', { state: 'completed', outcome: 'passed', caseCheckpoint: checkpoint,
+      assertions: { total: 1, failed: 0 }, requests: { total: 1, failed: 0 } });
+    const independent = f.base.put('effect.json', { applicationEffect: 'applied', runner: 'stopped' });
+    if (actual === 'observed') {
+      observeCheckpoint(f.root, { ...f.observation, ...checkpoint, outcome: 'matched', evidence: [tool, independent], detail: 'Observed applied' });
+      prepareCheckpoint(f.root, { ...scope, id: checkpoint.id });
+      observeCheckpoint(f.root, { ...f.observation, ...checkpoint, checkpoint: 'readback', outcome: 'interrupted' });
+    } else {
+      observeCheckpoint(f.root, { ...f.observation, ...checkpoint, outcome: 'interrupted' });
+    }
+    let receipt = finishCases(f.root, checkpoint.id).receipt;
+    if (actual === 'reconciled') reconcileCaseRunner(f.root, { ...checkpoint, invocationId: 'applied', outcome: 'applied', checkpointOutcome: 'matched',
+      source: 'Fixture readback', detail: 'Runner stopped and the approved action applied', evidence: [independent] });
+    for (const id of ['resume', 'resume-again']) {
+      startCases(f.root, { ...auth, id, target: scope.target, previous: receipt });
+      prepareCheckpoint(f.root, { ...scope, id });
+      observeCheckpoint(f.root, { ...f.observation, id, caseId: scope.caseId, checkpoint: 'precondition', outcome: 'matched' });
+      const next = prepareCheckpoint(f.root, { ...scope, id });
+      assert.equal(next.state, 'ready');
+      if (next.state !== 'ready') assert.fail('Expected resumed readback');
+      assert.equal(next.checkpoint.id, 'readback');
+      observeCheckpoint(f.root, { ...f.observation, id, caseId: scope.caseId, checkpoint: 'readback',
+        outcome: id === 'resume' ? 'interrupted' : 'matched' });
+      receipt = finishCases(f.root, id).receipt;
+    }
+    assert.equal(calls, 1);
+    assert.equal(caseResult(f.root, receipt, 'first', { ...first, target: f.base.target, outcome: 'Pass' }, true).design.id, 'first');
+  }
 });
