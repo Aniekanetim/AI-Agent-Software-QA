@@ -43,7 +43,7 @@ function verifyDataset(root: string, item: DataItem, environment: string) {
   if (assessment.datasets[0]?.status === 'needsReview') throw new Error('Check the selected dataset files and recorded hashes.');
 }
 
-export function assertDataReady(root: string, scope: DataScope, target: DataTarget, references: Evidence[] = [], now = Date.now()) {
+export function assertDataReady(root: string, scope: DataScope, target: DataTarget, references: Evidence[] = [], now = Date.now(), cases?: { id: string; checkId: string; conditionId: string }[]) {
   assertNonsecret(scope);
   requireText(target.environment, 'Target environment'); requireText(target.buildId, 'Target build');
   if (scope?.schemaVersion !== 1 || !['none', 'required'].includes(scope.mode) || !Array.isArray(scope.checks) || !scope.checks.length || !Array.isArray(references)) {
@@ -54,6 +54,7 @@ export function assertDataReady(root: string, scope: DataScope, target: DataTarg
     if (!Array.isArray(check.conditionIds) || !check.conditionIds.length || !Array.isArray(check.dataItemIds)) throw new Error('Bind each selected check to its conditions and data items.');
     uniqueTexts(check.conditionIds, 'Check condition IDs'); uniqueTexts(check.dataItemIds, 'Check data item IDs');
   }
+  if (cases) requireCaseData(scope, cases);
   const selected = new Set(scope.checks.flatMap(check => check.dataItemIds));
   const receipt = { scopeDigest: dataScopeDigest(scope), mode: scope.mode, checks: scope.checks, plan: scope.plan ?? null, observations: references };
   if (scope.mode === 'none') {
@@ -79,7 +80,8 @@ export function assertDataReady(root: string, scope: DataScope, target: DataTarg
     }
     observations.set(observation.itemId, observation);
   }
-  const items = plan.items.filter(item => selected.has(item.id)).map(item => {
+  const applicable = cases ? new Set(cases.map(item => item.conditionId)) : undefined;
+  const items = plan.items.filter(item => selected.has(item.id) && (!applicable || item.conditionIds.some(id => applicable.has(id)))).map(item => {
     const refreshed = observations.get(item.id);
     return refreshed ? { ...item, stateVerification: refreshed.verification } : item;
   });
@@ -108,3 +110,11 @@ export function assertDataReady(root: string, scope: DataScope, target: DataTarg
   })) };
 }
 export type DataReceipt = ReturnType<typeof assertDataReady>;
+
+export function requireCaseData(scope: DataScope | undefined, cases: Iterable<{ id: string; checkId: string; conditionId: string }>) {
+  for (const item of cases) {
+    if (!scope?.checks?.some(check => check.id === item.checkId && check.conditionIds.includes(item.conditionId))) {
+      throw new Error(`Review the data applicability for case ${item.id} (${item.checkId}/${item.conditionId}) before execution.`);
+    }
+  }
+}

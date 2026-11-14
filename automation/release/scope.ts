@@ -16,6 +16,7 @@ interface Review {
 interface CoverageReview extends Review {
   library: Evidence; modules: string[];
   changeManifest?: Evidence;
+  applicability?: Evidence;
   obligations: {
     id: string; moduleId: string; testTypeId: string; conditionId: string;
     state: 'required' | 'excluded' | 'unresolved'; checkIds?: string[]; exceptionAllowed?: boolean;
@@ -63,6 +64,9 @@ function matchCoverage(root: string, assignment: Assignment, round: Evidence, ap
   if (!sameEvidence(readiness.round, round)) throw new Error('G2 must identify the exact reviewed round.');
   const coverage = readReview<CoverageReview>(root, readiness.scopeReview, 'G1', assignment);
   const { round: plan } = readRound(root, round);
+  if (plan.applicability && !sameEvidence(coverage.applicability, plan.applicability)) {
+    throw new Error('G1 must review the pinned coverage applicability for this round.');
+  }
   if (plan.caseBatches) {
     if (!readiness.caseBatch || !plan.caseBatches.some(ref => sameEvidence(ref, readiness.caseBatch))) {
       throw new Error('G2 must identify an approved case batch in this round.');
@@ -108,7 +112,9 @@ function checkScope(root: string, assignment: Assignment, plan: ReturnType<typeo
 
 export function previewReleaseScope(root: string, request: { assignment: Assignment; round: Evidence; changeManifest: Evidence }, liveBoard?: ReleaseBoard) {
   const { assignment, round, changeManifest } = request;
-  return checkScope(root, assignment, readRound(root, round).round, changeManifest, liveBoard);
+  const scope = readRound(root, round);
+  return { ...checkScope(root, assignment, scope.round, changeManifest, liveBoard),
+    coverageGaps: scope.round.applicability ? scope.missingCoverage : ['round/applicability'] };
 }
 
 export function bindReleaseScope(root: string, request: { assignment: Assignment; expectedRevision: string | null; round: Evidence; approval: Evidence; requireCases?: boolean }, liveBoard?: ReleaseBoard) {
@@ -119,6 +125,7 @@ export function bindReleaseScope(root: string, request: { assignment: Assignment
     if (current && 'round' in current && sameEvidence(current.round, round) && sameEvidence(current.approval, approval)) {
       const { plan, changeManifest } = matchCoverage(root, assignment, round, approval);
       if (request.requireCases && !plan.caseBatches) throw new Error('Pin the reviewed case batches before binding current release scope.');
+      if (request.requireCases && !plan.applicability) throw new Error('Pin independently reviewed coverage applicability before binding current release scope.');
       checkScope(root, assignment, plan, changeManifest, liveBoard);
       return releaseScope(root, assignment);
     }
@@ -128,6 +135,7 @@ export function bindReleaseScope(root: string, request: { assignment: Assignment
     }
     const { plan, changeManifest } = matchCoverage(root, assignment, round, approval);
     if (request.requireCases && !plan.caseBatches) throw new Error('Pin the reviewed case batches before binding current release scope.');
+    if (request.requireCases && !plan.applicability) throw new Error('Pin independently reviewed coverage applicability before binding current release scope.');
     checkScope(root, assignment, plan, changeManifest, liveBoard);
     record.value.history.push({ round, approval });
     save(root, record.path, record.value, record.revision);

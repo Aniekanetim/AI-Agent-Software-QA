@@ -84,6 +84,8 @@ test('an empty local release requires a current digest and a manifest change inv
 });
 test('a parent in Retest still needs G5 and a scoped fix waits for its separate regression', () => {
   const f = fixture();
+  assert.throws(() => f.move('Dev Todo'), /cannot enter Dev Todo/);
+  assert.equal(b.findTicket(f.root, 'QA-001').status, 'Ready for QA');
   f.move('Retest');
   assert.throws(() => f.move('Tested-Ok'), /reviewed G5 release and delivery/);
   put(f.root, `${b.boardRoot}/Retest/BUG-001.md`, '# BUG-001: Synthetic scoped defect\n\n| Type | Bug |\n');

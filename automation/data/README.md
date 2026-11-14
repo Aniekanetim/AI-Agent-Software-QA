@@ -59,3 +59,5 @@ For application and external state, the verified entry needs `observedAt` and `r
 - **GitHub regression.** Use [the reviewed policy and receiver contract](../github/README.md#data-aware-regression) when enabling data-aware runs or dispatch.
 
 Use the receipt to report the inputs used and the starting state checked. The receipt records the structural and freshness checks on the supplied evidence. Keep the actual tool outcomes, QA verdict and owner decisions in their existing records.
+
+A reviewed data scope names the check and condition of each selected case. This applies to explicit no-data decisions and reviewed subset execution as well as to full batches. Recheck the bound target and state evidence before running or resuming the affected checkpoint.

@@ -7,7 +7,7 @@ import { selectedCommand, runProcess } from '../tools/registry.js';
 import { contained, load, save, revision, replace, digest, requireText, verifyEvidence, withLock, assertNonsecret, type Evidence } from '../shared/store.js';
 
 import { requireLocalSource } from '../task-source/config.js';
-import { assertDataReady, dataScopeDigest, type DataReceipt, type DataScope } from '../data/readiness.js';
+import { assertDataReady, dataScopeDigest, requireCaseData, type DataReceipt, type DataScope } from '../data/readiness.js';
 import { assertCaseInputs, inspectCases, startCases, verifyCaseAuthorization, type CaseAuthorization } from '../execution/cases.js';
 
 const exec = promisify(execFile);
@@ -145,6 +145,7 @@ function verifyRegressionCases(root: string, policy: RegressionPolicy, ticket: T
     assignment: { source: 'local', ticketId: ticket.id }, target: { buildId: target.buildId, environment: target.id },
     gate: ticket.status === 'Retest' ? 'G4' : 'G2',
   });
+  requireCaseData(policy.dataScope, design.cases.values());
   if ([...design.cases.values()].some(item => !policy.suiteEvidence.some(ref => ref.sha256 === item.definition.sha256 && ref.path === item.definition.path && ref.pointer === item.definition.pointer))) {
     throw new Error('The reviewed suite must include the exact case definitions.');
   }
@@ -266,7 +267,8 @@ export async function executeRegression(root: string, policy: RegressionPolicy, 
         verifyRegressionCases(root, policy, ticket, target);
         const caseExecution = `ci-${key.slice(0, 64)}`;
         startCases(root, { ...policy.caseAuthorization, id: caseExecution, target: target.evidence,
-          local: { ticketId: ticket.id, generation: ticket.generation } });
+          local: { ticketId: ticket.id, generation: ticket.generation },
+          ...(policy.dataScope && data ? { dataBinding: { scope: policy.dataScope, observations: data.observations } } : {}) });
         assertCaseInputs(root, caseExecution, policy.suiteEvidence);
         record.caseExecution = caseExecution;
       }

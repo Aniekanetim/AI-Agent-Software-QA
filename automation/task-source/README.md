@@ -88,3 +88,9 @@ Run `task-source publish --input` with the reviewed proposal, authorization `sou
 Use `task-source close --input` with `claimId`, actual disposition `source`, and `evidence` after execution and publishing are settled. A parent completes with `disposition: "completed"` after verified G5, the confirmed native move, and a fresh board reconciliation. If a human made the move, use `task-source observe-completion --input` with the reviewed handoff and delivery evidence, or the reviewed `failedFix` for Rework. Map the actual destination even on a read-only board. Use `disposition: "released"` for a resumable handback and inspect prior claim history on resumption.
 
 Local GitHub automatic assignment/dispatch and automated blocker delivery apply to folder-based projects. For live work, link the PR from its native ticket, check the exact revision and build, and handle blocker questions through the actual QA conversation and authorized native ticket updates.
+
+### Current disposition and interrupted execution
+
+Scoped defect completion reads the native ticket again before closing its claim. If the ticket is no longer at the reviewed destination, preserve its historical publication and reconcile its current queue or scope.
+
+An interrupted start or settlement can leave a case record ahead of the connected execution journal. Inspect the original case and claim before retrying. Retry the same execution ID with its actual approved start inputs or terminal evidence. Conflicting inputs and unresolved effects need reconciliation.

@@ -47,12 +47,15 @@ export function load<T>(root: string, path: string, empty: () => T): { value: T;
   if (!existsSync(target)) return { value: empty(), revision: null };
   const bytes = readFileSync(target);
   try { return { value: JSON.parse(bytes.toString('utf8')) as T, revision: digest(bytes) }; }
-  catch { throw new Error('Saved state is unreadable. Preserve it and reconcile; do not reset it.'); }
+  catch { throw new Error(`Saved state is unreadable at ${path}. Preserve it and reconcile the original record; do not reset it.`); }
 }
 export function withLock<T>(root: string, resource: string, action: () => T): T {
   const folder = privatePath(root, '.local/locks'); mkdirSync(folder, { recursive: true });
   const lock = resolve(folder, digest(resource) + '.lock');
-  try { mkdirSync(lock); } catch { throw new Error('Another writer owns this operation. Reload or inspect the existing claim.'); }
+  try { mkdirSync(lock); } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    throw new Error(`Another writer owns this operation. Inspect .local/locks/${digest(resource)}.lock/owner.json and verify the owning process and journal before recovering ${resource}.`);
+  }
   try { writeFileSync(resolve(lock, 'owner.json'), JSON.stringify({ pid: process.pid, resource, created: new Date().toISOString() })); return action(); }
   finally { if (existsSync(resolve(lock, 'owner.json'))) unlinkSync(resolve(lock, 'owner.json')); rmdirSync(lock); }
 }

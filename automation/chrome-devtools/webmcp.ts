@@ -5,7 +5,7 @@ import { readRecord, readinessIssues } from '../tools/registry.js';
 import { type ChromeSettings, validateSettings, settingsHash, webOrigin } from './config.js';
 import { type Bridge, type Provider, validateScope, structured, responseMessage, claimed, BridgeFailure } from './transport.js';
 import { documentContextScript, documentTreeHash, requireDocumentBinding, type BrowserDocument } from './document-context.js';
-import { claimCaseCheckpoint, type CaseCheckpoint } from '../execution/cases.js';
+import { admitCaseCheckpoint, type CaseCheckpoint } from '../execution/cases.js';
 
 export interface Target {
   pageId: number; url: string; role: string; accountState: string; build: string | null; contextEvidence: Evidence[];
@@ -226,22 +226,29 @@ async function executeClaimed(root: string, bridge: Bridge, settings: ChromeSett
   const live = await inspect(root, bridge, settings, request.target, inventory.channel);
   requireDocumentBinding(live);
   if (digest(canonical(live.tools)) !== inventory.catalogueHash || live.documentId !== inventory.documentId || live.documentTreeHash !== inventory.documentTreeHash) throw new Error('The live document or tool catalogue changed (including iframe identity); refresh before execution.');
-  if (request.caseCheckpoint) {
-    requireText(request.target.build, 'Observed case build');
-    claimCaseCheckpoint(root, request.caseCheckpoint, request.authorization,
-      { buildId: request.target.build, environment: request.caseCheckpoint.environment },
-      { kind: 'webmcp', id: request.id, inputDigest: caseInputDigest(request) });
-  }
   // Reserve before sending. A crash retains inProgress and cannot silently repeat a mutation.
   const record: InvocationRecord = { schemaVersion: 1, id: request.id, requestHash, inventory: request.inventory, source: request.source, authorization: request.authorization,
     provider: bridge.provider, toolName: request.toolName, effect: request.effect, inputHash: digest(canonical(request.input)), inputFields: Object.keys(request.input), startedAt: new Date().toISOString(),
     invocation: 'inProgress', applicationOutcome: 'notAssessed', qaVerdict: 'Not established by this helper',
     ...(request.caseCheckpoint ? { caseCheckpoint: request.caseCheckpoint } : {}) };
-  save(root, path, record, null);
+  const dispatch = () => {
+    save(root, path, record, null);
+    return bridge.call(inventory.channel === 'application' ? 'execute_webmcp_tool' : 'execute_3p_developer_tool',
+      { pageId: request.target.pageId, toolName: request.toolName, input: JSON.stringify(request.input) });
+  };
+  let invoked: Promise<unknown> | undefined;
+  if (request.caseCheckpoint) {
+    requireText(request.target.build, 'Observed case build');
+    // Admission failures must remain distinct from an invocation that was sent.
+    invoked = admitCaseCheckpoint(root, request.caseCheckpoint, request.authorization,
+      { buildId: request.target.build, environment: request.caseCheckpoint.environment },
+      { kind: 'webmcp', id: request.id, inputDigest: caseInputDigest(request) }, dispatch);
+  }
   try {
-    const result = await bridge.call(inventory.channel === 'application' ? 'execute_webmcp_tool' : 'execute_3p_developer_tool', { pageId: request.target.pageId, toolName: request.toolName, input: JSON.stringify(request.input) });
+    const result = await (invoked ?? dispatch());
     record.invocation = invocationOutcome(result); record.outputHash = digest(canonical(result));
   } catch (error) {
+    if (revision(root, path) === null) throw error;
     record.invocation = error instanceof BridgeFailure && error.kind === 'toolError' ? 'reportedError' : 'unknown';
     record.reason = record.invocation === 'reportedError' ? 'The bridge returned an explicit error. Application outcome remains unverified; raw output was not retained.' : 'The call did not yield a confirmed response. Inspect the application state before a new attempt; raw output was not retained.';
   }

@@ -1,5 +1,9 @@
 import { contained, evidence, digest, load, requireText, sameEvidence, save, verifyEvidence, withLock, type Evidence } from '../shared/store.js';
 import { identifier, indexById, pinned } from '../release/library.js';
+import { assertContinuation } from '../board/board.js';
+import { activeSource } from '../task-source/config.js';
+import { assertConnectedCase, readConnectedCase } from '../task-source/work.js';
+import { assertDataReady, requireCaseData, type DataScope } from '../data/readiness.js';
 import type { Assignment } from '../release/scope.js';
 import type { Target } from '../release/round.js';
 import { readdirSync, existsSync } from 'node:fs';
@@ -81,6 +85,7 @@ export function verifyUnderstandingReview(root: string, decision: { understandin
 type Status = 'Pass' | 'Fail' | 'Partial' | 'Blocked';
 export interface CheckpointObservation {
   outcome: 'matched' | 'deviation' | 'invalid' | 'needsReview' | 'interrupted';
+  observedAt?: string;
   source: string;
   evidence: Evidence[];
   issue?: string;
@@ -93,8 +98,9 @@ interface Attempt {
   issue?: string;
   reviewRequired?: boolean;
   checkpoint?: string;
+  checkpointTarget?: Evidence;
   invocation?: { checkpoint: string; id: string; kind: 'postman' | 'webmcp'; pid?: number };
-  observations: (CheckpointObservation & { checkpoint: string; invocation?: Attempt['invocation']; runnerEvidence?: Evidence })[];
+  observations: (CheckpointObservation & { checkpoint: string; invocation?: Attempt['invocation']; runnerEvidence?: Evidence; targetObservation?: Evidence; carried?: { receipt: Evidence; reconciliation?: Evidence } })[];
 }
 interface FlowIssue {
   id: string;
@@ -109,6 +115,8 @@ interface Session extends CaseAuthorization {
   previous?: Evidence;
   verifiedPrerequisites?: { caseId: string; basis: string; receipt: Evidence }[];
   local?: { ticketId: string; generation: string };
+  connected?: { claimId: string };
+  dataBinding?: { scope: DataScope; observations: Evidence[] };
   cases: string[];
   attempts: Attempt[];
   flowIssues?: FlowIssue[];
@@ -195,15 +203,18 @@ interface RunnerReconciliation extends CaseCheckpoint {
   invocationId: string;
   source: string;
   detail: string;
-  outcome: 'notApplied';
+  outcome: 'notApplied' | 'applied';
+  checkpointOutcome?: 'matched' | 'deviation';
+  observedAt?: string;
   evidence: Evidence[];
 }
 
 export function reconcileCaseRunner(root: string, request: RunnerReconciliation) {
-  requireText(request.source, 'Who verified the original runner stopped and the action was not applied');
+  requireText(request.source, 'Who verified the original runner stopped and observed the application state');
   requireText(request.detail, 'How the original runner and target state were independently checked');
-  if (request.outcome !== 'notApplied' || !request.evidence?.length) {
-    throw new Error('Link independent evidence that the original runner stopped and the action was not applied.');
+  if (!['notApplied', 'applied'].includes(request.outcome) || !request.evidence?.length ||
+      (request.outcome === 'applied' ? !['matched', 'deviation'].includes(request.checkpointOutcome ?? '') : request.checkpointOutcome !== undefined)) {
+    throw new Error('Link independent evidence of the stopped runner and actual effect. For applied work, record whether its approved checkpoint matched or deviated.');
   }
   return withLock(root, 'case-execution', () => {
     const session = inspectCases(root, request.id);
@@ -220,14 +231,19 @@ export function reconcileCaseRunner(root: string, request: RunnerReconciliation)
       const record = load<RunnerRecord | null>(root, runnerPath(invocation), () => null).value;
       if (active && (!sameCheckpoint(record, request) ||
           (invocation.kind === 'postman' ? record?.state !== 'completed' : record?.invocation === 'inProgress' || record?.invocation === 'awaitingSubmission'))) {
-        throw new Error('The original runner may still be active. Verify its termination before recording a retry decision.');
+        throw new Error('The original runner may still be active. Verify its termination before recording its outcome.');
       }
+    }
+    if (request.observedAt !== undefined && (!/(Z|[+-]\d\d:\d\d)$/.test(request.observedAt) ||
+        !(Date.parse(request.observedAt) >= Date.parse(targetObservation(root, observed.targetObservation ?? session.target,
+          readCaseBatch(root, session.batch).batch.target).observedAt)))) {
+      throw new Error('Record the actual runner readback time at or after the observed target.');
     }
     const path = reconciliationPath(request);
     const existing = load<RunnerReconciliation | null>(root, path, () => null);
     for (const ref of request.evidence) {
       if (ref.path === runnerPath(invocation) || ref.path === sessionPath(session.id) || ref.path === session.target.path) {
-        throw new Error('Supply independent evidence of the stopped runner and unaffected application state.');
+        throw new Error('Supply independent evidence of the stopped runner and actual application state.');
       }
       verifyEvidence(root, ref);
     }
@@ -262,7 +278,7 @@ function priorRunnerHold(root: string, session: Session, design: Design, item: C
         const path = reconciliationPath(request);
         const reviewed = load<RunnerReconciliation | null>(root, path, () => null).value;
         if (!reviewed || reviewed.id !== prior.id || reviewed.caseId !== item.id || reviewed.checkpoint !== observed.checkpoint ||
-            reviewed.invocationId !== observed.invocation.id || reviewed.outcome !== 'notApplied' || !reviewed.evidence?.length) return `runner-${observed.invocation.id}`;
+            reviewed.invocationId !== observed.invocation.id || !['notApplied', 'applied'].includes(reviewed.outcome) || !reviewed.evidence?.length) return `runner-${observed.invocation.id}`;
         try { reviewed.evidence.forEach(ref => verifyEvidence(root, ref)); }
         catch { return `runner-${observed.invocation.id}`; }
       }
@@ -406,15 +422,21 @@ function targetObservation(root: string, ref: Evidence, target: Target) {
   if (!sameTarget({ buildId: observed?.buildId, environment: observed?.environment ?? observed?.id! }, target) ||
       !Number.isFinite(Date.parse(observed.observedAt))) throw new Error('Observe the exact approved case target.');
   requireText(observed.source, 'Actual case target source');
+  return observed;
 }
 
-export function startCases(root: string, request: CaseAuthorization & { id: string; target: Evidence; caseIds?: string[]; previous?: Evidence; local?: Session['local'] }) {
+export function startCases(root: string, request: CaseAuthorization & { id: string; target: Evidence; caseIds?: string[]; previous?: Evidence; local?: Session['local']; connected?: Session['connected']; dataBinding?: Session['dataBinding'] }) {
   const design = verifyCaseAuthorization(root, request);
   targetObservation(root, request.target, design.batch.target);
+  if (request.local && request.connected) throw new Error('Bind the execution to one canonical source.');
   const cases = request.caseIds ?? [...design.cases.keys()];
   const verifiedPrerequisites: NonNullable<Session['verifiedPrerequisites']> = [];
   names(cases, 'selected case IDs');
   if (cases.some(id => !design.cases.has(id))) throw new Error('Select cases from the approved batch.');
+  if (request.dataBinding) {
+    requireCaseData(request.dataBinding.scope, cases.map(id => design.cases.get(id)!));
+    assertDataReady(root, request.dataBinding.scope, design.batch.target, request.dataBinding.observations, Date.now(), cases.map(id => design.cases.get(id)!));
+  }
   if (request.previous) {
     const previous = pinned<Session>(root, request.previous, 'previous case execution');
     const priorDesign = verifyCaseAuthorization(root, previous);
@@ -457,6 +479,8 @@ export function startCases(root: string, request: CaseAuthorization & { id: stri
       if (!sameEvidence(stored.batch, request.batch) || !sameEvidence(stored.approval, request.approval) ||
           !sameEvidence(stored.target, request.target) || JSON.stringify(stored.cases) !== JSON.stringify(cases) ||
           JSON.stringify(stored.local) !== JSON.stringify(request.local) ||
+          JSON.stringify(stored.connected) !== JSON.stringify(request.connected) ||
+          JSON.stringify(stored.dataBinding) !== JSON.stringify(request.dataBinding) ||
           (stored.previous || request.previous) && !sameEvidence(stored.previous, request.previous)) {
         throw new Error('This case execution ID already has different inputs.');
       }
@@ -465,7 +489,7 @@ export function startCases(root: string, request: CaseAuthorization & { id: stri
     if (request.previous && !sameEvidence(request.previous, evidence(root, request.previous.path))) throw new Error('The previous case receipt changed.');
     rejectConcurrent(root, design, request);
     const session: Session = { schemaVersion: 1, id: request.id, batch: request.batch, approval: request.approval, target: request.target,
-      previous: request.previous, local: request.local, cases, attempts: [],
+      previous: request.previous, local: request.local, connected: request.connected, dataBinding: request.dataBinding, cases, attempts: [],
       ...(verifiedPrerequisites.length ? { verifiedPrerequisites } : {}) };
     save(root, path, session, null);
     return session;
@@ -504,16 +528,46 @@ export function verifyCaseCheckpoint(root: string, request: CaseCheckpoint, refs
   checkCaseCheckpoint(root, session, verifyCaseAuthorization(root, session), request, refs, target);
 }
 
-export function claimCaseCheckpoint(root: string, request: CaseCheckpoint, refs: Evidence[], target: Target,
-  invocation: { kind: 'postman' | 'webmcp'; id: string; inputDigest: string }) {
-  return updateSession(root, request.id, (session, design) => {
-    const { item, attempt } = checkCaseCheckpoint(root, session, design, request, refs, target);
-    const runner = item.checkpoints[attempt.observations.length]?.runner;
-    if (runner?.kind !== invocation.kind || runner.inputDigest !== invocation.inputDigest) {
-      throw new Error('Use the exact runner and inputs approved for this checkpoint.');
-    }
-    if (attempt.invocation) throw new Error('This checkpoint already has a runner invocation. Reconcile its actual outcome before retrying.');
-    attempt.invocation = { kind: invocation.kind, id: invocation.id, checkpoint: request.checkpoint, pid: process.pid };
+function checkExecutionData(root: string, session: Session, design: Design, item: CaseDefinition) {
+  if (!session.dataBinding) {
+    if (session.local || session.connected) throw new Error('Restart the affected active execution from its reviewed data scope.');
+    return;
+  }
+  assertDataReady(root, session.dataBinding.scope, design.batch.target, session.dataBinding.observations, Date.now(), [item]);
+}
+
+export async function admitCaseCheckpoint<T>(root: string, request: CaseCheckpoint, refs: Evidence[], target: Target,
+  invocation: Parameters<typeof claimCaseCheckpoint>[4], dispatch: () => T) {
+  const session = inspectCases(root, request.id);
+  const observed = session.connected ? await readConnectedCase(root, request.id) : undefined;
+  return claimCaseCheckpoint(root, request, refs, target, invocation, observed, dispatch);
+}
+
+export function claimCaseCheckpoint<T = void>(root: string, request: CaseCheckpoint, refs: Evidence[], target: Target,
+  invocation: { kind: 'postman' | 'webmcp'; id: string; inputDigest: string },
+  observed?: Awaited<ReturnType<typeof readConnectedCase>>, dispatch?: () => T) {
+  return withLock(root, 'qa-board', () => {
+    updateSession(root, request.id, (session, design) => {
+      if (session.local) assertContinuation(root, session.local.ticketId, session.local.generation);
+      if (session.connected || activeSource(root).value.choice.kind === 'live') {
+        if (!observed || !session.connected) throw new Error('Refresh the current connected claim before invocation.');
+        assertConnectedCase(root, request.id, session.connected.claimId, observed);
+      }
+      verifyEvidence(root, session.target);
+      const { item, attempt } = checkCaseCheckpoint(root, session, design, request, refs, target);
+      if (!attempt.checkpointTarget) throw new Error('Observe the current target and reserve this checkpoint again.');
+      targetObservation(root, attempt.checkpointTarget, target);
+      const alreadyApplied = appliedCheckpoint(root, session, design, item, request.checkpoint);
+      if (alreadyApplied) throw new Error('The earlier effect must be verified or reviewed before issuing this action again.');
+      checkExecutionData(root, session, design, item);
+      const runner = item.checkpoints[attempt.observations.length]?.runner;
+      if (runner?.kind !== invocation.kind || runner.inputDigest !== invocation.inputDigest) {
+        throw new Error('Use the exact runner and inputs approved for this checkpoint.');
+      }
+      if (attempt.invocation) throw new Error('This checkpoint already has a runner invocation. Reconcile its actual outcome before retrying.');
+      attempt.invocation = { kind: invocation.kind, id: invocation.id, checkpoint: request.checkpoint, pid: process.pid };
+    });
+    return dispatch?.();
   });
 }
 
@@ -551,6 +605,80 @@ function dependencyHold(root: string, session: Session, design: Design, item: Ca
   }
 }
 
+// Only carry across attempts in the explicit resume chain. A new reviewed execution can
+// deliberately test the same case, but it cannot use resume to repeat an observed effect.
+function appliedCheckpoint(root: string, session: Session, design: Design, item: CaseDefinition, checkpoint: string) {
+  for (const { session: prior, receipt } of earlierSessions(root, session.previous)) {
+    const row = prior.attempts.find(attempt => attempt.caseId === item.id)?.observations.find(observed => observed.checkpoint === checkpoint);
+    if (!row?.invocation) continue;
+    const path = reconciliationPath({ id: prior.id, caseId: item.id, checkpoint });
+    const reviewed = conclusive(row.outcome) ? null : load<RunnerReconciliation | null>(root, path, () => null).value;
+    if (!conclusive(row.outcome) && reviewed?.outcome !== 'applied') continue;
+    const priorDesign = readCaseBatch(root, prior.batch);
+    const priorCase = priorDesign.cases.get(item.id);
+    const compatible = priorCase && sameTarget(priorDesign.batch.target, design.batch.target) &&
+      caseBasis(priorDesign, priorCase) === caseBasis(design, item);
+    return { prior, receipt, row, reviewed, reconciliation: reviewed ? evidence(root, path) : undefined, compatible };
+  }
+}
+
+function carryAppliedCheckpoints(root: string, session: Session, design: Design, item: CaseDefinition, attempt: Attempt) {
+  while (attempt.observations.length < item.checkpoints.length) {
+    const next = item.checkpoints[attempt.observations.length]!;
+    if (!next.runner) {
+      // Recheck earlier read-only observations normally before a later carried effect.
+      return;
+    }
+    const applied = appliedCheckpoint(root, session, design, item, next.id);
+    if (!applied) return;
+    if (!applied.compatible) {
+      attempt.status = 'Partial';
+      attempt.issue = `runner-${applied.row.invocation!.id}-changed-basis`;
+      attempt.reviewRequired = true;
+      return;
+    }
+    const observation = applied.reviewed
+      ? { ...applied.row, outcome: applied.reviewed.checkpointOutcome!, evidence: applied.reviewed.evidence,
+          source: applied.reviewed.source, detail: applied.reviewed.detail, observedAt: applied.reviewed.observedAt ?? applied.row.observedAt }
+      : applied.row;
+    const carried = applied.row.carried ?? { receipt: applied.receipt, reconciliation: applied.reconciliation };
+    verifyCarriedCheckpoint(root, item, observation, carried);
+    attempt.observations.push({ ...observation, carried });
+    if (observation.outcome === 'deviation') { attempt.status = 'Fail'; return; }
+  }
+  attempt.status = 'Pass';
+}
+
+function verifyCarriedCheckpoint(root: string, item: CaseDefinition, observation: Attempt['observations'][number],
+  carried: NonNullable<Attempt['observations'][number]['carried']>) {
+  const prior = pinned<Session>(root, carried.receipt, 'original case receipt');
+  if (!prior.finished || carried.receipt.path !== sessionPath(prior.id)) throw new Error('Link the settled original case receipt.');
+  const attempt = prior.attempts.find(row => row.caseId === item.id);
+  const original = attempt?.observations.find(row => row.checkpoint === observation.checkpoint);
+  if (!original?.invocation || original.invocation.id !== observation.invocation?.id) {
+    throw new Error('Link the original action and its outcome.');
+  }
+  const request = { id: prior.id, caseId: item.id, checkpoint: observation.checkpoint };
+  if (carried.reconciliation) {
+    const reviewed = pinned<RunnerReconciliation>(root, carried.reconciliation, 'runner readback');
+    if (carried.reconciliation.path !== reconciliationPath(request) || reviewed.id !== prior.id || reviewed.caseId !== item.id ||
+        reviewed.checkpoint !== request.checkpoint || reviewed.invocationId !== original.invocation.id || reviewed.outcome !== 'applied' ||
+        reviewed.checkpointOutcome !== observation.outcome || JSON.stringify(reviewed.evidence) !== JSON.stringify(observation.evidence)) {
+      throw new Error('Link independent readback of the original applied action and approved outcome.');
+    }
+    reviewed.evidence.forEach(ref => verifyEvidence(root, ref));
+  } else if (original.carried) {
+    // A repeated interruption keeps the first recorded invocation and readback.
+    verifyCarriedCheckpoint(root, item, observation, original.carried);
+  } else {
+    if (original.outcome !== observation.outcome || JSON.stringify(original.evidence) !== JSON.stringify(observation.evidence)) {
+      throw new Error('Preserve the observed outcome of the original invocation.');
+    }
+    verifyRunnerOutcome(root, request, original.invocation, original,
+      [prior.target, item.definition, ...attempt!.observations[0]!.evidence], original.runnerEvidence);
+  }
+}
+
 export function prepareCheckpoint(root: string, request: { id: string; caseId: string; target: Evidence }) {
   return updateSession(root, request.id, (session, design) => {
     if (!session.cases.includes(request.caseId)) throw new Error('This case is outside the selected execution.');
@@ -564,6 +692,7 @@ export function prepareCheckpoint(root: string, request: { id: string; caseId: s
     const shared = session.prerequisiteIssues?.find(issue => item.prerequisiteKeys?.includes(issue.key));
     if (dependency || disputed || shared) return { state: 'Blocked' as const, issue: dependency ?? disputed?.id ?? shared!.issue };
     targetObservation(root, request.target, design.batch.target);
+    checkExecutionData(root, session, design, item);
     try { verifyCurrentCase(root, design, item); }
     catch {
       attempt.status = attempt.observations.length ? 'Partial' : 'Blocked';
@@ -572,10 +701,15 @@ export function prepareCheckpoint(root: string, request: { id: string; caseId: s
       flagFlow(session, item, { id: attempt.issue, flowId: item.flowId, reason: 'Applicable accepted source or map revision changed.', evidence: [] });
       return { state: attempt.status, issue: attempt.issue };
     }
-    const checkpoint = item.checkpoints[attempt.observations.length]!;
     const unresolved = priorRunnerHold(root, session, design, item);
     if (unresolved) return { state: 'Blocked' as const, issue: unresolved };
+    if (attempt.observations.length && session.previous) {
+      carryAppliedCheckpoints(root, session, design, item, attempt);
+      if (attempt.status) return { state: attempt.status, issue: attempt.issue };
+    }
+    const checkpoint = item.checkpoints[attempt.observations.length]!;
     attempt.checkpoint = checkpoint.id;
+    attempt.checkpointTarget = request.target;
     return { state: 'ready' as const, caseId: item.id, checkpoint, criteria: item.criteria, flow: design.flows.get(item.flowId)! };
   });
 }
@@ -605,8 +739,14 @@ export function observeCheckpoint(root: string, request: CheckpointObservation &
       ? verifyRunnerOutcome(root, { id, caseId, checkpoint }, attempt.invocation, observation,
         [session.target, item.definition, ...attempt.observations[0]!.evidence])
       : undefined;
-    attempt.observations.push({ ...observation, checkpoint, invocation: attempt.invocation, runnerEvidence });
+    if (observation.observedAt !== undefined && (!/(Z|[+-]\d\d:\d\d)$/.test(observation.observedAt) ||
+        !(Date.parse(observation.observedAt) >= Date.parse(targetObservation(root, attempt.checkpointTarget ?? session.target, design.batch.target).observedAt)))) {
+      throw new Error('Use the actual checkpoint observation time at or after the observed target.');
+    }
+    attempt.observations.push({ ...observation, checkpoint, invocation: attempt.invocation, runnerEvidence,
+      targetObservation: attempt.checkpointTarget });
     delete attempt.checkpoint;
+    delete attempt.checkpointTarget;
     delete attempt.invocation;
     let stale = false;
     try { verifyCurrentCase(root, design, item); } catch { stale = true; }
@@ -660,7 +800,11 @@ export async function runApprovedCases(root: string, id: string, adapter: {
         const step = prepareCheckpoint(root, { id, caseId, target });
         if (step.state !== 'ready') break;
         progressed = true;
-        const observed = await adapter.execute(step);
+        const execute = () => adapter.execute(step);
+        const observed = await (session.local && !step.checkpoint.runner ? withLock(root, 'qa-board', () => {
+          assertContinuation(root, session.local!.ticketId, session.local!.generation);
+          return execute();
+        }) : execute());
         observeCheckpoint(root, { ...observed, id, caseId, checkpoint: step.checkpoint.id });
       }
     }
@@ -692,7 +836,7 @@ export function caseResult(root: string, receipt: Evidence, caseId: string, expe
   if (!session.cases.includes(caseId) || !item || item.checkId !== expected.checkId || item.conditionId !== expected.conditionId ||
       (item.context || expected.context) && !sameEvidence(item.context, expected.context) ||
       !attempt || attempt.status !== expected.outcome || !attempt.observations.length) throw new Error('The claimed verdict has no matching case checkpoint evidence.');
-  targetObservation(root, session.target, design.batch.target);
+  const observed = targetObservation(root, session.target, design.batch.target);
   const observations = attempt.observations;
   if (observations.some((row, i) => row.checkpoint !== item.checkpoints[i]?.id || !row.evidence.length ||
       i < observations.length - 1 && row.outcome !== 'matched')) throw new Error('The checkpoint evidence does not follow the approved case.');
@@ -705,7 +849,8 @@ export function caseResult(root: string, receipt: Evidence, caseId: string, expe
       const runner = item.checkpoints[index]?.runner;
       if (runner && conclusive(row.outcome)) {
         if (row.invocation?.kind !== runner.kind) throw new Error('Link the reviewed runner invocation for the checkpoint.');
-        verifyRunnerOutcome(root, { id: session.id, caseId, checkpoint: row.checkpoint }, row.invocation, row,
+        if (row.carried) verifyCarriedCheckpoint(root, item, row, row.carried);
+        else verifyRunnerOutcome(root, { id: session.id, caseId, checkpoint: row.checkpoint }, row.invocation, row,
           [session.target, item.definition, ...observations[0]!.evidence], row.runnerEvidence);
       }
     }
@@ -716,5 +861,8 @@ export function caseResult(root: string, receipt: Evidence, caseId: string, expe
     }
     if (dependencyHold(root, session, design, item)) throw new Error('A prerequisite for the case evidence needs review.');
   }
-  return { batch: session.batch, approval: session.approval, basis: caseBasis(design, item), design: item, assignment: design.batch.assignment };
+  return { batch: session.batch, approval: session.approval, basis: caseBasis(design, item), design: item, assignment: design.batch.assignment,
+    targetObservedAt: Math.max(Date.parse(observed.observedAt), ...observations.map(row => row.targetObservation
+      ? Date.parse(targetObservation(root, row.targetObservation, design.batch.target).observedAt) : -Infinity)),
+    checkpointObservedAt: Math.max(...observations.map(row => row.observedAt ? Date.parse(row.observedAt) : -Infinity)) };
 }

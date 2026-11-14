@@ -3,6 +3,14 @@ import { identifier, indexById, pinned, readLibrary, references } from './librar
 import { caseResult, readCaseBatch } from '../execution/cases.js';
 
 export interface Target { buildId: string; environment: string }
+interface CoverageCoordinate { moduleId: string; testTypeId: string; conditionId: string }
+interface Applicability {
+  schemaVersion: 1; library: Evidence;
+  modules: { id: string; owner: string; decision: Evidence; coordinates: (CoverageCoordinate & {
+    state: 'required' | 'excluded' | 'unresolved'; reason: string; basis: Evidence;
+  })[] }[];
+}
+const coverageKey = ({ moduleId, testTypeId, conditionId }: CoverageCoordinate) => `${moduleId}/${testTypeId}/${conditionId}`;
 interface Obligation {
   id: string; moduleId: string; testTypeId: string; conditionId: string;
   state: 'required' | 'excluded' | 'unresolved'; checkIds: string[];
@@ -12,6 +20,7 @@ export interface Round {
   schemaVersion: 1; id: string; library: Evidence; scope: Evidence; changes: Evidence;
   target: Target; assignmentIds: string[]; moduleIds: string[]; obligations: Obligation[];
   caseBatches?: Evidence[];
+  applicability?: Evidence;
 }
 type Outcome = 'Pass' | 'Fail' | 'Blocked' | 'Partial' | 'Not run';
 interface Observation {
@@ -91,10 +100,40 @@ export function readRound(root: string, ref: Evidence) {
     }
     if ([...required].some(key => !covered.has(key))) throw new Error('Every required check and condition needs an approved case in the round.');
   }
-  return { round, catalogue, required };
+  const applicability = round.applicability ? pinned<Applicability>(root, round.applicability, 'reviewed coverage applicability') : undefined;
+  const missingCoverage: string[] = [];
+  if (applicability) {
+    if (applicability.schemaVersion !== 1 || !sameEvidence(applicability.library, round.library)) {
+      throw new Error('Use independently reviewed coverage applicability for this library revision.');
+    }
+    const modules = indexById(applicability.modules, 'applicability module');
+    const supplied = new Map(round.obligations.map(row => [coverageKey(row), row]));
+    for (const moduleId of round.moduleIds) {
+      const reviewed = modules.get(moduleId);
+      if (!reviewed) { missingCoverage.push(`${moduleId}/applicability`); continue; }
+      const module = catalogue.modules.get(moduleId)!;
+      requireText(reviewed.owner, 'Coverage decision owner');
+      verifyEvidence(root, reviewed.decision);
+      if (!Array.isArray(reviewed.coordinates) || !reviewed.coordinates.length) throw new Error('Record the reviewed coverage coordinates.');
+      const seen = new Set<string>();
+      for (const coordinate of reviewed.coordinates) {
+        const key = coverageKey(coordinate);
+        if (coordinate.moduleId !== moduleId || !module.testTypeIds.includes(coordinate.testTypeId) ||
+            !module.conditionIds.includes(coordinate.conditionId) || seen.has(key) ||
+            !['required', 'excluded', 'unresolved'].includes(coordinate.state)) throw new Error(`Review coverage applicability for ${key}.`);
+        seen.add(key);
+        requireText(coordinate.reason, 'Coverage applicability reason');
+        verifyEvidence(root, coordinate.basis);
+        const obligation = supplied.get(key);
+        if (!obligation || obligation.state !== coordinate.state) missingCoverage.push(key);
+      }
+      for (const [key, row] of supplied) if (row.moduleId === moduleId && !seen.has(key)) missingCoverage.push(key);
+    }
+  }
+  return { round, catalogue, required, missingCoverage };
 }
 
-function readRun(root: string, ref: Evidence, scope: ReturnType<typeof readRound>, roundRef: Evidence, current = false) {
+function readRun(root: string, ref: Evidence, scope: ReturnType<typeof readRound>, roundRef: Evidence, current = false, chronology = true) {
   const run = pinned<Run>(root, ref, 'test run');
   if (run?.schemaVersion !== 1) throw new Error('Use a version 1 test run.');
   identifier(run.id, 'run');
@@ -124,6 +163,10 @@ function readRun(root: string, ref: Evidence, scope: ReturnType<typeof readRound
     }
     if (execution) {
       const result = caseResult(root, execution.receipt, execution.caseId, { ...observation, target: run.target }, current);
+      if (chronology && (result.targetObservedAt > Date.parse(run.observedAt) ||
+          result.checkpointObservedAt > Date.parse(run.observedAt))) {
+        throw new Error('The case target or checkpoint was observed after the claimed run outcome.');
+      }
       if (scope.round.caseBatches && !scope.round.caseBatches.some(batch => sameEvidence(batch, result.batch))) {
         throw new Error('The case verdict came from a different approved batch.');
       }
@@ -136,7 +179,7 @@ function readRun(root: string, ref: Evidence, scope: ReturnType<typeof readRound
   return run;
 }
 
-export function assessRound(root: string, input: AssessmentInput, reportVersion: 1 | 2 = 2) {
+export function assessRound(root: string, input: AssessmentInput, reportVersion: 1 | 2 | 3 = 3) {
   const scope = readRound(root, input.round), { round, catalogue } = scope;
   if (!Array.isArray(input.runs)) throw new Error('Supply the run references for this round.');
   const eligible: { ref: Evidence; run: Run }[] = [];
@@ -145,7 +188,7 @@ export function assessRound(root: string, input: AssessmentInput, reportVersion:
   for (const ref of input.runs) {
     if (supplied.has(ref.sha256)) throw new Error('Supply each run once.');
     supplied.add(ref.sha256);
-    try { eligible.push({ ref, run: readRun(root, ref, scope, input.round) }); }
+    try { eligible.push({ ref, run: readRun(root, ref, scope, input.round, false, reportVersion >= 3) }); }
     catch (error) { ineligible.push({ ref, reason: error instanceof Error ? error.message : 'Run evidence needs review.' }); }
   }
   indexById(eligible.map(({ run }) => run), 'run');
@@ -156,7 +199,12 @@ export function assessRound(root: string, input: AssessmentInput, reportVersion:
     const rows = attempts.get(key) ?? [];
     rows.push({ runId: run.id, observedAt: run.observedAt, observation });
     attempts.set(key, rows);
-    if (['Pass', 'Fail', 'Partial'].includes(observation.outcome)) executions.add(`${run.id}/${observation.checkId}`);
+    if (['Pass', 'Fail', 'Partial'].includes(observation.outcome)) {
+      const execution = reportVersion >= 3 ? observation.caseExecution : undefined;
+      executions.add(execution
+        ? `case:${execution.receipt.sha256}/${execution.caseId}`
+        : `run:${run.id}/${observation.checkId}`);
+    }
   }
   const current = new Map<string, Outcome>();
   const precedence: Outcome[] = ['Fail', 'Blocked', 'Partial', 'Not run', 'Pass'];
@@ -165,6 +213,11 @@ export function assessRound(root: string, input: AssessmentInput, reportVersion:
     for (const row of rows) if (row.observation.previousRunId !== undefined) {
       const prior = rows.find(candidate => candidate.runId === row.observation.previousRunId);
       if (!prior || Date.parse(prior.observedAt) >= Date.parse(row.observedAt)) throw new Error(`Retest for ${key} must reference an earlier eligible observation in this round.`);
+      const currentCase = row.observation.caseExecution, previousCase = prior.observation.caseExecution;
+      if (reportVersion >= 3 && currentCase && previousCase && currentCase.caseId === previousCase.caseId &&
+          currentCase.receipt.sha256 === previousCase.receipt.sha256) {
+        throw new Error(`Use a distinct case execution for the reviewed retest of ${key}.`);
+      }
       if (['Pass', 'Fail'].includes(row.observation.outcome)) superseded.add(prior.runId);
     }
     const outcomes = rows.filter(row => !superseded.has(row.runId)).map(row => row.observation.outcome);
@@ -188,7 +241,11 @@ export function assessRound(root: string, input: AssessmentInput, reportVersion:
     for (const id of module.conditionIds) if (!scoped.some(item => item.conditionId === id)) gaps.push({ id: `${moduleId}/condition/${id}`, outcome: 'Missing scope decision', exceptionAllowed: false });
     for (const id of module.testTypeIds) if (!scoped.some(item => item.testTypeId === id)) gaps.push({ id: `${moduleId}/type/${id}`, outcome: 'Missing scope decision', exceptionAllowed: false });
   }
-  if (reportVersion === 2 && !executions.size) gaps.push({ id: 'round/execution', outcome: 'No checks executed', exceptionAllowed: false });
+  if (reportVersion >= 3) {
+    for (const id of scope.missingCoverage) gaps.push({ id, outcome: 'Missing or conflicting coverage applicability', exceptionAllowed: false });
+    if (round.caseBatches && !round.applicability) gaps.push({ id: 'round/applicability', outcome: 'Missing reviewed coverage applicability', exceptionAllowed: false });
+  }
+  if (reportVersion >= 2 && !executions.size) gaps.push({ id: 'round/execution', outcome: 'No checks executed', exceptionAllowed: false });
   return {
     roundId: round.id, projectId: catalogue.library.projectId, target: round.target, library: round.library,
     scope: round.scope, changes: round.changes, assignmentIds: round.assignmentIds, runs: eligible.map(({ ref, run }) => ({ id: run.id, ref })),
@@ -226,7 +283,7 @@ export function recordAssessment(root: string, input: AssessmentInput) {
     const report = assessRound(root, input);
     verifyRunSet(root, input);
     if (report.ineligible.length) throw new Error('Reconcile unavailable or changed retained run evidence before recording the assessment.');
-    const record = { schemaVersion: 2, input, report };
+    const record = { schemaVersion: 3, input, report };
     const path = `.local/qa-release/assessment-${digest(JSON.stringify(record))}.json`;
     const existing = load<unknown>(root, path, () => null);
     if (existing.revision === null) save(root, path, record, null);
@@ -258,7 +315,9 @@ export function retainRun(root: string, input: { round: Evidence; run: Evidence 
         if (!prior) throw new Error('Retain the earlier run before recording its retest.');
         const earlier = readRun(root, prior.ref, scope, input.round);
         if (Date.parse(earlier.observedAt) >= Date.parse(run.observedAt) || !earlier.observations.some(item =>
-          item.checkId === observation.checkId && item.conditionId === observation.conditionId)) {
+          item.checkId === observation.checkId && item.conditionId === observation.conditionId &&
+          (!observation.caseExecution || !item.caseExecution || observation.caseExecution.caseId !== item.caseExecution.caseId ||
+            observation.caseExecution.receipt.sha256 !== item.caseExecution.receipt.sha256))) {
           throw new Error('Link the retest to an earlier eligible observation for the same check and condition.');
         }
       }
@@ -291,14 +350,17 @@ function verifyRunSet(root: string, input: AssessmentInput) {
 }
 
 export function verifyAssessment(root: string, ref: Evidence, currentRunSet = false, expectedRound?: Evidence) {
-  const record = pinned<{ schemaVersion: 1 | 2; input: AssessmentInput; report: ReturnType<typeof assessRound> }>(root, ref, 'release assessment');
-  if (record?.schemaVersion !== 1 && record?.schemaVersion !== 2) throw new Error('Use a supported release assessment.');
+  const record = pinned<{ schemaVersion: 1 | 2 | 3; input: AssessmentInput; report: ReturnType<typeof assessRound> }>(root, ref, 'release assessment');
+  if (record?.schemaVersion !== 1 && record?.schemaVersion !== 2 && record?.schemaVersion !== 3) throw new Error('Use a supported release assessment.');
   if (expectedRound && (record.input.round.path !== expectedRound.path || record.input.round.sha256 !== expectedRound.sha256)) {
     throw new Error('Use the assessment for this assignment’s current reviewed release round.');
   }
   if (currentRunSet) {
     verifyRunSet(root, record.input);
     const scope = readRound(root, record.input.round);
+    if (scope.round.caseBatches && (!scope.round.applicability || record.schemaVersion !== 3)) {
+      throw new Error('Refresh current release scope and assessment with independently reviewed coverage applicability.');
+    }
     if (scope.round.caseBatches) for (const run of record.input.runs) readRun(root, run, scope, record.input.round, true);
   }
   const actual = assessRound(root, record.input, record.schemaVersion);

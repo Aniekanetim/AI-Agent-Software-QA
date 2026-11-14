@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { contained, privatePath, load, save, revision, requireText, digest, evidence, verifyEvidence, assertNonsecret, type Evidence } from '../shared/store.js';
 import { probe, selectedCommand, runProcess, readRecord, saveRecord, readinessIssues, isolatedPostmanEnvironment, type Runner, type ToolRecord, type Command } from '../tools/registry.js';
 import { currentHarness, harnessKey } from '../tools/runtime.js';
-import { claimCaseCheckpoint, verifyCaseCheckpoint, type CaseCheckpoint } from '../execution/cases.js';
+import { admitCaseCheckpoint, verifyCaseCheckpoint, type CaseCheckpoint } from '../execution/cases.js';
 
 export const settingsPath = '.local/postman-settings.json';
 export interface PostmanSettings {
@@ -312,12 +312,15 @@ async function executeCollection(root: string, request: RunRequest, runner: Runn
   const result: RunResult = { schemaVersion: 1, id: request.id, requestDigest, state: 'running', outcome: 'incomplete', harness: identity, version: record.version, executable: command.executable,
     collection: request.collection, target: request.target, startedAt: new Date().toISOString(), source: request.source, authorizationReference: request.authorizationReference, inputs: request.approvedInputs,
     ...(request.caseCheckpoint ? { caseCheckpoint: request.caseCheckpoint } : {}), reporting: cloud ? 'cloudAllowed' : 'localOnly', exitCode: null };
-  if (request.caseCheckpoint) claimCaseCheckpoint(root, request.caseCheckpoint, request.approvedInputs,
-    { buildId: request.target.build, environment: request.target.environment },
-    { kind: 'postman', id: request.id, inputDigest: caseInputDigest(request) });
-  save(root, path, result, null);
+  const dispatch = () => {
+    save(root, path, result, null);
+    return runner(command, args, { cwd: contained(root, request.workingDirectory ?? '.'), env, timeout: request.timeoutMs + 15_000 });
+  };
   try {
-    const execution = await runner(command, args, { cwd: contained(root, request.workingDirectory ?? '.'), env, timeout: request.timeoutMs + 15_000 });
+    const execution = await (request.caseCheckpoint ? admitCaseCheckpoint(root, request.caseCheckpoint, request.approvedInputs,
+      { buildId: request.target.build, environment: request.target.environment },
+      { kind: 'postman', id: request.id, inputDigest: caseInputDigest(request) }, dispatch) : dispatch());
+    if (!execution) throw new Error('The collection was not dispatched.');
     result.exitCode = execution.code;
     let report: unknown;
     if (json) { try { report = JSON.parse(readFileSync(reportFile, 'utf8')); } catch { /* Missing report remains incomplete. */ } }
