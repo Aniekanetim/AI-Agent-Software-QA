@@ -221,7 +221,7 @@ test('Postman runs the reserved reviewed collection once and retains its outcome
     return fakeRunner()(...args);
   };
   await assert.rejects(postman.runCollection(f.root, { ...run, id: 'canceled-run',
-    caseCheckpoint: { id: second.id, caseId: second.caseId, checkpoint: 'run' } }, probe), /lifecycle changed|no longer executable/);
+    caseCheckpoint: { id: second.id, caseId: second.caseId, checkpoint: 'run' } }, probe), /lifecycle changed|no longer eligible/);
   assert.equal(productCalls, 0);
 });
 
