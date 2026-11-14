@@ -179,6 +179,11 @@ function readRun(root: string, ref: Evidence, scope: ReturnType<typeof readRound
   return run;
 }
 
+function caseOccurrence(observation: Observation) {
+  const execution = observation.caseExecution;
+  return execution && `case:${execution.receipt.sha256}/${execution.caseId}`;
+}
+
 export function assessRound(root: string, input: AssessmentInput, reportVersion: 1 | 2 | 3 = 3) {
   const scope = readRound(root, input.round), { round, catalogue } = scope;
   if (!Array.isArray(input.runs)) throw new Error('Supply the run references for this round.');
@@ -200,27 +205,25 @@ export function assessRound(root: string, input: AssessmentInput, reportVersion:
     rows.push({ runId: run.id, observedAt: run.observedAt, observation });
     attempts.set(key, rows);
     if (['Pass', 'Fail', 'Partial'].includes(observation.outcome)) {
-      const execution = reportVersion >= 3 ? observation.caseExecution : undefined;
-      executions.add(execution
-        ? `case:${execution.receipt.sha256}/${execution.caseId}`
-        : `run:${run.id}/${observation.checkId}`);
+      const occurrence = reportVersion >= 3 ? caseOccurrence(observation) : undefined;
+      executions.add(occurrence ?? `run:${run.id}/${observation.checkId}`);
     }
   }
   const current = new Map<string, Outcome>();
   const precedence: Outcome[] = ['Fail', 'Blocked', 'Partial', 'Not run', 'Pass'];
   for (const [key, rows] of attempts) {
+    const occurrence = (row: typeof rows[number]) =>
+      (reportVersion >= 3 ? caseOccurrence(row.observation) : undefined) ?? `run:${row.runId}`;
     const superseded = new Set<string>();
     for (const row of rows) if (row.observation.previousRunId !== undefined) {
       const prior = rows.find(candidate => candidate.runId === row.observation.previousRunId);
       if (!prior || Date.parse(prior.observedAt) >= Date.parse(row.observedAt)) throw new Error(`Retest for ${key} must reference an earlier eligible observation in this round.`);
-      const currentCase = row.observation.caseExecution, previousCase = prior.observation.caseExecution;
-      if (reportVersion >= 3 && currentCase && previousCase && currentCase.caseId === previousCase.caseId &&
-          currentCase.receipt.sha256 === previousCase.receipt.sha256) {
+      if (reportVersion >= 3 && occurrence(prior) === occurrence(row)) {
         throw new Error(`Use a distinct case execution for the reviewed retest of ${key}.`);
       }
-      if (['Pass', 'Fail'].includes(row.observation.outcome)) superseded.add(prior.runId);
+      if (['Pass', 'Fail'].includes(row.observation.outcome)) superseded.add(occurrence(prior));
     }
-    const outcomes = rows.filter(row => !superseded.has(row.runId)).map(row => row.observation.outcome);
+    const outcomes = rows.filter(row => !superseded.has(occurrence(row))).map(row => row.observation.outcome);
     current.set(key, precedence.find(outcome => outcomes.includes(outcome))!);
   }
   const findings = round.obligations.map(obligation => {
@@ -316,8 +319,7 @@ export function retainRun(root: string, input: { round: Evidence; run: Evidence 
         const earlier = readRun(root, prior.ref, scope, input.round);
         if (Date.parse(earlier.observedAt) >= Date.parse(run.observedAt) || !earlier.observations.some(item =>
           item.checkId === observation.checkId && item.conditionId === observation.conditionId &&
-          (!observation.caseExecution || !item.caseExecution || observation.caseExecution.caseId !== item.caseExecution.caseId ||
-            observation.caseExecution.receipt.sha256 !== item.caseExecution.receipt.sha256))) {
+          (!caseOccurrence(observation) || caseOccurrence(observation) !== caseOccurrence(item)))) {
           throw new Error('Link the retest to an earlier eligible observation for the same check and condition.');
         }
       }

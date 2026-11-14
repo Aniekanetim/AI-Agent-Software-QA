@@ -12,7 +12,7 @@ import { bindReleaseScope, previewReleaseScope, releaseScope, sameEvidence } fro
 import { currentFixes, defectCompletion, failedConfirmation, fixStatus, requireFixBatch, verifyRework, type DefectCompletion, type ReworkDecision } from '../regression/fix.js';
 import { nativeReleaseBoard, type ReleaseBoard } from '../regression/board.js';
 import type { Assignment } from '../release/scope.js';
-import { finishCases, prepareCheckpoint, readCaseBatch, startCases, verifyCaseAuthorization, verifyUnderstandingReview } from '../execution/cases.js';
+import { finishCases, inspectCases, prepareCheckpoint, readCaseBatch, startCases, verifyCaseAuthorization, verifyUnderstandingReview } from '../execution/cases.js';
 
 interface Claim {
   id: string; sourceKey: string; sourceRevision: string; identity: Identity; ticket: Ticket; queue: 'ready' | 'retest'; source: string;
@@ -847,6 +847,9 @@ export async function prepareLiveCase(root: string, request: Parameters<typeof p
   const observed = await readConnectedCase(root, request.id, reader);
   return withLock(root, 'qa-board', () => {
     assertConnectedCase(root, request.id, observed.claimId, observed);
+    if (inspectCases(root, request.id).connected?.claimId !== observed.claimId) {
+      throw new Error('Settle the old case execution and resume it with its current reviewed claim and data.');
+    }
     return prepareCheckpoint(root, request);
   });
 }
