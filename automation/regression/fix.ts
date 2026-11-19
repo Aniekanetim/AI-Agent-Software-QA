@@ -4,6 +4,7 @@ import { retainedRun, retainedRuns, sameTarget, type Round, type Target } from '
 import type { Assignment } from '../release/scope.js';
 import type { ReleaseBoard } from './board.js';
 import { caseBasis, caseResult, verifyCaseAuthorization } from '../execution/cases.js';
+import { assertCompanyBasis } from '../company-context/guards.js';
 
 interface FixIdentity { defect: Assignment; fixRevision: string }
 interface Intake extends FixIdentity {
@@ -306,6 +307,7 @@ function requireCasePlan(root: string, entry: Fix, revision: Revision | undefine
 }
 
 function verifyReview(root: string, entry: Fix, ref: Evidence, requireCases = false) {
+  assertCompanyBasis(root, entry.identity.defect);
   if (requireCases) requireCasePlan(root, entry, entry.plans.at(-1));
   const current = assess(root, entry);
   if (!current || current.report.state !== 'reviewPending') throw new Error('Complete confirmation and every required regression check before reviewing this fix.');
@@ -369,6 +371,7 @@ export function requireVerifiedFix(root: string, key: string, defect: Assignment
 }
 
 export function defectCompletion(root: string, defect: Assignment, ticketRevision: string, completion: DefectCompletion | undefined, approval?: Evidence, preview = false, requireCases = false) {
+  if (!preview) assertCompanyBasis(root, defect);
   if (!completion) throw new Error('Record separate confirmation and regression outcomes for the fix, or the reviewed no-change disposition.');
   if (completion.fix) {
     const entry = findFix(root, completion.fix), current = assess(root, entry);

@@ -1,6 +1,7 @@
 import { digest, evidence, load, requireText, sameEvidence, save, verifyEvidence, withLock, type Evidence } from '../shared/store.js';
 import { identifier, indexById, pinned, readLibrary, references } from './library.js';
 import { caseResult, readCaseBatch } from '../execution/cases.js';
+import { assertCompanyBasis } from '../company-context/guards.js';
 
 export interface Target { buildId: string; environment: string }
 interface CoverageCoordinate { moduleId: string; testTypeId: string; conditionId: string }
@@ -375,5 +376,9 @@ export function verifyCurrentCaseEvidence(root: string, assessment: Evidence) {
   const { input } = pinned<{ input: AssessmentInput }>(root, assessment, 'current release assessment');
   const scope = readRound(root, input.round);
   if (!scope.round.caseBatches) throw new Error('Current sign-off needs a reviewed case batch and case-level evidence.');
-  return scope.round.caseBatches.map(ref => readCaseBatch(root, ref).batch.understanding);
+  return scope.round.caseBatches.map(ref => {
+    const { batch } = readCaseBatch(root, ref);
+    assertCompanyBasis(root, batch.assignment, undefined, batch.understanding);
+    return batch.understanding;
+  });
 }

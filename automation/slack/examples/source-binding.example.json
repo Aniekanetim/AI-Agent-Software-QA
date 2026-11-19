@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "assignment": { "source": "actual-canonical-task-source", "ticketId": "ACTUAL_TICKET_ID" },
+  "target": { "environment": "actual-environment", "release": "actual-release", "at": "2026-11-19T00:00:00Z" },
+  "selections": [{ "bindingId": "company", "digest": "actual-selection-digest" }],
+  "dependencies": [{
+    "bindingId": "company", "criterionIds": ["ACTUAL_CRITERION_ID"],
+    "claim": { "path": ".local/actual-owner-decision-claim.json", "sha256": "actual-evidence-hash" }
+  }],
+  "exclusions": []
+}

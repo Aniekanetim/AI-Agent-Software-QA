@@ -1,5 +1,7 @@
 # AI-led QA workflow with human review
 
+For selected [company Slack sources](../../automation/company-context/README.md), read existing decisions before raising duplicate questions. At G1/G2/G4 bind exact source applicability and criteria to the reviewed understanding; refresh actual source evidence before dependent execution/resumption. Known material changes or missing relevant analysis hold affected cases while independent approved cases continue. Source capture and semantic interpretation do not manufacture human approval. G5 and scoped fix/release closure recheck current sources alongside mandatory coverage/regression, preserving historical results. No source-reading capability grants Slack posting or product execution authority.
+
 
 ## Purpose and responsibilities
 

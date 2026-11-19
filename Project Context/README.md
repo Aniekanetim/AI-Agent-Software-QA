@@ -1,5 +1,7 @@
 # Project Context
 
+Accepted owner decisions can remain in canonical Slack threads supplied through [company context](../automation/company-context/README.md). The integration owns private retrieval/version records; agents retain permitted learning in their AI context and reference actual decisions from tasks. Channel access/selection does not make every message a requirement. No automatic source ingestion rewrites this human-maintained folder. Explicit named-document maintenance remains separate. Source changes propagate through affected understanding/cases and current release review, preserving earlier source versions.
+
 This is the human-maintained product baseline. Business, product, design and technical owners maintain their requirements, contracts and decisions here or in linked canonical sources. Applicable accepted sources supply the QA test basis. A human-maintained file can still be draft, missing or superseded; check its owner, state and revision before use.
 
 The agent's observations and inferences belong in the separate [discovery context](../Product%20Discovery/Project%20Context/README.md). Read relevant sources in both stores. The agent may use discovery knowledge for navigation/setup/investigation but cannot treat the current application response as intended behavior.

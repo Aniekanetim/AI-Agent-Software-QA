@@ -1,5 +1,7 @@
 # Product discovery workflow
 
+Consult selected [company context](../automation/company-context/README.md) for existing answers and current decisions before asking the team again. Slack source refresh does not authorize application exploration or rewrite the human baseline. Link relevant learned facts and actual owner decisions with their source revisions. Keep discovery authorization independent of source connection, task pickup and QA approval.
+
 Use this independent pipeline to learn how an application behaves and preserve that knowledge for later work. [Discovery requests](README.md) supply the learning objective. The [AI-managed context](Project%20Context/README.md) holds the learning; the [human-maintained context](../Project%20Context/README.md) holds the team's product baseline. The QA workflow retains its own testing gates and seven-folder board.
 
 ## 1. Read the request and existing knowledge

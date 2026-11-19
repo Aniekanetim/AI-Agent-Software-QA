@@ -738,12 +738,13 @@ test('a returned Retest ticket gets a new claim and can move to Rework again', a
 test('settings keeps the existing numeric close shortcut and offers Task source at 12', () => {
   const f = fixture();
   const shown = menu.openMenu(f.root, 'Synthetic settings request');
-  assert.deepEqual(shown.choices.slice(10), [
+  assert.deepEqual(shown.choices.slice(10, 13), [
     { id: 'close', label: 'Close settings' }, { id: 'taskSource', label: 'Task source' }, { id: 'testData', label: 'Test data and datasets' },
   ]);
   assert.equal(menu.chooseArea(f.root, '11').action, 'closed');
   menu.openMenu(f.root, 'Synthetic settings request');
   assert.equal(menu.chooseArea(f.root, '12').area, 'Task source');
+  assert.equal(menu.chooseArea(f.root, '14').area, 'Company context');
 });
 
 test('a manually handed-off native Retest stays resumable and cannot be marked verified by generic closure', async () => {

@@ -1,5 +1,7 @@
 # Adopt the workflow for a project
 
+Version 1.16.0 adds [company Slack context](automation/company-context/README.md). During onboarding, inspect and reuse actual harness connections before setup questions, select company/project channels and retain the historical/read/analysis coverage. Existing projects can use Settings → Company context. Without a selected source, existing operation continues. For open work that uses Slack decisions, bind the source manifest to reviewed understanding, refresh its actual source evidence and retain current receipts before dependent execution/G5. Preserve completed history and existing onboarding state; no Slack schedule is activated by upgrading.
+
 Choose one QA root for each project. All links, discovery records and board folders resolve from that root. Start [guided onboarding](Onboarding/README.md): it prepares context, access and tools; later tasks determine testing coverage. Discovery and QA remain separate procedures connected through explicit requests and two context stores.
 
 When starting from the public repository URL, follow [agent repository adoption](docs/adopt-from-repository.md). Record the workflow source/revision in shared progress, separately from the application target. A fork or template repository can serve directly as the project-specific QA root.

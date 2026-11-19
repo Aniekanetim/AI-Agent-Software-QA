@@ -1,5 +1,7 @@
 # Tools, intake and check-ins
 
+[Company context](company-context/README.md) adds native/API Slack reads, onboarding/Settings channel selection, source versions and current-use checks. Discover/reuse actual access before setup. Company-source refresh has its own scope and scheduler evidence; this package does not silently expand an existing board schedule. [Slack connection](slack/README.md) · [Verification limits](../docs/company-context-validation.md)
+
 Start with [shared discovery/reuse](tools/README.md): verify existing tools through the actual calling harness before offering installation or sign-in. [Postman CLI](postman/README.md) adds collection-based API execution with conditional cloud authentication. The master remains unconfigured.
 
 The runtime helpers support [guided onboarding](../Onboarding/README.md), [browser capabilities](browser/README.md), [email/mailbox verification](email/README.md) and [GitHub intake/regression](github/README.md). Install with `npm ci --ignore-scripts --cache .local/npm-cache`; `npm run qa -- help` lists commands. The agent's actual conversation and human decisions remain essential. Installed tooling, saved preferences and verified access are distinct states.

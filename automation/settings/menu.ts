@@ -8,6 +8,9 @@ import { chromeNetworkMode, settingsPath, type ChromeSettings } from '../chrome-
 import { dataStatus } from '../data/intake.js';
 
 import { activeSource, sourcePath } from '../task-source/config.js';
+import * as company from '../company-context/config.js';
+import { status as companyStatus, settingsPath as companySettingsPath } from '../company-context/store.js';
+import { refreshSchedule } from '../company-context/schedule.js';
 
 const existingAreas = [
   { id: 'project', label: 'Project and environments', files: ['.local/project.json'], stage: 'project' },
@@ -23,10 +26,11 @@ const existingAreas = [
 ] as const;
 const taskSource = { id: 'taskSource', label: 'Task source', files: [sourcePath], stage: 'operation' } as const;
 const testData = { id: 'testData', label: 'Test data and datasets', files: [], stage: 'operation' } as const;
-export const areas = [...existingAreas, taskSource, testData] as const;
-const menuChoices = [...existingAreas, { id: 'close', label: 'Close settings' }, taskSource, testData] as const;
+const companyContext = { id: 'companyContext', label: 'Company context', files: [companySettingsPath], stage: 'understanding' } as const;
+export const areas = [...existingAreas, taskSource, testData, companyContext] as const;
+const menuChoices = [...existingAreas, { id: 'close', label: 'Close settings' }, taskSource, testData, companyContext] as const;
 interface NotificationRecovery { questionId: string; preferencesPath: string; preferencesRevision: string | null; recordedAt: string; action: 'leftWithoutUpdatingNotificationEdit' }
-interface Menu { schemaVersion: 1; open: boolean; area: string | null; questionId: string | null; source: string | null; questionKind?: 'attention'; notificationRecoveryHistory?: NotificationRecovery[] }
+interface Menu { schemaVersion: 1; open: boolean; area: string | null; questionId: string | null; source: string | null; questionKind?: 'attention' | 'companyContext'; notificationRecoveryHistory?: NotificationRecovery[]; companyRecoveryHistory?: { questionId: string; recordedAt: string }[] }
 const path = '.local/settings-menu.json';
 export function menuState(root: string) { return load<Menu>(root, path, () => ({ schemaVersion: 1, open: false, area: null, questionId: null, source: null })); }
 function notificationQuestion(root: string, id: string) {
@@ -64,10 +68,16 @@ export function showMenu(root: string) {
   assertNonsecret(current);
   const chrome = current.find(item => item.path === settingsPath)?.value as ChromeSettings | undefined;
   const notification = menu.questionId && menu.questionKind === 'attention' ? notificationQuestion(root, menu.questionId) : null;
+  const companyQuestion = (() => {
+    if (menu.questionKind !== 'companyContext' || !menu.questionId) return null;
+    try { const question = company.editQuestion(root).value; if (!question || question.id !== menu.questionId) throw new Error(); return { question, issue: null }; }
+    catch { return { question: null, issue: 'The company-context edit needs recovery. Back and Close remain available; the original data is preserved.' }; }
+  })();
   return { action: menu.open ? (area ? 'editArea' : 'chooseArea') : 'closed', area: area?.label ?? null,
     choices: area ? ['Back', 'Cancel this edit', 'Close settings'] : menuChoices.map(({ id, label }) => ({ id, label })),
     current,
     ...(menu.open && area?.id === 'testData' ? { testData: dataStatus(root) } : {}),
+    ...(menu.open && area?.id === 'companyContext' ? { companyContext: { provider: 'slack', ...companyStatus(root) }, companySchedule: (() => { try { return refreshSchedule(root); } catch { return { issue: 'The refresh schedule needs reconciliation; other Settings remain available.' }; } })(), actions: ['Inspect Slack connection', 'Add or remove channels', 'Refresh catalog/history', 'Directory access', 'Freshness and schedule', 'Disconnect'] } : {}),
     ...(menu.open && area?.id === 'browser' ? {
       browserAccess: browserAccessStatus(root),
       browserNetworking: {
@@ -77,8 +87,9 @@ export function showMenu(root: string) {
         instruction: 'Keep Standard to allow sign-in redirects. Select Strict to restrict browser traffic to approved origins. Reload the connection after changing the mode.',
       },
     } : {}),
-    question: menu.questionId ? notification ? notification.question : readState(root).value.questions.find(q => q.id === menu.questionId) : null,
-    questionIssue: notification?.issue ?? null,
+    question: menu.questionId ? companyQuestion ? companyQuestion.question : notification ? notification.question : readState(root).value.questions.find(q => q.id === menu.questionId) : null,
+    questionIssue: companyQuestion?.issue ?? notification?.issue ?? null,
+    companyRecoveryHistory: menu.companyRecoveryHistory ?? [],
     notificationRecoveryHistory: menu.notificationRecoveryHistory ?? [],
     instruction: menu.open && area?.id === 'testData'
       ? 'Show the dataset status and next step. To add data, use the source and intended use to prepare a guided intake preview.'
@@ -104,6 +115,10 @@ export function startEdit(root: string, input: { id: string; prompt: string; fil
   if (current.value.open && area?.id === 'testData') throw new Error('Share the source and intended use, then prepare a guided data intake preview.');
   if (!current.value.open || !area || current.value.questionId || !(area.files as readonly string[]).includes(input.file)) throw new Error('Bind the edit to the selected area and its canonical destination.');
   requireText(input.source);
+  if (area.id === 'companyContext') {
+    company.beginEdit(root, input); current.value.questionKind = 'companyContext'; current.value.questionId = input.id;
+    save(root, path, current.value, current.revision); return showMenu(root);
+  }
   if (area.id === 'taskSource') throw new Error('Use task-source inspect, preview and save for this area.');
   if (area.id === 'email') throw new Error('Use email account discovery and the guarded mailbox-selection procedure; do not overwrite connection JSON.');
   if (input.file === attention.preferencesPath) {
@@ -116,11 +131,20 @@ export function startEdit(root: string, input: { id: string; prompt: string; fil
 }
 export function saveEdit(root: string, reply: Reply) {
   const current = menuState(root);
-  if (!current.value.open || !current.value.questionId || current.value.questionKind === 'attention' || !reply.answers.some(a => a.id === current.value.questionId)) throw new Error('The response must answer the active settings edit; notification preferences use save-attention.');
+  if (!current.value.open || !current.value.questionId || current.value.questionKind || !reply.answers.some(a => a.id === current.value.questionId)) throw new Error('Use the dedicated integration save procedure for the active edit.');
   commitReply(root, reply); current.value.questionId = null; save(root, path, current.value, current.revision); return showMenu(root);
 }
 export function presentEdit(root: string) {
   const pending = menuState(root);
+  if (pending.value.questionKind === 'companyContext') {
+    try {
+      const question = company.editQuestion(root).value;
+      if (!question || question.id !== pending.value.questionId) return showMenu(root);
+      if (['answered', 'canceled'].includes(question.status)) { pending.value.questionId = null; delete pending.value.questionKind; save(root, path, pending.value, pending.revision); }
+      else if (question.status === 'queued') company.markEdit(root, 'presenting');
+    } catch { /* Preserve an unreadable optional edit and allow leaving. */ }
+    return showMenu(root);
+  }
   if (pending.value.questionKind === 'attention') {
     if (!pending.value.open || !pending.value.questionId) throw new Error('Select the current notification preference question.');
     const { question: q } = notificationQuestion(root, pending.value.questionId);
@@ -142,6 +166,12 @@ export function cancelEdit(root: string, back = false) {
   withLock(root, 'conversation', () => {
     if (existsSync(contained(root, journalPath))) throw new Error('Recover or reconcile the pending save before navigation.');
     const current = menuState(root);
+    if (current.value.questionKind === 'companyContext') {
+      try { const question = company.editQuestion(root).value; if (question && !['answered', 'canceled'].includes(question.status)) company.markEdit(root, 'canceled'); }
+      catch { (current.value.companyRecoveryHistory ??= []).push({ questionId: current.value.questionId!, recordedAt: new Date().toISOString() }); }
+      current.value.questionId = null; delete current.value.questionKind; if (back) current.value.area = null;
+      save(root, path, current.value, current.revision); return;
+    }
     if (current.value.questionKind === 'attention') {
       const { question: q } = current.value.questionId ? notificationQuestion(root, current.value.questionId) : { question: null };
       if (!q) retainNotificationRecovery(root, current.value);
@@ -165,6 +195,17 @@ export function saveAttentionEdit(root: string, request: Parameters<typeof atten
   if (!menu.value.open || menu.value.questionKind !== 'attention' || menu.value.questionId !== request.questionId) throw new Error('Answer the selected notification preference question.');
   attention.savePreferences(root, request);
   menu.value.questionId = null; delete menu.value.questionKind; save(root, path, menu.value, menu.revision); return showMenu(root);
+}
+export function saveCompanyEdit(root: string, request: Parameters<typeof company.answerEdit>[1]) {
+  const menu = menuState(root);
+  if (!menu.value.open || menu.value.questionKind !== 'companyContext' || menu.value.questionId !== company.editQuestion(root).value?.id) throw new Error('Answer the selected company-context question.');
+  company.answerEdit(root, request); menu.value.questionId = null; delete menu.value.questionKind;
+  save(root, path, menu.value, menu.revision); return showMenu(root);
+}
+export function recoverCompanyEdit(root: string, id: string) {
+  const current = menuState(root), question = company.editQuestion(root).value;
+  if (!current.value.open || current.value.area !== 'companyContext' || current.value.questionId || !question || question.id !== id || !current.value.companyRecoveryHistory?.some(item => item.questionId === id)) throw new Error('Reopen Company context and recover the actual original edit without replacing another question.');
+  current.value.questionId = id; current.value.questionKind = 'companyContext'; save(root, path, current.value, current.revision); return showMenu(root);
 }
 export function closeMenu(root: string) {
   cancelEdit(root, true);

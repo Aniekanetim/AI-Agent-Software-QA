@@ -4,6 +4,7 @@ import { sameTarget, verifyAssessment, verifyCurrentCaseEvidence, type Target } 
 import { releaseBoard, requireCurrentScope, sameEvidence, type Assignment } from './scope.js';
 import { releaseFixes } from '../regression/fix.js';
 import type { ReleaseBoard } from '../regression/board.js';
+import { assertCompanyBasis } from '../company-context/guards.js';
 
 type Preferences =
   | { channel: 'taskBoard'; recipient: string; acknowledgementRequired: boolean }
@@ -65,6 +66,7 @@ export function resolveHandoffRoute(root: string, requested?: Route, ticketUrl?:
 }
 
 export function currentAssessment(root: string, assessment: Evidence, assignment: Assignment) {
+  assertCompanyBasis(root, assignment);
   const scope = requireCurrentScope(root, assignment);
   const report = verifyAssessment(root, assessment, true, scope.round);
   if (!report.assignmentIds.includes(assignment.ticketId) || !sameTarget(report.target, scope.target)) {

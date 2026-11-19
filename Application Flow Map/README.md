@@ -1,5 +1,7 @@
 # Application Flow Map
 
+[Company-source changes](../automation/company-context/README.md) can alter a rule or reveal a dependency. Link the actual statement/decision revision to the affected feature/relationship and downstream cases. Mark missing or stale connections for assessment, preserve historical paths and avoid inferring hidden integrations solely from Slack discussion. The source index, map and result library have distinct responsibilities.
+
 Use this application-wide view to understand which features, shared components and external integrations connect, and why a change could affect other behavior. The agent uses it to investigate impact; people use it to inspect and challenge that reasoning. The [task board](../QA%20task%20management%20Board/README.md) remains the reporting entry point.
 
 **Master state: unconfigured.** No application features, relationships, map owners or map-based test coverage are established. Populate a project copy from actual sources and authorized learning. A populated diagram is not proof of completeness, current behavior or passing tests.

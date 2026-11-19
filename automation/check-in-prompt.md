@@ -8,6 +8,11 @@ Read AGENTS.md, unified_project_context.md, Project Context/README.md,
 Product Discovery/Project Context/README.md, QA Process Context/README.md,
 Application Flow Map/README.md,
 QA task management Board/README.md and QA/Quality assurance/qa-workflow.md.
+Before dependent work, inspect configured company context, refresh relevant actual
+Slack sources, analyze changed threads and verify the reviewed source basis. Reuse
+existing answers; hold only affected checks for material changes or missing intent.
+Source refresh does not grant testing, exploration or posting authority. Include
+background refresh in this check-in only when its source-reading scope is authorized.
 Run npm run qa -- task-source check-in from the actual QA root. If local, follow
 QA task management Board/README.md and inspect Ready for QA and Retest. Read all
 seven local status folders for IDs and deduplication. If live, follow

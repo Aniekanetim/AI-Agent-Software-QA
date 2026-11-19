@@ -7,6 +7,9 @@ import { assertDataReady, requireCaseData, type DataScope } from '../data/readin
 import type { Assignment } from '../release/scope.js';
 import type { Target } from '../release/round.js';
 import { readdirSync, existsSync } from 'node:fs';
+import { assertCompanyBasis } from '../company-context/guards.js';
+import { prepareCompanyBasis } from '../company-context/runtime.js';
+import { ContextError } from '../company-context/types.js';
 
 interface Source {
   id: string;
@@ -27,6 +30,7 @@ interface Flow {
 }
 interface Understanding {
   schemaVersion: 1;
+  companyContext?: Evidence;
   assignment: Assignment;
   sources: Source[];
   flows: Flow[];
@@ -397,6 +401,7 @@ function validateDecision(root: string, decision: Decision) {
 type Design = ReturnType<typeof readCaseBatch>;
 function verifyCurrentCase(root: string, design: Design, item: CaseDefinition) {
   const flow = design.flows.get(item.flowId)!;
+  assertCompanyBasis(root, design.batch.assignment, [...new Set([...flow.criteria, ...item.criteria])], design.batch.understanding);
   for (const id of flow.criteria) verifyEvidence(root, design.sources.get(id)!.current);
   if (flow.currentMap) verifyEvidence(root, flow.currentMap);
 }
@@ -539,6 +544,8 @@ function checkExecutionData(root: string, session: Session, design: Design, item
 export async function admitCaseCheckpoint<T>(root: string, request: CaseCheckpoint, refs: Evidence[], target: Target,
   invocation: Parameters<typeof claimCaseCheckpoint>[4], dispatch: () => T) {
   const session = inspectCases(root, request.id);
+  const design = readCaseBatch(root, session.batch), item = design.cases.get(request.caseId);
+  await prepareCompanyBasis(root, design.batch.assignment, item ? design.flows.get(item.flowId)!.criteria : []);
   const observed = session.connected ? await readConnectedCase(root, request.id) : undefined;
   return claimCaseCheckpoint(root, request, refs, target, invocation, observed, dispatch);
 }
@@ -697,8 +704,14 @@ export function prepareCheckpoint(root: string, request: { id: string; caseId: s
     targetObservation(root, request.target, design.batch.target);
     checkExecutionData(root, session, design, item);
     try { verifyCurrentCase(root, design, item); }
-    catch {
+    catch (error) {
       attempt.status = attempt.observations.length ? 'Partial' : 'Blocked';
+      if (error instanceof ContextError) {
+        attempt.issue = `company-context-${error.code}`;
+        // An access/freshness hold is not a new human decision. Current guards still reject changed intent.
+        attempt.reviewRequired = false;
+        return { state: attempt.status, issue: attempt.issue };
+      }
       attempt.issue = `flow-${item.flowId}`;
       attempt.reviewRequired = true;
       flagFlow(session, item, { id: attempt.issue, flowId: item.flowId, reason: 'Applicable accepted source or map revision changed.', evidence: [] });
@@ -800,6 +813,9 @@ export async function runApprovedCases(root: string, id: string, adapter: {
       for (;;) {
         const target = await adapter.target();
         await adapter.beforeCheckpoint?.();
+        const design = readCaseBatch(root, session.batch), item = design.cases.get(caseId)!;
+        try { await prepareCompanyBasis(root, design.batch.assignment, [...new Set([...design.flows.get(item.flowId)!.criteria, ...item.criteria])]); }
+        catch { /* The synchronous checkpoint records the affected case hold; independent cases continue. */ }
         const step = prepareCheckpoint(root, { id, caseId, target });
         if (step.state !== 'ready') break;
         progressed = true;

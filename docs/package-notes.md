@@ -1,6 +1,10 @@
 # Package notes
 
-**Version:** 1.15.2. **Created:** 22 October 2026. **Updated:** 13 November 2026. **State:** reusable workflow package.
+**Version:** 1.16.0. **Created:** 22 October 2026. **Updated:** 19 November 2026. **State:** reusable workflow package.
+
+## Version 1.16.0 — selected company Slack context
+
+[Company context](../automation/company-context/README.md) adds native/API Slack access, guarded channel selection during onboarding/Settings, resumable history/thread reads, private versioned sources and separate interpretation coverage. Source-bound understanding and freshness checks extend existing execution, fix disposition and G5 handoff. Explicit decision supersession holds affected work; exact-policy equivalence can renew source evidence without another routine approval. Historical outcomes remain linked to their original basis. No live workspace, source binding or refresh schedule is shipped. [Package verification and limits](company-context-validation.md)
 
 ## Version 1.15.2 - reconcile interrupted actions and verify case outcomes
 

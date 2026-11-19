@@ -15,6 +15,9 @@ Say **Open settings** at any point. The agent shows current values and these are
 11. Close settings
 12. Task source
 13. Test data and datasets
+14. Company context
+
+**Company context → Slack** shows the actual workspace/account, selected channels, history/read gaps, freshness and directory capabilities. Use [guarded company configuration](../automation/company-context/README.md) to add/remove channels or reconnect. Generic JSON saves cannot replace source settings. Preserve Back, Cancel, Close and unrelated onboarding answers. A channel selection is distinct from actual membership/read access; completed external membership changes remain recorded if an edit is canceled.
 
 Direct requests such as “Keep browser sessions visible,” “Use Postman for this collection” or “Check every hour” also work. Distinguish a task-specific instruction from a project constraint; ask only when its scope is materially unclear. Reuse the clear instruction, show the affected current value and consequence, and ask only for a genuinely missing decision. A request to change cadence authorizes its relevant scheduler change; retain any existing required concrete briefing and inspect the actual saved schedule afterwards.
 

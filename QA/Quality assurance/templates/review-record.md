@@ -39,4 +39,6 @@ Link strategy/coverage/design/data/configuration or regression revisions actuall
 
 ## Connection reasoning reviewed
 
+Company-source basis and decision versions, when configured: <exact manifest/understanding references>. Actual thread/history freshness and analysis coverage: <receipts and limits>. Applicable release/environment/effective timing and changed rules/cases: <IDs and rationale>. Distinguish an owner decision already made in Slack from this human QA gate decision. Record one focused material question when needed; unchanged evidence refresh does not require routine reapproval.
+
 Record the applicable [map](../../../Application%20Flow%20Map/README.md) revision/IDs, candidate paths, actual source authority and uncertainties supplied to the reviewer. Preserve corrections and responsible-owner decisions. Review of map capture, approval of intended policy and bounded execution authorization must not be conflated.

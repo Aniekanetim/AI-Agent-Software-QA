@@ -1,5 +1,7 @@
 # AI-managed product knowledge
 
+[Company Slack context](../../automation/company-context/README.md) can supply relevant statements and leads. Preserve exact thread/version provenance, observation versus interpretation, source applicability, effective timing and uncertainty. Publish only permitted summaries here; restricted content remains in private source records. Actual human owner decisions retain their original authority through canonical links. Retrieval, capture review and approval of a test expectation remain distinguishable.
+
 This context contains what the agent has learned from authorized discovery. It helps later work navigate the product, prepare data and interpret observations. The [human-maintained baseline](../../Project%20Context/README.md) remains the source of applicable accepted product expectations. No product knowledge is supplied in this reusable template.
 
 ## Domain index
