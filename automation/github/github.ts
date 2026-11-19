@@ -9,6 +9,8 @@ import { contained, load, save, revision, replace, digest, requireText, verifyEv
 import { requireLocalSource } from '../task-source/config.js';
 import { assertDataReady, dataScopeDigest, requireCaseData, type DataReceipt, type DataScope } from '../data/readiness.js';
 import { assertCaseInputs, inspectCases, startCases, verifyCaseAuthorization, type CaseAuthorization } from '../execution/cases.js';
+import { prepareCompanyBasis } from '../company-context/runtime.js';
+import { assertCompanyBasis } from '../company-context/guards.js';
 
 const exec = promisify(execFile);
 export type GhRunner = (args: string[]) => Promise<string>;
@@ -245,6 +247,7 @@ export async function executeRegression(root: string, policy: RegressionPolicy, 
     if (existing.value.status !== 'completed') throw new Error('A previous invocation is running or uncertain. Inspect its outcome before any retry.');
     return { action: 'unchanged', record: existing.value };
   }
+  await prepareCompanyBasis(root, { source: 'local', ticketId: ticket.id });
   binding = bindLegacy(root, binding);
   if (binding.legacy && binding.legacy.value.nextAction !== 'retry') {
     const record = load<Omit<RunRecord, 'ticketId' | 'generation' | 'operationId'>>(root, binding.legacy.ref.path, () => { throw new Error('Missing legacy result.'); }).value;
@@ -259,6 +262,7 @@ export async function executeRegression(root: string, policy: RegressionPolicy, 
   try {
     const work = withLock(root, 'qa-board', () => {
       assertExecutable(root, ticket.id, ticket.generation);
+      assertCompanyBasis(root, { source: 'local', ticketId: ticket.id });
       if (revision(root, path)) throw new Error('Another worker already claimed this regression.');
       assertLegacyStart(root, binding);
       const data = regressionData(root, policy, target, dataInput);
@@ -298,6 +302,7 @@ export async function dispatchRegression(root: string, policy: RegressionPolicy,
   checkDataRequest(policy, dataInput);
   let binding = runBinding(root, policy, pr, target, 'workflowDispatch');
   const { ticket, key } = binding; if (!policy.dispatch) throw new Error('No workflow dispatch was approved.');
+  await prepareCompanyBasis(root, { source: 'local', ticketId: ticket.id });
   const path = `.local/github-dispatch/${key}.json`;
   const bound = load<{ state: string } | null>(root, path, () => null).value;
   if (bound?.state === 'dispatched') return { ...bound, key, action: 'unchanged', result: 'Not yet observed' };
@@ -323,6 +328,7 @@ export async function dispatchRegression(root: string, policy: RegressionPolicy,
   let data: DataReceipt | undefined;
   const previous = withLock(root, 'qa-board', () => {
     assertExecutable(root, ticket.id, ticket.generation);
+    assertCompanyBasis(root, { source: 'local', ticketId: ticket.id });
     const existing = load<{ state: string } | null>(root, path, () => null).value;
     if (existing?.state === 'dispatched') return existing;
     if (existing) throw new Error('A dispatch already exists and its outcome is uncertain. Inspect its actual GitHub run before repeating.');
@@ -338,6 +344,7 @@ export async function dispatchRegression(root: string, policy: RegressionPolicy,
   try {
     const work = withLock(root, 'qa-board', () => {
       assertExecutable(root, ticket.id, ticket.generation);
+      assertCompanyBasis(root, { source: 'local', ticketId: ticket.id });
       regressionData(root, policy, target, dataInput);
       verifyRegressionCases(root, policy, ticket, target);
       sent = true;

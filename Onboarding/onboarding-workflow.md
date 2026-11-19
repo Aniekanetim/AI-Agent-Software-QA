@@ -1,5 +1,7 @@
 # Guided onboarding procedure
 
+During the existing tools/context stages, inspect [company-source access](../automation/company-context/README.md). Reuse the actual Slack connection and supplied workspace/channel choice before asking setup questions. Present channel catalog completeness, actual history/thread/directory access, initial history bounds and refresh/retention choices. Use the dedicated preview/apply procedure and record the real answer. Account for retrieved versus interpreted coverage in the existing understanding handoff. Slack setup can wait without resetting onboarding when independent context is available. Later changes use Settings → Company context.
+
 Use this procedure in a project-specific QA root. Preserve the existing working contract and records. Onboarding prepares the agent; Product Discovery learns; QA evaluates assigned work. Their requests, permissions and completion records remain separate.
 
 ## 1. Inspect before asking

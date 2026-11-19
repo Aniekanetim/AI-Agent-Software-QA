@@ -43,6 +43,17 @@ import * as chromeConfig from './chrome-devtools/config.js';
 import * as chromeTransport from './chrome-devtools/transport.js';
 import * as webmcp from './chrome-devtools/webmcp.js';
 import { rehearseChrome } from './chrome-devtools/rehearsal.js';
+import * as companyConfig from './company-context/config.js';
+import * as companyStore from './company-context/store.js';
+import * as companySync from './company-context/sync.js';
+import * as companyKnowledge from './company-context/knowledge.js';
+import * as companyGuards from './company-context/guards.js';
+import * as companyImpact from './company-context/impact.js';
+import { apiAdapter } from './company-context/runtime.js';
+import { SlackApi } from './slack/api.js';
+import { importHostPage, importHostCatalog } from './slack/import.js';
+import { refreshSchedule, recordRefreshSchedule } from './company-context/schedule.js';
+import { recordSourceLink, retrieveSourceLink } from './company-context/links.js';
 
 const args = process.argv.slice(2), options = new Map<string, string>();
 const positional: string[] = [];
@@ -67,6 +78,7 @@ async function currentPr(repository: string, number: number) {
   const raw = JSON.parse(await github.runGh(['api', `repos/${repository}/pulls/${number}`])); return github.normalizePr(repository, raw);
 }
 const help = {
+  'company-context': 'status | discover [--input] | inspect --connection [--input] | channels --connection [--previous] [--budget] --source | import-host-catalog --input | preview/apply --input | recover --operation | refresh --binding [--budget] | resume --job [--retry-failures] | recover-refresh --job --source | job --job | import-host-page --input | sources --binding | claim/analyze/bind-basis/verify-basis/impact/equivalent/reconcile-source/source-link/import-link/join/disconnect/schedule --input : selected read access supplies context, not test or posting authority',
   cases: 'validate --input | start --input | next --input | observe --input | reconcile-runner --input | status --id | finish --id',
   regression: 'register --input | approve-plan --input | status --fix | retain-results --input | record-review --input | release --input',
   release: 'library --input | scope --input | preview-scope --input | bind-scope --input | invalidate-scope --input | retain-run --input | runs --input | assess --input | record-assessment --input | verify-assessment --input | route [--ticket-url]',
@@ -80,7 +92,7 @@ const help = {
   chrome: 'check --source | mcp-config | rehearse --provider cli/mcpServer [--headless] [--executable path] | session-start --input | page --input | inventory --input | import-host-inventory --input | case-input-digest --input | execute --input | confirm --input | session-stop --id : explicit scoped WebMCP operations; no implicit product authorization',
   postman: 'check --source | login-instructions | case-input-digest --input | run --input | run-status --id : detects/reuses the CLI; local runs need no login; cloud operations need selected account/reporting scope',
   onboarding: 'start | roadmap-shown --source | status | next | queue --input | shown/not-shown --id --source | reply --input | recover | reconcile --input | retire-tool-questions --input | pause/resume --source | clarify/defer --input | check/domains --input | finish --input',
-  settings: 'open --source | show | choose --area | edit --input | present | save --input | attention-shown --source | save-attention --input | cancel | back | close',
+  settings: 'open --source | show | choose --area | edit --input | present | save --input | attention-shown/company-shown --source | save-attention/save-company --input | recover-company --id | cancel | back | close',
   browser: 'versions | install | mcp-config | check --provider library/cli/mcpServer [--headless] [--context interactive/scheduled/ci] | import-report --input | fixture',
   'browser-access': 'targets | status | ensure-standard --input | prepare --input | apply --input | native-plan --input | native-apply --input | record --input : prepare the project browser and verify target access',
   email: 'policy | account --input | accounts | options --input | plan --input | discover --provider gmailApi/agentmail --source | create-inbox --input | select --input | verify --input | begin --input | outcome --input',
@@ -95,6 +107,46 @@ async function main() {
     output({ area, commands: help[area as keyof typeof help] }); return;
   }
   if (area === 'evidence') { output(store.evidence(root, option('path'), options.get('pointer'))); return; }
+  if (area === 'company-context') {
+    if (action === 'status') output({ ...companyStore.status(root), schedule: (() => { try { return refreshSchedule(root); } catch { return { issue: 'Refresh schedule record needs reconciliation; preserve it and inspect the actual scheduler.' }; } })() });
+    else if (action === 'discover') {
+      if (options.has('input')) output(companyConfig.recordConnection(root, input()));
+      else output({ provider: 'slack', next: 'Inspect the actual harness integration directory and connected Slack account metadata. Reuse existing access, then retain actual identity/capability evidence with discover --input. If missing, guide native OAuth connection; direct API setup is available through inspect --input. No connection is created by this command.' });
+    } else if (action === 'inspect') {
+      const value = options.has('input') ? input<{ id: string; credentialVariable: string; source: string }>() : (() => { const actual = companyStore.connection(root, option('connection')); return { id: actual.id, credentialVariable: actual.credentialVariable!, source: options.get('source') ?? actual.source }; })();
+      if (!/^QA_SLACK_[A-Z0-9_]+$/.test(value.credentialVariable ?? '')) throw new Error('Select a named QA_SLACK_ runtime credential variable, or inspect native access through the actual host.');
+      output(await companyConfig.inspectApi(root, value, new SlackApi(process.env[value.credentialVariable] ?? '')));
+    } else if (action === 'channels') output(await companyConfig.discoverChannels(root, option('connection'), apiAdapter(root, option('connection')), { source: option('source'), budget: Number(options.get('budget') ?? 20), ...(options.has('previous') ? { previous: fromFile<store.Evidence>(option('previous')) } : {}) }));
+    else if (action === 'import-host-catalog') output(importHostCatalog(root, input()));
+    else if (action === 'preview') output(companyConfig.previewConfiguration(root, input()));
+    else if (action === 'apply' || action === 'disconnect') output(companyConfig.applyConfiguration(root, input()));
+    else if (action === 'recover') output(companyConfig.recoverConfiguration(root, option('operation')));
+    else if (action === 'refresh') {
+      const original = companyStore.binding(root, option('binding'));
+      if (original.selection.followNewChannels && companyStore.connection(root, original.connectionId).transport === 'api') await companyConfig.followCatalog(root, original.id, apiAdapter(root, original.connectionId));
+      const selected = companyStore.binding(root, original.id); const job = companySync.startRefresh(root, selected.id).job;
+      const actual = companyStore.connection(root, selected.connectionId, true);
+      if (actual.transport === 'host') output({ job, next: 'Use the actual native Slack tool for the next job unit, then import-host-page with its request-bound call evidence. The terminal has not read Slack.' });
+      else output(await companySync.refresh(root, job.id, apiAdapter(root, actual.id), { budget: Number(options.get('budget') ?? 20) }));
+    } else if (action === 'resume') { const job = companySync.inspectJob(root, option('job')).value; output(await companySync.refresh(root, job.id, apiAdapter(root, job.connectionId), { budget: Number(options.get('budget') ?? 20), retryFailures: options.has('retry-failures') })); }
+    else if (action === 'job') output(companySync.inspectJob(root, option('job')).value);
+    else if (action === 'recover-refresh') output(companySync.recoverRefresh(root, option('job'), option('source')));
+    else if (action === 'import-host-page') output(await importHostPage(root, input()));
+    else if (action === 'sources') output(companyKnowledge.inspectedSources(root, option('binding')));
+    else if (action === 'claim') output(companyKnowledge.recordClaim(root, input()));
+    else if (action === 'analyze') output(companyKnowledge.recordAnalysis(root, input()));
+    else if (action === 'bind-basis') output(companyGuards.bindBasis(root, input()));
+    else if (action === 'verify-basis') { const value = input<{ assignment: { source: string; ticketId: string } }>(); const result = companyGuards.refreshReceipt(root, value.assignment); companyGuards.assertCompanyBasis(root, value.assignment); output(result); }
+    else if (action === 'impact') output(options.has('input') ? companyImpact.recordImpactDisposition(root, input()) : companyImpact.assessImpacts(root));
+    else if (action === 'reconcile-source') output(companyKnowledge.reconcileSource(root, input()));
+    else if (action === 'equivalent') output(companyKnowledge.recordEquivalent(root, input()));
+    else if (action === 'schedule') output(recordRefreshSchedule(root, input()));
+    else if (action === 'source-link') { const value = input<{ bindingId: string; sourceId: string; source: string }>(); output(await retrieveSourceLink(root, value, apiAdapter(root, companyStore.binding(root, value.bindingId).connectionId))); }
+    else if (action === 'import-link') output(recordSourceLink(root, input()));
+    else if (action === 'join') { const value = input<Parameters<typeof companyConfig.joinChannel>[1]>(); output(await companyConfig.joinChannel(root, value, apiAdapter(root, companyStore.binding(root, value.bindingId).connectionId))); }
+    else throw new Error('Unknown company-context command.');
+    return;
+  }
   if (area === 'cases') {
     if (action === 'validate') {
       const { batch, cases } = caseExecution.verifyCaseAuthorization(root, input());
@@ -351,6 +403,9 @@ async function main() {
     else if (action === 'save') value = settings.saveEdit(root, input());
     else if (action === 'attention-shown') { attentionPreferences.markEdit(root, 'asked', option('source')); value = settings.showMenu(root); }
     else if (action === 'save-attention') value = settings.saveAttentionEdit(root, input());
+    else if (action === 'company-shown') { companyConfig.markEdit(root, 'asked', option('source')); value = settings.showMenu(root); }
+    else if (action === 'save-company') value = settings.saveCompanyEdit(root, input());
+    else if (action === 'recover-company') value = settings.recoverCompanyEdit(root, option('id'));
     else if (action === 'cancel' || action === 'back') value = settings.cancelEdit(root, action === 'back');
     else if (action === 'close') { settings.closeMenu(root); value = settings.showMenu(root); }
     else throw new Error('Unknown settings command.');

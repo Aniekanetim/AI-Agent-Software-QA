@@ -1,5 +1,7 @@
 # Reuse on another project or machine
 
+For [company context](../automation/company-context/README.md), reconnect through the actual new-machine harness and verify workspace/principal, selected channels and required history/thread access. Keep credentials and restricted source caches outside public transfers. An explicitly shared local context root requires its named-root authorization and source/retention policy; reselect it when the path changes. Old freshness receipts and local locks do not establish new-machine access or distributed coordination. Preserve original source/decision references and record any unavailable historical evidence.
+
 ## A different project
 
 Make a fresh project-specific copy. Humans supply available baseline sources/owners; the agent records the learning/testing objective, access and setup gaps. Start with empty QA queues and discovery requests, no observations/outcomes/approvals from another product. Keep reusable policy separate from project data.

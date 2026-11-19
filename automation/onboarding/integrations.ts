@@ -11,6 +11,7 @@ import { settings as postmanSettings, capabilityIssues as postmanCapabilityIssue
 import { readSettings as chromeSettings } from '../chrome-devtools/config.js';
 import { browserAccessStatus } from '../browser/access.js';
 import type { Stage } from './state.js';
+import { status as companyStatus } from '../company-context/store.js';
 
 /** Project preparation and optional capability gaps remain separate; neither authorizes task execution. */
 export function integrationStatus(root: string) {
@@ -122,7 +123,10 @@ export function integrationStatus(root: string) {
   for (const access of browserAccessStatus(root)) if (access.status !== 'verified') {
     issues.push(`Browser target${'target' in access ? ' ' + access.target.environment + ' (' + access.origin + ')' : ''}: ${access.next}`);
   }
-  return { issues: stageIssues.map(issue => issue.message), stageIssues, capabilityIssues: issues, chrome, taskReadiness: 'Assess the selected operations for each task; onboarding completion is not task execution authorization.' };
+  const company = companyStatus(root);
+  if (company.issue) issues.push(company.issue);
+  for (const selected of company.bindings) if (selected.issue) issues.push(`Company context ${selected.id}: ${selected.issue}`);
+  return { issues: stageIssues.map(issue => issue.message), stageIssues, capabilityIssues: issues, chrome, companyContext: company, taskReadiness: 'Assess the selected operations for each task; onboarding completion is not task execution authorization.' };
 }
 
 /** Backwards-compatible full diagnostic list, not the onboarding blocking decision. */

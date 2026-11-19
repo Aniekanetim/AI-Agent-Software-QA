@@ -1,5 +1,7 @@
 # Shared project progress
 
+Version 1.16.0 adds [company context](automation/company-context/README.md): selected Slack sources during onboarding/Settings, private versioned reads, separate interpretation coverage and source validity at execution/fix/G5 boundaries. The reusable package remains unconfigured; no adopting-company workspace, decision, test outcome or refresh schedule is established. Record actual project connections/coverage/decisions only in the adopting root and preserve their source versions separately from application builds.
+
 **Project:** not configured. **Current checkpoint:** setup. **QA/discovery execution:** not started. **Human project decisions:** none recorded. **Schedules:** not configured for this project.
 
 ## Purpose and ownership

@@ -13,6 +13,8 @@ import { currentFixes, defectCompletion, failedConfirmation, fixStatus, requireF
 import { nativeReleaseBoard, type ReleaseBoard } from '../regression/board.js';
 import type { Assignment } from '../release/scope.js';
 import { finishCases, inspectCases, prepareCheckpoint, readCaseBatch, startCases, verifyCaseAuthorization, verifyUnderstandingReview } from '../execution/cases.js';
+import { prepareCompanyBasis } from '../company-context/runtime.js';
+import { assertCompanyBasis, assertCompanyPlan } from '../company-context/guards.js';
 
 interface Claim {
   id: string; sourceKey: string; sourceRevision: string; identity: Identity; ticket: Ticket; queue: 'ready' | 'retest'; source: string;
@@ -331,6 +333,7 @@ async function checkExecution(root: string, request: { claimId: string; gates: P
   if (gate.caseBatches?.length && !batch) throw new Error('Select the approved case batch for this execution.');
   const caseAuthorization = batch ? { batch, approval: request.gates[executionGate]! } : undefined;
   if (caseAuthorization) {
+    assertCompanyPlan(root, assignmentFor(claim));
     const design = verifyCaseAuthorization(root, caseAuthorization, { assignment: assignmentFor(claim), target: observation, gate: executionGate });
     selectedCases = [...design.cases.values()].filter(item => !request.caseIds || request.caseIds.includes(item.id));
     requireCaseData(scope, selectedCases);
@@ -339,6 +342,7 @@ async function checkExecution(root: string, request: { claimId: string; gates: P
       throw new Error('Bind the case batch to the selected confirmation or regression checks.');
     }
   }
+  if (!caseAuthorization) await prepareCompanyBasis(root, assignmentFor(claim));
   const data = scope === undefined ? undefined : assertDataReady(root, scope, observation, request.dataObservations, Date.now(), selectedCases);
   return { result: { claim, buildId: request.buildId, target: request.target, gates: request.gates, checkedAt: new Date().toISOString(),
     ...(data ? { data } : {}), ...(fixBatch ? { fixBatch } : {}), ...(caseAuthorization ? { caseAuthorization } : {}) }, scope, observation, selectedCases };
@@ -801,6 +805,7 @@ export async function beginExecution(root: string, request: Parameters<typeof pr
   const { result: { claim, buildId, target, gates, checkedAt, caseAuthorization }, scope, observation, selectedCases } = await checkExecution(root, request, reader);
   if (request.requireCaseBatch && !caseAuthorization) throw new Error('Bind the reviewed feature understanding and case batch to this execution approval.');
   return withLock(root, 'qa-board', () => withLock(root, 'release-records', () => {
+    if (caseAuthorization) assertCompanyPlan(root, assignmentFor(claim)); else assertCompanyBasis(root, assignmentFor(claim));
     if (activeSource(root).revision !== claim.sourceRevision) throw new Error('The task source changed before execution.');
     openClaim(root, claim.id);
     verifyEvidence(root, target);

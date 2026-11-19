@@ -2,6 +2,7 @@ import { assertExecutable } from '../board/board.js';
 import { assertNonsecret, load, requireText, verifyEvidence, type Evidence } from '../shared/store.js';
 import { assertDataReady, dataScopeDigest, requireCaseData, type DataScope, type DataTarget } from './readiness.js';
 import { inspectCases, prepareCheckpoint, runApprovedCases, startCases, verifyCaseAuthorization } from '../execution/cases.js';
+import { assertCompanyBasis, assertCompanyPlan } from '../company-context/guards.js';
 
 interface LocalObservation extends DataTarget { ticketId: string; generation: string; observedAt: string; source: string }
 interface LocalDecision {
@@ -53,6 +54,7 @@ export function preflightLocalData(root: string, request: LocalPreflight) {
   const batch = request.caseExecution?.batch ?? reviewed.caseBatch;
   if (reviewed.caseBatches?.length && !batch && request.caseExecution) throw new Error('Select a case batch from the execution decision.');
   if (batch) {
+    assertCompanyPlan(root, { source: 'local', ticketId: ticket.id });
     const authorization = { batch, approval: request.gates[reviewed.gate]! };
     const design = verifyCaseAuthorization(root, authorization, { assignment: { source: 'local', ticketId: ticket.id }, target, gate: reviewed.gate });
     if (!request.caseExecution) throw new Error('Identify the approved local case execution before starting.');
@@ -63,6 +65,7 @@ export function preflightLocalData(root: string, request: LocalPreflight) {
       local: { ticketId: ticket.id, generation: ticket.generation },
       dataBinding: { scope, observations: data.observations } });
   } else if (request.caseExecution) throw new Error('Bind the case batch to the existing execution approval.');
+  else assertCompanyBasis(root, { source: 'local', ticketId: ticket.id });
   return { ticketId: ticket.id, generation: ticket.generation, target: request.target, gates: request.gates, checkedAt: new Date().toISOString(),
     data: data ?? assertDataReady(root, scope, target, request.dataObservations), ...(cases ? { cases } : {}) };
 }

@@ -1,5 +1,7 @@
 # Start with a new project
 
+The agent should also inspect [company-source access](../automation/company-context/README.md) through the actual harness, reuse existing Slack connections and supplied selections, then offer channel selection during onboarding. A configured source needs actual reading/analysis coverage and source-bound understanding before dependent QA work. It does not activate a scheduler or grant message posting.
+
 Open the project-specific QA root and paste this prompt into its agent chat. The folder must be accessible to that chat; a prompt alone does not transfer files or credentials.
 
 ```text

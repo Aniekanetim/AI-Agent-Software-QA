@@ -1,5 +1,7 @@
 # Join a project
 
+When company decisions live in Slack, use [Company context](../automation/company-context/README.md) during the existing tools/context stages. Discover and reuse working access, choose workspace/channels, establish historical coverage and verify actual history/thread/directory capabilities. Users can change the selection later through Settings → Company context. Keep initial product understanding sourced and reviewed; channel selection is not a test authorization. Slack can wait when independent context/work is available.
+
 Onboarding prepares the agent to work on a project. It establishes context, access, tools and working preferences. After onboarding, a QA ticket or a configured GitHub trigger tells the agent what needs attention. The ticket, accepted expectations and risks determine the testing required; onboarding does not restrict the agent to a testing category.
 
 Tell your agent: **“Start onboarding for this project using Onboarding/onboarding-workflow.md.”** The agent reads existing preparation first, presents the roadmap and asks one focused missing decision at a time. You can say **Continue onboarding**, **Pause**, **Open settings**, **Back**, **Cancel this edit** or **Close settings**.

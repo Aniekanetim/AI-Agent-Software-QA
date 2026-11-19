@@ -1,0 +1,14 @@
+{
+  "bindings": [{
+    "id": "company",
+    "connectionId": "actual-verified-connection-id",
+    "selection": {
+      "mode": "explicit", "channelIds": ["ACTUAL_CHANNEL_ID"], "followNewChannels": false,
+      "catalog": { "path": ".local/actual-completed-catalog.json", "sha256": "replace-with-actual-evidence-hash" }
+    },
+    "history": { "oldest": "0.000000", "includeThreads": true },
+    "directory": false, "maxAgeMs": 900000,
+    "retention": { "source": "Actual team private-cache retention choice", "keepHistorical": true }
+  }],
+  "source": "Actual user channel/history selection reference"
+}

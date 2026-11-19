@@ -1,5 +1,7 @@
 # QA Process Context
 
+When [company-source decisions](../automation/company-context/README.md) affect the test basis, trace the actual source/version through applicable rule IDs, module/test-type obligations, cases, approved batches and results. Reassess affected strategy/coverage/data/configuration/regression records after a material change. Source retrieval and the agent's interpretation are separate from accepted product intent and human execution/sign-off decisions.
+
 This folder holds the project's maintained testing approach, coverage obligations and operational references. Read it when preparing or resuming a QA assignment. The [task board](../QA%20task%20management%20Board/README.md) remains the reporting entry point: tickets link plans, results, defects and completion handoffs.
 
 **Master state: unconfigured.** The files below are guidance and templates, with no project owners, approved strategy, execution or coverage established. In a project copy, name the actual owners and link existing canonical records before creating replacements. Empty folders and completed templates do not establish readiness.
