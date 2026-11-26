@@ -4,6 +4,7 @@ import { connection, binding } from './store.js';
 import { assertCompanyBasis, currentBasis, refreshReceipt } from './guards.js';
 import { startRefresh, refresh } from './sync.js';
 import { assertCompanyBoundary, boundaryRequirement, type Boundary } from './boundary.js';
+import { effectiveClaim } from './knowledge.js';
 
 export function apiAdapter(root: string, id: string): Adapter {
   const selected = connection(root, id, true);
@@ -19,14 +20,23 @@ export async function prepareCompanyBasis(root: string, assignment: Assignment, 
   try { refreshReceipt(root, assignment, Date.now(), criteria); verify(); return; }
   catch (error) { if (!(error instanceof ContextError) || error.code !== 'REFRESH_REQUIRED') throw error; }
   const basis = currentBasis(root, assignment); if (!basis) return;
+  let pendingJob: string | undefined;
   for (const id of new Set(basis.dependencies.filter(item => !criteria || item.criterionIds.some(id => criteria.includes(id))).map(item => item.bindingId))) {
-    const selected = binding(root, id), job = startRefresh(root, id).job;
-    const adapter = adapterFor(selected.connectionId);
-    const result = await refresh(root, job.id, adapter, { budget: 20 });
-    if (result.job.state === 'complete' && requirement && (!result.job.startedAt || !result.job.generation || result.job.generation <= requirement.generationFloors?.[id]! || Date.parse(result.job.startedAt) < Date.parse(requirement.createdAt))) {
-      await refresh(root, startRefresh(root, id).job.id, adapter, { budget: 20 });
+    const selected = binding(root, id);
+    const channelIds = [...new Set(basis.dependencies.filter(dep => dep.bindingId === id && (!criteria || dep.criterionIds.some(value => criteria.includes(value))))
+      .flatMap(dep => effectiveClaim(root, basis.basis, dep).claim.sources.map(ref => ref.sourceId.split('/')[1]!)))];
+    const job = startRefresh(root, id, Date.now(), { channelIds, directory: false,
+      ...(requirement ? { notBefore: requirement.createdAt, afterGeneration: requirement.generationFloors[id] } : {}) }).job;
+    pendingJob = job.id;
+    let adapter: Adapter;
+    try { adapter = adapterFor(selected.connectionId); }
+    catch (error) {
+      if (error instanceof ContextError && error.code === 'HOST_READ_REQUIRED') throw Object.assign(new ContextError(error.code, `${error.message} Inspect scoped job ${job.id} and import its next actual request.`), { jobId: job.id });
+      throw error;
     }
+    try { await refresh(root, job.id, adapter, { budget: 20 }); }
+    catch (error) { if (error instanceof ContextError) Object.assign(error, { jobId: job.id }); throw error; }
   }
-  refreshReceipt(root, assignment, Date.now(), criteria);
-  verify();
+  try { refreshReceipt(root, assignment, Date.now(), criteria); verify(); }
+  catch (error) { if (error instanceof ContextError && error.code === 'REFRESH_REQUIRED' && pendingJob) Object.assign(error, { jobId: pendingJob }); throw error; }
 }

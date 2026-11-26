@@ -1,6 +1,6 @@
 # Shared project progress
 
-Version 1.16.2 corrects [company context](automation/company-context/README.md): freshness requires completed relevant reads and distinct execution/review/action boundaries; catalog pages and cursor history survive resumptions. The reusable package remains unconfigured; no adopting-company workspace, decision, test outcome or refresh schedule is established. Record actual project connections/coverage/decisions only in the adopting root and preserve their source versions separately from application builds.
+Version 1.16.3 corrects [company context](automation/company-context/README.md): freshness requires completed relevant reads and distinct execution/review/action boundaries; catalog pages and cursor history survive resumptions. The reusable package remains unconfigured; no adopting-company workspace, decision, test outcome or refresh schedule is established. Record actual project connections/coverage/decisions only in the adopting root and preserve their source versions separately from application builds.
 
 **Project:** not configured. **Current checkpoint:** setup. **QA/discovery execution:** not started. **Human project decisions:** none recorded. **Schedules:** not configured for this project.
 

@@ -6,6 +6,8 @@ The implementation uses native-host callbacks or the Slack Web API. Source versi
 
 ## Package verification
 
+The `company-context-scoped-refresh.test.ts` cases add the new-work-cycle independence branch: directory cooldown and unavailable unrelated thread do not prevent an actual required channel read; a shared history-method cooldown remains enforced after reinspection; finishing an older broad job preserves newer scoped coverage. These checks distinguish reusable existing receipts from admission into a new boundary.
+
 Version 1.16.2 adds intended-contract tests in `company-context-remaining.test.ts`, connected source/disposition checks in `company-context-live.test.ts`, real process crash/concurrency tests in `company-context-recovery.test.ts` and expanded conditions in `company-context-contracts.test.ts`. The combined journey asserts 16 checkpoint actions, 16 explicit synthetic reviewed scopes/decisions and zero routine-case review requests. It includes an upstream superseding decision, a separate regression defect, a source-dependent no-change disposition and material post-G5 hold resolved through an actual synthetic owner correction of effective release plus a new scoped G5 review. These counters describe the synthetic fixture, not human approvals or all harness conversations.
 
 The [CC-01–CC-44 assertion map](company-context-matrix.md) identifies concrete assertions and external limits. The real crash tests prepare the boundary first, intercept actual disposable-child persistence at the head/progress and progress/completion seams, confirm child exit and reconcile only that child's test locks. Test-local instrumentation is not a production bypass switch. Actual adopting-company Slack and unattended-host smoke remain separately unverified.

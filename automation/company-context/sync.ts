@@ -27,14 +27,23 @@ export function sourceVersion(root: string, identity: ReturnType<typeof connecti
 }
 const jobPath = (id: string) => `${prefix}/sync/${key(id)}.json`;
 export function inspectJob(root: string, id: string) { return load<SyncJob>(root, jobPath(id), () => { throw new Error('Inspect the original company refresh job.'); }); }
-export function startRefresh(root: string, id: string, now = Date.now()) {
+export function startRefresh(root: string, id: string, now = Date.now(), scope?: { channelIds: string[]; directory: boolean; notBefore?: string; afterGeneration?: number }) {
   const selected = binding(root, id), actual = connection(root, selected.connectionId, true), storage = storeRoot(root, selected), current = head(storage, actual.identity).value;
+  const channels = [...new Set(scope?.channelIds ?? selected.selection.channelIds)].sort(), directory = scope?.directory ?? selected.directory;
+  if (!channels.length || channels.some(channel => !selected.selection.channelIds.includes(channel)) || directory && !selected.directory ||
+      scope?.afterGeneration !== undefined && (!Number.isSafeInteger(scope.afterGeneration) || scope.afterGeneration < 0) ||
+      scope?.notBefore && !Number.isFinite(Date.parse(scope.notBefore))) throw new Error('Refresh actual selected source channels and their required generation.');
+  const signature = (units: SyncUnit[]) => JSON.stringify([units.filter(unit => unit.kind === 'history').map(unit => unit.channelId).sort(), units.some(unit => unit.kind === 'directory')]);
+  const desired = JSON.stringify([channels, directory]);
   return withLock(root, `company-jobs:${id}`, () => {
-    for (const file of jsonFiles(root, `${prefix}/sync`)) {
-      const old = load<SyncJob>(root, file, () => { throw new Error('Missing refresh.'); }).value;
-      if (old.bindingId === id && !['complete', 'superseded'].includes(old.state) && old.selectionDigest === selectionDigest(selected)) return { job: old, reused: true };
+    const jobs = jsonFiles(root, `${prefix}/sync`).map(file => load<SyncJob>(root, file, () => { throw new Error('Missing refresh.'); }).value);
+    for (const old of jobs) {
+      if (old.bindingId === id && !['complete', 'superseded'].includes(old.state) && old.selectionDigest === selectionDigest(selected) &&
+          old.connectionRevision === connectionRevision(actual) && signature(old.units) === desired &&
+          (!scope?.notBefore || old.startedAt && Date.parse(old.startedAt) >= Date.parse(scope.notBefore)) &&
+          (scope?.afterGeneration === undefined || old.generation && old.generation > scope.afterGeneration)) return { job: old, reused: true };
     }
-    const units: SyncUnit[] = selected.selection.channelIds.map(channelId => {
+    const units: SyncUnit[] = channels.map(channelId => {
       const through = current.coverage[channelId]?.through;
       const oldest = through && compareTs(through, selected.history.oldest) > 0 ? through : selected.history.oldest;
       return { kind: 'history', channelId, oldest, seenCursors: [], pages: 0 };
@@ -42,14 +51,20 @@ export function startRefresh(root: string, id: string, now = Date.now()) {
     if (selected.history.includeThreads) {
       const roots = new Set<string>();
       for (const item of Object.values(current.sources)) {
-        if (!selected.selection.channelIds.includes(item.ref.sourceId.split('/')[1]!)) continue;
+        if (!channels.includes(item.ref.sourceId.split('/')[1]!)) continue;
         const value = readObject<SourceVersion>(storage, item.ref.snapshot), message = value.message;
-        if (!selected.selection.channelIds.includes(message.channelId)) continue;
+        if (!channels.includes(message.channelId)) continue;
         const ts = message.threadTs ?? message.ts, identity = `${message.channelId}/${ts}`;
         if (!roots.has(identity)) { roots.add(identity); units.push({ kind: 'thread', channelId: message.channelId, ts, seenCursors: [], pages: 0 }); }
       }
     }
-    if (selected.directory) units.push({ kind: 'directory', seenCursors: [], pages: 0 });
+    if (directory) units.push({ kind: 'directory', seenCursors: [], pages: 0 });
+    // Slack limits apply by actual connection/method, not by our job or selected channel.
+    for (const unit of units) {
+      const cooldowns = jobs.filter(job => job.connectionId === actual.id && job.identity.workspaceId === actual.identity.workspaceId)
+        .flatMap(job => job.units.filter(old => old.kind === unit.kind && old.nextAt && Date.parse(old.nextAt) > now).map(old => old.nextAt!));
+      if (cooldowns.length) unit.nextAt = new Date(Math.max(...cooldowns.map(Date.parse))).toISOString();
+    }
     const sequencePath = `${prefix}/sync-generations/${key(id)}.json`, sequence = load<number>(root, sequencePath, () => 0);
     if (!Number.isSafeInteger(sequence.value) || sequence.value < 0) throw new Error('Reconcile the original source-read generation.');
     save(root, sequencePath, sequence.value + 1, sequence.revision);
@@ -143,12 +158,16 @@ export async function refresh(root: string, id: string, adapter: Adapter, option
         }
         progress.pages++; if (page.nextCursor) { progress.cursor = page.nextCursor; progress.seenCursors.push(page.nextCursor); } else progress.done = true;
         delete current.inFlight; current.cursor = (reserved.index + 1) % current.units.length; current.observedAt = new Date(now()).toISOString(); current.issue = null;
-        for (const channelId of selected.selection.channelIds) {
+        for (const channelId of current.units.filter(item => item.kind === 'history').map(item => item.channelId!)) {
           const channelUnits = current.units.filter(item => item.channelId === channelId);
           if (channelUnits.every(item => item.done && !item.issue)) {
             (current.channelCompletedAt ??= {})[channelId] ??= current.observedAt;
-            updateHead(storage, current.identity, currentHead => { currentHead.coverage[channelId] = { channelId, oldest: current.oldest, through: current.cutoff,
-              threads: channelUnits.filter(item => item.kind === 'thread').map(item => item.ts!), readAt: current.channelCompletedAt![channelId]! }; });
+            updateHead(storage, current.identity, currentHead => {
+              const prior = currentHead.coverage[channelId];
+              if (prior?.through && compareTs(prior.through, current.cutoff) > 0) return;
+              currentHead.coverage[channelId] = { channelId, oldest: current.oldest, through: current.cutoff,
+                threads: channelUnits.filter(item => item.kind === 'thread').map(item => item.ts!), readAt: current.channelCompletedAt![channelId]! };
+            });
             if (!current.completedChannels.includes(channelId)) current.completedChannels.push(channelId);
           }
         }
