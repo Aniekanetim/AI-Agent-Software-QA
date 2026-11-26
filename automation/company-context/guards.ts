@@ -3,10 +3,11 @@ import { contained, load, save, digest, verifyEvidence, sameEvidence, requireTex
 import { ContextError, unique, validateClaim, type Assignment, type Basis, type BasisBinding, type Receipt, type Claim, type SourceVersion } from './types.js';
 import { settings, prefix, binding, connection, storeRoot, selectionDigest, connectionRevision, head, readObject, immutable } from './store.js';
 import { analysisPath, requireCurrentSource, effectiveClaim, type Analysis } from './knowledge.js';
+import { currentCompletions, verifyCompletion } from './completion.js';
 
 const assignmentKey = (assignment: Assignment) => { requireText(assignment?.source); requireText(assignment.ticketId); return digest(JSON.stringify([assignment.source, assignment.ticketId])); };
 export const basisPath = (assignment: Assignment) => `${prefix}/bindings/${assignmentKey(assignment)}.json`;
-const receiptPath = (assignment: Assignment, id: string, claim: Evidence) => `${prefix}/receipts/${digest(JSON.stringify([assignmentKey(assignment), id, claim.sha256]))}.json`;
+export const receiptPath = (assignment: Assignment, id: string, claim: Evidence) => `${prefix}/receipts/${digest(JSON.stringify([assignmentKey(assignment), id, claim.sha256]))}.json`;
 function sameAssignment(a: Assignment, b: Assignment) { return a?.source === b.source && a.ticketId === b.ticketId; }
 function currentRecord(root: string, assignment: Assignment) {
   const record = load<BasisBinding | null>(root, basisPath(assignment), () => null);
@@ -69,11 +70,11 @@ export function refreshReceipt(root: string, assignment: Assignment, now = Date.
     for (const dependency of dependencies) {
     const sources = effectiveClaim(root, current.record.basis, dependency).claim.sources;
     for (const ref of sources) requireCurrentSource(storage, actual.identity, ref);
-    const state = head(storage, actual.identity).value;
-    const checkedAt = Math.min(...sources.map(ref => Date.parse(state.sources[ref.sourceId]!.observedAt)));
+    const completions = currentCompletions(root, selected.id, sources, now);
+    const checkedAt = Math.min(...completions.map(ref => Date.parse(readObject<{ completedAt: string }>(root, ref).completedAt)));
     if (!Number.isFinite(checkedAt) || checkedAt > now || now - checkedAt > selected.maxAgeMs || checkedAt < Date.parse(actual.checkedAt)) throw new ContextError('REFRESH_REQUIRED', 'Reread the actual cited Slack threads through the selected connection; cached snapshots cannot establish freshness.');
     const receipt: Receipt = { schemaVersion: 1, assignment, bindingId: selected.id, selectionDigest: selectionDigest(selected), connectionRevision: connectionRevision(actual), verified: sources,
-      verifiedChannels: [...new Set(sources.map(ref => ref.sourceId.split('/')[1]!))], checkedAt: new Date(checkedAt).toISOString(), validUntil: new Date(checkedAt + selected.maxAgeMs).toISOString(), evidence: sources.map(ref => ref.snapshot) };
+      verifiedChannels: [...new Set(sources.map(ref => ref.sourceId.split('/')[1]!))], checkedAt: new Date(checkedAt).toISOString(), validUntil: new Date(checkedAt + selected.maxAgeMs).toISOString(), evidence: sources.map(ref => ref.snapshot), completions };
     const path = receiptPath(assignment, selected.id, dependency.claim), old = load<Receipt | null>(root, path, () => null); save(root, path, receipt, old.revision);
     receipts.push(immutable(root, 'receipt-history', receipt));
     }
@@ -106,6 +107,12 @@ export function assertCompanyBasis(root: string, assignment: Assignment, criteri
     for (const ref of claim.sources) {
       const value = requireCurrentSource(storage, actual.identity, ref); relevantChannels.add(value.message.channelId);
       if (!receipt.verified.some(item => item.sourceId === ref.sourceId && item.revision === ref.revision)) throw new Error('The freshness receipt does not cover this approved source revision.');
+    }
+    for (const channel of relevantChannels) {
+      const completion = receipt.completions?.find(ref => readObject<{ channelId: string }>(root, ref).channelId === channel);
+      if (!completion) throw new ContextError('REFRESH_REQUIRED', 'Renew legacy evidence with a completed scoped read; historical receipts remain readable.');
+      const value = verifyCompletion(root, completion, selected.id, channel, now);
+      if (claim.sources.some(ref => ref.sourceId.split('/')[1] === channel && !value.sources.some(source => source.sourceId === ref.sourceId && source.revision === ref.revision))) throw new ContextError('REFRESH_REQUIRED', 'The read completion does not cover this decision.');
     }
     for (const channelId of relevantChannels) if (head(storage, actual.identity).value.coverage[channelId]?.issue) throw new ContextError('SOURCE_UNAVAILABLE', 'Relevant channel/thread coverage has an unresolved access or read gap.');
     const analysis = load<Analysis | null>(root, analysisPath(selected.id), () => null).value;

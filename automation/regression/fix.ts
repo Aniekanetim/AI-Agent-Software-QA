@@ -5,6 +5,9 @@ import type { Assignment } from '../release/scope.js';
 import type { ReleaseBoard } from './board.js';
 import { caseBasis, caseResult, verifyCaseAuthorization } from '../execution/cases.js';
 import { assertCompanyBasis } from '../company-context/guards.js';
+import { assertCompanyBoundary, type Boundary } from '../company-context/boundary.js';
+import { prepareCompanyBasis, apiAdapter } from '../company-context/runtime.js';
+import type { Adapter } from '../company-context/types.js';
 
 interface FixIdentity { defect: Assignment; fixRevision: string }
 interface Intake extends FixIdentity {
@@ -311,6 +314,7 @@ function verifyReview(root: string, entry: Fix, ref: Evidence, requireCases = fa
   if (requireCases) requireCasePlan(root, entry, entry.plans.at(-1));
   const current = assess(root, entry);
   if (!current || current.report.state !== 'reviewPending') throw new Error('Complete confirmation and every required regression check before reviewing this fix.');
+  assertCompanyBoundary(root, entry.identity.defect, { purpose: 'g5', id: `fix:${entry.key}:${current.assessmentDigest}`, target: entry.identity.target });
   const review = pinned<Review>(root, ref, 'fix disposition');
   if (review?.gate !== 'G5' || !['Approved', 'Approved with limits'].includes(review.decision) || review.fix !== entry.key ||
       review.assessmentDigest !== current.assessmentDigest || !Array.isArray(review.findings)) {
@@ -348,6 +352,18 @@ function verifyReview(root: string, entry: Fix, ref: Evidence, requireCases = fa
   return { review, assessmentDigest: current.assessmentDigest, approval: current.revision.approval };
 }
 
+export async function prepareFixSources(root: string, input: { fix: string; close?: Evidence }, adapterFor: (id: string) => Adapter = id => apiAdapter(root, id)) {
+  const entry = findFix(root, input.fix), current = assess(root, entry);
+  if (!current || current.report.state !== 'reviewPending') throw new Error('Complete confirmation and required regression before preparing scoped G5.');
+  let boundary: Boundary = { purpose: 'g5', id: `fix:${entry.key}:${current.assessmentDigest}`, target: entry.identity.target };
+  if (input.close) {
+    const review = verifyReview(root, entry, input.close).review;
+    boundary = { purpose: 'close', id: review.ticketRevision, target: entry.identity.target, decision: input.close };
+  }
+  await prepareCompanyBasis(root, entry.identity.defect, undefined, adapterFor, boundary);
+  return { prepared: true, boundary };
+}
+
 export function recordFixReview(root: string, request: { fix: string; review: Evidence; requireCases?: boolean }) {
   return lock(root, () => {
     const current = ledger(root), entry = findFix(root, request.fix, true, current.value.fixes);
@@ -383,6 +399,7 @@ export function defectCompletion(root: string, defect: Assignment, ticketRevisio
     if (!preview) {
       const verified = requireVerifiedFix(root, completion.fix, defect, approval, requireCases);
       if (verified.review.ticketRevision !== ticketRevision) throw new Error('The scoped fix disposition must cover this ticket revision.');
+      assertCompanyBoundary(root, defect, { purpose: 'close', id: ticketRevision, target: entry.identity.target, decision: verified.evidence });
     }
     return current.assessmentDigest;
   }

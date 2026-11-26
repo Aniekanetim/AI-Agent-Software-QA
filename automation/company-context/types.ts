@@ -34,6 +34,7 @@ export interface Settings { schemaVersion: 1; bindings: Binding[]; source: strin
 export interface Catalog {
   schemaVersion: 1; id: string; connectionId: string; identity: Identity; channels: Channel[];
   cursor: string | null; complete: boolean; source: string; checkedAt: string; evidence: Evidence[];
+  seenCursors?: string[]; operationId?: string; issue?: string; nextAt?: string | null;
 }
 export interface SourceRef { sourceId: string; revision: string; snapshot: Evidence; url?: string }
 export interface SourceVersion { schemaVersion: 1; sourceId: string; message: Message; revision: string; observedAt: string; source: string; operationEvidence: Evidence[]; redacted: boolean }
@@ -58,6 +59,12 @@ export interface SyncJob {
   cutoff: string; oldest: string; units: SyncUnit[]; cursor: number; state: 'pending' | 'running' | 'partial' | 'complete' | 'superseded';
   observedAt: string; nextAt: string | null; issue: string | null; directory: Person[]; operationEvidence: Evidence[];
   inFlight?: { pid: number; unit: number; startedAt: string }; completedChannels: string[];
+  startedAt?: string; connectionRevision?: string; observedSources?: Record<string, string>; generation?: number; channelCompletedAt?: Record<string, string>;
+}
+export interface ReadCompletion {
+  schemaVersion: 1; jobId: string; generation: number; bindingId: string; channelId: string; identity: Identity;
+  connectionRevision: string; selectionDigest: string; startedAt: string; completedAt: string;
+  oldest: string; cutoff: string; threads: string[]; sources: SourceRef[]; operations: Evidence[];
 }
 export interface Assignment { source: string; ticketId: string }
 export interface Dependency { bindingId: string; criterionIds: string[]; claim: Evidence }
@@ -71,6 +78,7 @@ export interface Receipt {
   schemaVersion: 1; assignment: Assignment; bindingId: string; selectionDigest: string;
   connectionRevision: string;
   verified: SourceRef[]; verifiedChannels: string[]; checkedAt: string; validUntil: string; evidence: Evidence[];
+  completions?: Evidence[];
 }
 export class ContextError extends Error {
   constructor(public code: string, message: string, public retryAt?: string) { super(message); this.name = 'CompanyContextError'; }

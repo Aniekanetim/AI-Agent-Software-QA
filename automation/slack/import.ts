@@ -1,3 +1,4 @@
+import { beginCatalog, reserveCatalogPage, commitCatalogPage, failCatalogPage, catalogProgress } from '../company-context/catalog.js';
 import { verifyEvidence, requireText, digest, type Evidence } from '../shared/store.js';
 import { HostSlackAdapter } from './host.js';
 import { assertIdentity, channelPage } from './adapter.js';
@@ -35,21 +36,21 @@ export async function importHostPage(root: string, input: HostRead) {
     directory: async cursor => match('directory', undefined, undefined, undefined, undefined, cursor) as Page<Person>,
   }), { budget: 1 });
 }
-export function importHostCatalog(root: string, input: { connectionId: string; pages: { page: Page<Channel>; cursor: string | null; call: Evidence }[]; source: string }) {
+export function importHostCatalog(root: string, input: { connectionId: string; pages: { page: Page<Channel>; cursor: string | null; call: Evidence }[]; source: string; previous?: Evidence }) {
   const actual = connection(root, input.connectionId, true); if (actual.transport !== 'host') throw new Error('Use the actual native Slack connection.'); requireText(input.source);
-  let cursor: string | null = null, complete = false; const channels = new Map<string, Channel>(), seen = new Set<string>(), refs: Evidence[] = [];
-  for (const item of input.pages) {
-    if (complete || item.cursor !== cursor) throw new Error('Retain the original complete native catalog page chain.');
-    const call = readObject<{ connectionId: string; cursor: string | null; identity: Identity; source: string; resultDigest: string }>(root, item.call);
-    assertIdentity(call.identity, actual.identity); if (call.connectionId !== actual.id || call.cursor !== cursor || !call.source) throw new Error('Bind the native catalog call to its actual account/cursor.');
-    if (call.resultDigest !== hostPageDigest(item.page)) throw new Error('The native channel page differs from its recorded output.');
-    const page = channelPage(item.page, actual.identity); page.evidence.forEach(ref => verifyEvidence(root, ref)); refs.push(item.call, ...page.evidence);
-    page.items.forEach(channel => channels.set(channel.id, channel)); cursor = page.nextCursor;
-    if (!cursor) complete = true; else { if (seen.has(cursor)) throw new Error('Native Slack catalog pagination repeated a cursor.'); seen.add(cursor); }
-  }
   if (!input.pages.length) throw new Error('Retain actual native catalog pages.');
-  const catalog: Catalog = { schemaVersion: 1, id: `host-${Date.now()}`, connectionId: actual.id, identity: actual.identity, channels: [...channels.values()], cursor, complete, source: input.source, checkedAt: new Date().toISOString(), evidence: refs };
-  const reference = immutable(root, 'catalogs', catalog); recordCapability(root, actual.id, 'channels', reference);
-  if (complete) for (const selected of settings(root).value?.bindings ?? []) if (selected.connectionId === actual.id && selected.selection.followNewChannels) adoptFollowingCatalog(root, selected.id, reference);
-  return { catalog: reference, complete, channelCount: channels.size };
+  let catalog = beginCatalog(root, actual.id, input.source, input.previous);
+  for (const item of input.pages) {
+    if (catalog.complete || item.cursor !== catalog.cursor) throw new Error('Retain the original native catalog page chain.');
+    const call = readObject<{ connectionId: string; cursor: string | null; identity: Identity; source: string; resultDigest: string }>(root, item.call);
+    assertIdentity(call.identity, actual.identity); if (call.connectionId !== actual.id || call.cursor !== item.cursor || !call.source) throw new Error('Bind the native catalog call to its actual account/cursor.');
+    if (call.resultDigest !== hostPageDigest(item.page)) throw new Error('The native channel page differs from its recorded output.');
+    item.page.evidence.forEach(ref => verifyEvidence(root, ref));
+    reserveCatalogPage(root, catalog);
+    try { catalog = commitCatalogPage(root, catalog, { ...item.page, evidence: [...item.page.evidence, item.call] }); }
+    catch (error) { throw failCatalogPage(root, catalog, error); }
+  }
+  const reference = catalogProgress(root, catalog.operationId!).value.catalog; recordCapability(root, actual.id, 'channels', reference);
+  if (catalog.complete) for (const selected of settings(root).value?.bindings ?? []) if (selected.connectionId === actual.id && selected.selection.followNewChannels) adoptFollowingCatalog(root, selected.id, reference);
+  return { catalog: reference, complete: catalog.complete, channelCount: catalog.channels.length, operationId: catalog.operationId };
 }

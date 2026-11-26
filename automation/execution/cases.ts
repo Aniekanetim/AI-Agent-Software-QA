@@ -10,6 +10,7 @@ import { readdirSync, existsSync } from 'node:fs';
 import { assertCompanyBasis } from '../company-context/guards.js';
 import { prepareCompanyBasis } from '../company-context/runtime.js';
 import { ContextError } from '../company-context/types.js';
+import { assertCompanyBoundary, boundaryRequirement, type Boundary } from '../company-context/boundary.js';
 
 interface Source {
   id: string;
@@ -399,6 +400,7 @@ function validateDecision(root: string, decision: Decision) {
 }
 
 type Design = ReturnType<typeof readCaseBatch>;
+function companyExecution(session: { id: string }, design: Design): Boundary { return { purpose: 'execution', id: session.id, target: design.batch.target }; }
 function verifyCurrentCase(root: string, design: Design, item: CaseDefinition) {
   const flow = design.flows.get(item.flowId)!;
   assertCompanyBasis(root, design.batch.assignment, [...new Set([...flow.criteria, ...item.criteria])], design.batch.understanding);
@@ -477,6 +479,7 @@ export function startCases(root: string, request: CaseAuthorization & { id: stri
       }
     }
   }
+  boundaryRequirement(root, design.batch.assignment, companyExecution(request, design), true);
   return withLock(root, 'case-execution', () => {
     const path = sessionPath(request.id);
     const stored = load<Session | null>(root, path, () => null).value;
@@ -519,6 +522,7 @@ function checkCaseCheckpoint(root: string, session: Session, design: Design, req
   if (request.checkpoint === 'precondition') throw new Error('Verify the actual starting state before invoking the test runner.');
   if (!item || !refs.some(ref => sameEvidence(item.definition, ref))) throw new Error('The runner inputs must include the approved case definition.');
   verifyCurrentCase(root, design, item);
+  assertCompanyBoundary(root, design.batch.assignment, companyExecution(session, design), [...new Set([...design.flows.get(item.flowId)!.criteria, ...item.criteria])]);
   if (priorRunnerHold(root, session, design, item)) throw new Error('Reconcile the original runner outcome before dispatching another action.');
   if (dependencyHold(root, session, design, item) || session.flowIssues?.some(issue => issue.flowId === item.flowId) ||
       session.prerequisiteIssues?.some(issue => item.prerequisiteKeys?.includes(issue.key))) {
@@ -545,7 +549,7 @@ export async function admitCaseCheckpoint<T>(root: string, request: CaseCheckpoi
   invocation: Parameters<typeof claimCaseCheckpoint>[4], dispatch: () => T) {
   const session = inspectCases(root, request.id);
   const design = readCaseBatch(root, session.batch), item = design.cases.get(request.caseId);
-  await prepareCompanyBasis(root, design.batch.assignment, item ? design.flows.get(item.flowId)!.criteria : []);
+  await prepareCompanyBasis(root, design.batch.assignment, item ? [...new Set([...design.flows.get(item.flowId)!.criteria, ...item.criteria])] : [], undefined, companyExecution(session, design));
   const observed = session.connected ? await readConnectedCase(root, request.id) : undefined;
   return claimCaseCheckpoint(root, request, refs, target, invocation, observed, dispatch);
 }
@@ -703,7 +707,7 @@ export function prepareCheckpoint(root: string, request: { id: string; caseId: s
     if (dependency || disputed || shared) return { state: 'Blocked' as const, issue: dependency ?? disputed?.id ?? shared!.issue };
     targetObservation(root, request.target, design.batch.target);
     checkExecutionData(root, session, design, item);
-    try { verifyCurrentCase(root, design, item); }
+    try { verifyCurrentCase(root, design, item); assertCompanyBoundary(root, design.batch.assignment, companyExecution(session, design), [...new Set([...design.flows.get(item.flowId)!.criteria, ...item.criteria])]); }
     catch (error) {
       attempt.status = attempt.observations.length ? 'Partial' : 'Blocked';
       if (error instanceof ContextError) {
@@ -802,6 +806,7 @@ export function finishCases(root: string, id: string) {
 export async function runApprovedCases(root: string, id: string, adapter: {
   target: () => Evidence | Promise<Evidence>;
   beforeCheckpoint?: () => void | Promise<void>;
+  companyAdapter?: (id: string) => import('../company-context/types.js').Adapter;
   execute: (step: Extract<ReturnType<typeof prepareCheckpoint>, { state: 'ready' }>) => CheckpointObservation | Promise<CheckpointObservation>;
 }) {
   const session = inspectCases(root, id);
@@ -814,7 +819,7 @@ export async function runApprovedCases(root: string, id: string, adapter: {
         const target = await adapter.target();
         await adapter.beforeCheckpoint?.();
         const design = readCaseBatch(root, session.batch), item = design.cases.get(caseId)!;
-        try { await prepareCompanyBasis(root, design.batch.assignment, [...new Set([...design.flows.get(item.flowId)!.criteria, ...item.criteria])]); }
+        try { await prepareCompanyBasis(root, design.batch.assignment, [...new Set([...design.flows.get(item.flowId)!.criteria, ...item.criteria])], adapter.companyAdapter, companyExecution(session, design)); }
         catch { /* The synchronous checkpoint records the affected case hold; independent cases continue. */ }
         const step = prepareCheckpoint(root, { id, caseId, target });
         if (step.state !== 'ready') break;

@@ -1,5 +1,7 @@
 # Slack access
 
+Catalog imports accept previous evidence so a native reader can resume with only the next actual page. API/native readers share durable cursor history and completed-read eligibility. Before execution/G5/action preparation, reserve the actual company-source boundary and obtain its request-bound reads; an earlier capture is not a new operation. No terminal adapter can manufacture access to the host integration.
+
 Use [company context](../company-context/README.md) to select company/project channels, retain source versions and use learned information through the existing QA gates.
 
 First inspect the actual harness integration directory and connected-account metadata. Reuse an adequate Slack connection. Installation, authentication, workspace access, channel visibility and actual history/thread/directory operations are separate facts. The adapter never assumes unrestricted private-channel or direct-message access. [Slack history access](https://docs.slack.dev/reference/methods/conversations.history/#usage-info)

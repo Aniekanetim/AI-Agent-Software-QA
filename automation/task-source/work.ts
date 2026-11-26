@@ -1,3 +1,4 @@
+import { assertCompanyBoundary } from '../company-context/boundary.js';
 import { randomUUID } from 'node:crypto';
 import { assertDataReady, dataScopeDigest, requireCaseData, type DataReceipt, type DataScope } from '../data/readiness.js';
 import { assertNonsecret, digest, load, requireText, save, verifyEvidence, withLock, type Evidence } from '../shared/store.js';
@@ -804,8 +805,9 @@ export async function beginExecution(root: string, request: Parameters<typeof pr
   id(request.id);
   const { result: { claim, buildId, target, gates, checkedAt, caseAuthorization }, scope, observation, selectedCases } = await checkExecution(root, request, reader);
   if (request.requireCaseBatch && !caseAuthorization) throw new Error('Bind the reviewed feature understanding and case batch to this execution approval.');
+  if (!caseAuthorization) await prepareCompanyBasis(root, assignmentFor(claim), undefined, undefined, { purpose: 'execution', id: request.id, target: observation });
   return withLock(root, 'qa-board', () => withLock(root, 'release-records', () => {
-    if (caseAuthorization) assertCompanyPlan(root, assignmentFor(claim)); else assertCompanyBasis(root, assignmentFor(claim));
+    if (caseAuthorization) assertCompanyPlan(root, assignmentFor(claim)); else assertCompanyBoundary(root, assignmentFor(claim), { purpose: 'execution', id: request.id, target: observation });
     if (activeSource(root).revision !== claim.sourceRevision) throw new Error('The task source changed before execution.');
     openClaim(root, claim.id);
     verifyEvidence(root, target);

@@ -1,6 +1,6 @@
 # Adopt the workflow for a project
 
-Version 1.16.0 adds [company Slack context](automation/company-context/README.md). During onboarding, inspect and reuse actual harness connections before setup questions, select company/project channels and retain the historical/read/analysis coverage. Existing projects can use Settings → Company context. Without a selected source, existing operation continues. For open work that uses Slack decisions, bind the source manifest to reviewed understanding, refresh its actual source evidence and retain current receipts before dependent execution/G5. Preserve completed history and existing onboarding state; no Slack schedule is activated by upgrading.
+Version 1.16.1 strengthens [company Slack context](automation/company-context/README.md) with completed relevant reads and explicit execution/review/action boundaries. During onboarding, inspect and reuse actual harness connections before setup questions, select company/project channels and retain the historical/read/analysis coverage. Existing projects can use Settings → Company context. Without a selected source, existing operation continues. For open work that uses Slack decisions, bind the source manifest to reviewed understanding, refresh its actual source evidence and retain current receipts before dependent execution/G5. Preserve completed history and existing onboarding state; no Slack schedule is activated by upgrading.
 
 Choose one QA root for each project. All links, discovery records and board folders resolve from that root. Start [guided onboarding](Onboarding/README.md): it prepares context, access and tools; later tasks determine testing coverage. Discovery and QA remain separate procedures connected through explicit requests and two context stores.
 
@@ -112,6 +112,10 @@ For open work in 1.15.2, attach the [reviewed understanding and case batch](auto
 Follow [notification setup](automation/attention/README.md#configure-once-preserving-existing-setup) when wanted. Establish the actual host conversation and evidence, responsible recipients, one designated notifier, batch size, pacing, timezone and quiet hours. Reuse supplied answers and ask only focused missing questions. Enable only after reviewing the concrete policy; initial guidance is three action groups with full backlog access. No new mandatory onboarding stage is introduced.
 
 The Reporting settings area has an isolated notification editor. Its saves preserve existing onboarding, report preferences, mailbox bindings and schedules. Missing/disabled notification configuration leaves established QA work unchanged. The reusable package contains no live blocker, recipient, delivery receipt or active notification schedule. Existing installed check-in prompts need an authorized update through the host's supported scheduling interface; editing the repository template alone does not update them.
+
+### Upgrade to 1.16.1
+
+Preserve existing private settings, source snapshots, receipts, approvals and completed onboarding. For open work relying on Slack, obtain a completed relevant read for the current execution/review boundary using the [company-context procedure](automation/company-context/README.md#reviewed-execution-and-g5). Legacy receipts remain historical; they cannot replace missing proof of completed coverage. Unchanged expectations reuse the existing human approval. Retain partial catalog progress and resume its actual operation instead of starting over. No connection, schedule or project test is activated by this upgrade.
 
 ### Upgrade to 1.15.3
 

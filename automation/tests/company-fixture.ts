@@ -49,23 +49,23 @@ export async function companyFixture(channels = ['C1']) {
   const run = async (budget = 50, options: Parameters<typeof refresh>[3] = {}) => { const job = startRefresh(base.root, selected.id).job; return refresh(base.root, job.id, adapter, { budget, ...options }); };
   await run();
   const analyze = () => recordAnalysis(base.root, { bindingId: selected.id, sources: inspectedSources(base.root, selected.id).map(item => item.ref), reason: 'Synthetic project relevance and decision analysis', source: 'Synthetic agent analysis' });
-  const authorize = (options: { both?: boolean; skipAnalysis?: boolean; assignment?: { source: string; ticketId: string } } = {}) => {
+  const authorize = (options: { both?: boolean; skipAnalysis?: boolean; statement?: string; assignment?: { source: string; ticketId: string } } = {}) => {
     const assignment = options.assignment ?? { source: 'local', ticketId: 'QA-001' };
     const scopeChannels = settings(base.root).value!.bindings.find(item => item.id === selected.id)!.selection.channelIds;
     const author = base.put(base.next(), { ownerId: 'U2', source: 'Synthetic established project ownership' });
     const refs = inspectedSources(base.root, selected.id);
     const makeClaim = (channelId: string, id: string) => {
-      const claim: Claim = { schemaVersion: 1, id, statement: channelId === 'C1' ? 'Retry must preserve payment identity.' : 'Summary must load independently.', kind: 'decision', sources: refs.filter(item => item.ref.sourceId.includes(`/${channelId}/`)).map(item => item.ref), authority: { ownerId: 'U2', basis: author }, applicability: 'Synthetic staging scope', effective: 'Current reviewed staging build', supersedes: [], uncertainty: null, source: 'Synthetic owner decision in Slack', analyzedAt: new Date().toISOString() };
+      const claim: Claim = { schemaVersion: 1, id, statement: channelId === 'C1' ? options.statement ?? 'Retry must preserve payment identity.' : 'Summary must load independently.', kind: 'decision', sources: refs.filter(item => item.ref.sourceId.includes(`/${channelId}/`)).map(item => item.ref), authority: { ownerId: 'U2', basis: author }, applicability: 'Synthetic staging scope', effective: 'Current reviewed staging build', supersedes: [], uncertainty: null, source: 'Synthetic owner decision in Slack', analyzedAt: new Date().toISOString() };
       return recordClaim(base.root, { bindingId: selected.id, claim });
     };
     const claim = makeClaim('C1', 'retry-rule'), other = options.both ? makeClaim('C2', 'list-rule') : undefined;
     const basis: Basis = { schemaVersion: 1, assignment, target: { environment: 'staging', release: 'current', at: new Date().toISOString() }, selections: settings(base.root).value!.bindings.map(item => ({ bindingId: item.id, digest: selectionDigest(item) })),
       dependencies: [{ bindingId: selected.id, criterionIds: ['rule'], claim }, ...(other ? [{ bindingId: selected.id, criterionIds: ['other'], claim: other }] : [])],
-      exclusions: options.both || scopeChannels.length === 1 ? [] : [{ bindingId: selected.id, channelIds: scopeChannels.filter(id => id !== 'C1'), reason: 'Independent company channel not applicable to this task', source: 'Synthetic reviewed scope' }] };
+      exclusions: scopeChannels.every(id => id === 'C1' || options.both && id === 'C2') ? [] : [{ bindingId: selected.id, channelIds: scopeChannels.filter(id => id !== 'C1' && !(options.both && id === 'C2')), reason: 'Independent company channel not applicable to this task', source: 'Synthetic reviewed scope' }] };
     const basisRef = immutable(base.root, 'basis', basis);
     const understanding = base.put(base.next(), { schemaVersion: 1, assignment, companyContext: basisRef,
       sources: [{ id: 'rule', authority: 'Synthetic accepted owner rule', accepted: claim, current: claim }, ...(other ? [{ id: 'other', authority: 'Synthetic accepted owner rule', accepted: other, current: other }] : [])],
-      flows: [{ id: 'retry', featureId: 'payments', relationshipIds: [], actor: 'QA', startingState: 'One saved payment', expectedFlow: 'Retry keeps the same payment', criteria: ['rule'] }, ...(other ? [{ id: 'list', featureId: 'summary', relationshipIds: [], actor: 'QA', startingState: 'Summary available', expectedFlow: 'Load the summary', criteria: ['other'] }] : [])] });
+      flows: [{ id: 'retry', featureId: 'payments', relationshipIds: [], actor: 'QA', startingState: 'One saved payment', expectedFlow: options.statement ?? 'Retry keeps the same payment', criteria: ['rule'] }, ...(other ? [{ id: 'list', featureId: 'summary', relationshipIds: [], actor: 'QA', startingState: 'Summary available', expectedFlow: 'Load the summary', criteria: ['other'] }] : [])] });
     const packet = base.put(base.next(), { source: 'Synthetic informed review packet' });
     const g1 = base.put(base.next(), { gate: 'G1', decision: 'Approved', assignment, reviewer: 'Synthetic QA', source: 'Synthetic actual review response', understanding, packet });
     bindBasis(base.root, { basis: basisRef, approval: g1, source: 'Synthetic G1 binding' }); if (!options.skipAnalysis) analyze(); refreshReceipt(base.root, assignment);

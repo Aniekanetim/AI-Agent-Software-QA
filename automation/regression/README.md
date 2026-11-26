@@ -1,5 +1,7 @@
 # Post-fix verification and regression
 
+For source-dependent fixes, use company-context prepare-fix before scoped G5 and again with the actual review evidence for closure. Confirmation and regression stay separately required. A pending or stale relevant source read cannot certify either current fix disposition or a parent release; unchanged source reads reuse the existing human decisions. Parent release preparation also covers included fixes' applicable source dependencies.
+
 Every product fix follows the Retest workflow. Confirm the original defect on the fixed build and account for the required regression checks before closing the defect. Use the existing QA queues, reviews and test runners.
 
 ## Register the fix and review coverage
