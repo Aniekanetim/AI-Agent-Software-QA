@@ -1,4 +1,4 @@
-import { assertCompanyBoundary } from '../company-context/boundary.js';
+import { assertCompanyBoundary, retainCompanyAdmission } from '../company-context/boundary.js';
 import { randomUUID } from 'node:crypto';
 import { assertDataReady, dataScopeDigest, requireCaseData, type DataReceipt, type DataScope } from '../data/readiness.js';
 import { assertNonsecret, digest, load, requireText, save, verifyEvidence, withLock, type Evidence } from '../shared/store.js';
@@ -10,7 +10,7 @@ import { readBoard, prepareWrite, type BoardReader, type BoardWriter, type Conne
 import { currentAssessment, currentReleaseRegression, resolveHandoffRoute, reviewHandoff, verifyDelivery, verifyHandoffCases, type DeliveryEvidence, type HandoffApproval, type InventoryRecheck, type Route } from '../release/handoff.js';
 import { pinned } from '../release/library.js';
 import { bindReleaseScope, previewReleaseScope, releaseScope, sameEvidence } from '../release/scope.js';
-import { currentFixes, defectCompletion, failedConfirmation, fixStatus, requireFixBatch, verifyRework, type DefectCompletion, type ReworkDecision } from '../regression/fix.js';
+import { currentFixes, defectCompletion, failedConfirmation, fixStatus, requireFixBatch, verifyRework, type DefectCompletion, type ReworkDecision, type DispositionAction } from '../regression/fix.js';
 import { nativeReleaseBoard, type ReleaseBoard } from '../regression/board.js';
 import type { Assignment } from '../release/scope.js';
 import { finishCases, inspectCases, prepareCheckpoint, readCaseBatch, startCases, verifyCaseAuthorization, verifyUnderstandingReview } from '../execution/cases.js';
@@ -38,6 +38,7 @@ interface Execution {
   startedAt: string; terminal?: { state: 'completed' | 'stopped' | 'notStarted'; source: string; evidence: Evidence[] };
   fixBatch?: ReturnType<typeof requireFixBatch>;
   caseExecution?: true;
+  companyAdmission?: Evidence;
 }
 interface Journal { schemaVersion: 1; claims: Claim[]; publications: Publication[]; executions: Execution[] }
 const journalPath = '.local/task-source-work.json';
@@ -366,9 +367,9 @@ function scopedDefect(root: string, claim: Claim, ref: Evidence | undefined) {
   return true;
 }
 
-function scopedCompletion(root: string, claim: Claim, defect: Evidence, completion: DefectCompletion | undefined, preview = false, requireCases = false) {
+function scopedCompletion(root: string, claim: Claim, defect: Evidence, completion: DefectCompletion | undefined, preview = false, requireCases = false, action?: DispositionAction) {
   scopedDefect(root, claim, defect);
-  const digest = defectCompletion(root, assignmentFor(claim), claim.ticket.revision, completion, defect, preview, requireCases);
+  const digest = defectCompletion(root, assignmentFor(claim), claim.ticket.revision, completion, defect, preview, requireCases, action);
   const review = preview ? undefined : completion?.fix ? fixStatus(root, completion.fix).review ?? undefined : completion?.refutation;
   return { defect, completion: completion!, digest, ...(review ? { review } : {}) };
 }
@@ -416,7 +417,8 @@ export function closeClaim(root: string, request: CloseClaimRequest, board?: Rel
       const moved = publications.filter(item => item.destination?.queue === 'testedOk').at(-1);
       if (!moved?.fixProof && !request.defect) throw new Error('Use completed after the confirmed G5 move with current release or fix evidence.');
       if (!moved?.fixProof || moved.remoteId !== claim.ticket.id ||
-          JSON.stringify(scopedCompletion(root, claim, moved.fixProof.defect, moved.fixProof.completion, false, request.requireCases)) !== JSON.stringify(moved.fixProof)) {
+          JSON.stringify(scopedCompletion(root, claim, moved.fixProof.defect, moved.fixProof.completion, false, request.requireCases,
+            { purpose: 'close', id: claim.id, decision: moved.decision })) !== JSON.stringify(moved.fixProof)) {
         throw new Error('Verify the actual scoped defect completion with confirmation and regression evidence.');
       }
       if (observedMove?.publicationId !== moved.id || observedMove.sourceRevision !== claim.sourceRevision ||
@@ -570,7 +572,8 @@ function approvedPublication(root: string, request: PublicationRequest, claim: C
       verifyUnderstandingReview(root, decision, readCaseBatch(root, session.batch).batch.understanding);
     }
   }
-  const fixProof = request.defect ? scopedCompletion(root, claim, request.defect, request.completion, false, request.requireCases) : undefined;
+  const fixProof = request.defect ? scopedCompletion(root, claim, request.defect, request.completion, false, request.requireCases,
+    { purpose: 'publish', id: request.id, decision: request.decision }) : undefined;
   if (fixProof?.review && !sameEvidence(decision.fixReview, fixProof.review)) throw new Error('Bind the actual G5 publication to the reviewed fix disposition.');
   const rework = failed ? { fix: failed.fix, review: request.decision } : undefined;
   if (rework) verifyRework(root, assignmentFor(claim), claim.ticket.revision, rework);
@@ -658,8 +661,9 @@ function finishObservedReview(root: string, claim: Claim, item: Publication, boa
       if (!item.rework) throw new Error('Record the reviewed confirmation failure for the observed Rework move.');
       verifyRework(root, assignmentFor(claim), claim.ticket.revision, item.rework);
     }
-    if (item.fixProof && requireCases) {
-      const current = scopedCompletion(root, claim, item.fixProof.defect, item.fixProof.completion, false, true);
+    if (item.fixProof) {
+      const current = scopedCompletion(root, claim, item.fixProof.defect, item.fixProof.completion, false, requireCases,
+        { purpose: 'reconcile', id: item.id, decision: item.decision });
       if (JSON.stringify(current) !== JSON.stringify(item.fixProof)) throw new Error('Reconcile the observed move against the current reviewed fix disposition.');
     }
     if (item.handoff && (item.handoff.kind === 'completion' || recheck)) {
@@ -755,11 +759,10 @@ export async function observeReleaseCompletion(root: string, request: { id: stri
     let fixProof: ReturnType<typeof scopedCompletion> | undefined;
     let reviewRequired: string | undefined;
     if (request.defect) {
-      fixProof = scopedCompletion(root, claim, request.defect, request.completion);
-      if (request.requireCases) {
-        try { scopedCompletion(root, claim, request.defect, request.completion, false, true); }
-        catch (error) { reviewRequired = error instanceof Error ? error.message : 'Review the observed fix completion.'; }
-      }
+      fixProof = { ...scopedCompletion(root, claim, request.defect, request.completion, true), review: decision.fixReview };
+      try { fixProof = scopedCompletion(root, claim, request.defect, request.completion, false, request.requireCases,
+        { purpose: 'observe', id: request.id, decision: request.decision }); }
+      catch (error) { reviewRequired = error instanceof Error ? error.message : 'Review the observed fix completion.'; }
     }
     let rework: ReworkDecision | undefined;
     let handoff: Publication['handoff'];
@@ -829,6 +832,8 @@ export async function beginExecution(root: string, request: Parameters<typeof pr
       connected: { claimId: claim.id }, ...(scope && data ? { dataBinding: { scope, observations: data.observations } } : {}) });
     else if (request.previousCases || request.caseIds) throw new Error('Case selection needs a reviewed case batch.');
     const execution: Execution = { id: request.id, claimId: claim.id, buildId, target, gates, startedAt: checkedAt,
+      ...(!caseAuthorization ? { companyAdmission: retainCompanyAdmission(root, assignmentFor(claim), { purpose: 'execution', id: request.id, target: observation },
+        { id: request.id, ticketRevision: claim.ticket.revision, monitoring: 'Connected aggregate admission only; actual runner evidence and current G5 are separately required.' }) } : {}),
       ...(data ? { data } : {}), ...(fixBatch ? { fixBatch } : {}), ...(caseAuthorization ? { caseExecution: true } : {}) };
     current.value.executions.push(execution);
     save(root, journalPath, current.value, current.revision);

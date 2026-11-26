@@ -10,7 +10,7 @@ import { readdirSync, existsSync } from 'node:fs';
 import { assertCompanyBasis } from '../company-context/guards.js';
 import { prepareCompanyBasis } from '../company-context/runtime.js';
 import { ContextError } from '../company-context/types.js';
-import { assertCompanyBoundary, boundaryRequirement, type Boundary } from '../company-context/boundary.js';
+import { assertCompanyBoundary, boundaryRequirement, retainCompanyAdmission, type Boundary } from '../company-context/boundary.js';
 
 interface Source {
   id: string;
@@ -104,8 +104,9 @@ interface Attempt {
   reviewRequired?: boolean;
   checkpoint?: string;
   checkpointTarget?: Evidence;
+  companyAdmission?: Evidence;
   invocation?: { checkpoint: string; id: string; kind: 'postman' | 'webmcp'; pid?: number };
-  observations: (CheckpointObservation & { checkpoint: string; invocation?: Attempt['invocation']; runnerEvidence?: Evidence; targetObservation?: Evidence; carried?: { receipt: Evidence; reconciliation?: Evidence } })[];
+  observations: (CheckpointObservation & { checkpoint: string; invocation?: Attempt['invocation']; runnerEvidence?: Evidence; targetObservation?: Evidence; companyAdmission?: Evidence; carried?: { receipt: Evidence; reconciliation?: Evidence } })[];
 }
 interface FlowIssue {
   id: string;
@@ -576,6 +577,9 @@ export function claimCaseCheckpoint<T = void>(root: string, request: CaseCheckpo
         throw new Error('Use the exact runner and inputs approved for this checkpoint.');
       }
       if (attempt.invocation) throw new Error('This checkpoint already has a runner invocation. Reconcile its actual outcome before retrying.');
+      attempt.companyAdmission = retainCompanyAdmission(root, design.batch.assignment, companyExecution(session, design),
+        { id: `${session.id}:${item.id}:${request.checkpoint}:${invocation.id}`, monitoring: 'Runner admission; actual outcome retained separately. No continuous remote Slack monitoring.' },
+        [...new Set([...design.flows.get(item.flowId)!.criteria, ...item.criteria])]);
       attempt.invocation = { kind: invocation.kind, id: invocation.id, checkpoint: request.checkpoint, pid: process.pid };
     });
     return dispatch?.();
@@ -728,6 +732,9 @@ export function prepareCheckpoint(root: string, request: { id: string; caseId: s
       if (attempt.status) return { state: attempt.status, issue: attempt.issue };
     }
     const checkpoint = item.checkpoints[attempt.observations.length]!;
+    attempt.companyAdmission = retainCompanyAdmission(root, design.batch.assignment, companyExecution(session, design),
+      { id: `${session.id}:${item.id}:${checkpoint.id}`, monitoring: 'Agent checkpoint admission; recheck current sources before dependent checkpoints.' },
+      [...new Set([...design.flows.get(item.flowId)!.criteria, ...item.criteria])]);
     attempt.checkpoint = checkpoint.id;
     attempt.checkpointTarget = request.target;
     return { state: 'ready' as const, caseId: item.id, checkpoint, criteria: item.criteria, flow: design.flows.get(item.flowId)! };
@@ -764,10 +771,11 @@ export function observeCheckpoint(root: string, request: CheckpointObservation &
       throw new Error('Use the actual checkpoint observation time at or after the observed target.');
     }
     attempt.observations.push({ ...observation, checkpoint, invocation: attempt.invocation, runnerEvidence,
-      targetObservation: attempt.checkpointTarget });
+      targetObservation: attempt.checkpointTarget, companyAdmission: attempt.companyAdmission });
     delete attempt.checkpoint;
     delete attempt.checkpointTarget;
     delete attempt.invocation;
+    delete attempt.companyAdmission;
     let stale = false;
     try { verifyCurrentCase(root, design, item); } catch { stale = true; }
     const dependency = dependencyHold(root, session, design, item);

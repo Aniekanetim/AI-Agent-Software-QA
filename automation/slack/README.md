@@ -1,5 +1,7 @@
 # Slack access
 
+Use `catalog-jobs --connection <id>` to find retained unfinished inventories after an interrupted/failed native import. Validation errors expose current progress without accepting bad evidence or releasing another request's reservation. Repair and import only the pending page. Read-only inspection does not advance coverage. See [company context](../company-context/README.md#no-change-dispositions-and-execution-provenance) for disposition boundaries and pinned execution evidence.
+
 Catalog imports accept previous evidence so a native reader can resume with only the next actual page. API/native readers share durable cursor history and completed-read eligibility. Before execution/G5/action preparation, reserve the actual company-source boundary and obtain its request-bound reads; an earlier capture is not a new operation. No terminal adapter can manufacture access to the host integration.
 
 Use [company context](../company-context/README.md) to select company/project channels, retain source versions and use learned information through the existing QA gates.

@@ -1,5 +1,7 @@
 # Verify cases during an approved batch
 
+Current checkpoints retain immutable `companyAdmission` with their observations, and Postman/WebMCP runner admission records the proof checked immediately before invocation. It pins source basis, boundary, connection/selection, receipts and completed reads. These records survive renewal and interruption; they do not authorize an expired/changed source or turn aggregate output into supported case verdicts.
+
 For configured company sources, each case session gets one execution/resume boundary. Its relevant completed read must follow that boundary; subsequent checkpoints reuse eligible receipts. Prepare native source pages through the existing company-context import procedure before dependent actions. Recent timestamps or a partial thread cannot renew freshness. Routine unchanged reads do not require another human approval.
 
 At G1, explain how the relevant feature works and identify the accepted requirements that establish the expected outcomes. At G2 or G4, show the cases, starting conditions, permitted actions and verdict criteria together. The reviewer can approve the entire batch in one decision. Routine case and checkpoint checks run under that decision.

@@ -1,6 +1,6 @@
 import { digest, load, requireText, save, withLock, type Evidence } from '../shared/store.js';
 import { currentBasis, assertCompanyBasis, receiptPath } from './guards.js';
-import { immutable, prefix, readObject } from './store.js';
+import { immutable, prefix, readObject, binding, connection } from './store.js';
 import { ContextError, key, type Assignment, type Basis, type ReadCompletion } from './types.js';
 
 export interface Boundary {
@@ -15,13 +15,15 @@ const path = (assignment: Assignment, basis: Evidence, value: Boundary) => `${pr
 export function boundaryRequirement(root: string, assignment: Assignment, value: Boundary, create = false, now = Date.now()) {
   value = { purpose: value.purpose, id: value.id, target: { buildId: value.target?.buildId, environment: value.target?.environment, ...(value.target?.commit ? { commit: value.target.commit } : {}) }, ...(value.decision ? { decision: value.decision } : {}), ...((value.decision || value.decisionSha256) ? { decisionSha256: value.decision?.sha256 ?? value.decisionSha256 } : {}) };
   const basis = currentBasis(root, assignment); if (!basis?.dependencies.length) return null;
+  const applicability = readObject<Basis>(root, basis.basis).target;
+  if (applicability?.environment && applicability.environment !== value.target.environment) throw new ContextError('BASIS_CHANGED', 'Review company-source applicability for this actual target environment.');
   requireText(value.id); requireText(value.target?.buildId); requireText(value.target?.environment);
   if (!['execution', 'g5', 'publish', 'close', 'reconcile', 'observe'].includes(value.purpose)) throw new Error('Use the actual execution/release boundary.');
   if (create && ['publish', 'close', 'reconcile', 'observe'].includes(value.purpose)) {
     if (!value.decision) throw new Error('Retain the actual G5 decision before preparing a release action.');
     const decision = readObject<any>(root, value.decision);
     const observed = decision.target ?? (decision.targetObservation && readObject<any>(root, decision.targetObservation));
-    if (decision.gate !== 'G5' || !['Approved', 'Approved with limits'].includes(decision.decision) || !decision.reviewer || !decision.source || observed?.buildId !== value.target.buildId || observed.environment !== value.target.environment) throw new Error('Prepare this release action after its actual scoped G5 decision.');
+    if (decision.gate !== 'G5' || !['Approved', 'Approved with limits'].includes(decision.decision) || !decision.reviewer || !decision.source || observed?.buildId !== value.target.buildId || observed.environment !== value.target.environment || value.target.commit && observed.commit !== value.target.commit) throw new Error('Prepare this release action after its actual scoped G5 decision.');
   }
   const file = path(assignment, basis.basis, value);
   const inspect = () => {
@@ -43,11 +45,33 @@ export function boundaryRequirement(root: string, assignment: Assignment, value:
 
 export function assertCompanyBoundary(root: string, assignment: Assignment, value: Boundary, criteria?: string[], now = Date.now()) {
   // Validate known changes first, rather than masking them with missing boundary diagnostics.
-  assertCompanyBasis(root, assignment, criteria, undefined, now);
+  const validated = assertCompanyBasis(root, assignment, criteria, undefined, now);
   const requirement = boundaryRequirement(root, assignment, value); if (!requirement) return;
   const basis = readObject<Basis>(root, requirement.basis);
   for (const dep of basis.dependencies.filter(dep => !criteria || dep.criterionIds.some(id => criteria.includes(id)))) {
     const receipt = load<{ completions?: Evidence[] } | null>(root, receiptPath(assignment, dep.bindingId, dep.claim), () => null).value;
     if (!requirement.generationFloors || !receipt?.completions?.length || receipt.completions.some(ref => { const read = readObject<ReadCompletion>(root, ref); return read.generation <= requirement.generationFloors[dep.bindingId]! || Date.parse(read.startedAt) < Date.parse(requirement.createdAt); })) throw new ContextError('REFRESH_REQUIRED', `Reread the applicable company sources for ${value.purpose} boundary ${value.id}.`);
   }
+  return { ...validated!, requirement: requirement.reference, boundary: requirement.boundary };
+}
+
+/** Called at admission under the caller's operation lock. Inspection never writes proof. */
+export function retainCompanyAdmission(root: string, assignment: Assignment, boundary: Boundary,
+  operation: { id: string; ticketRevision?: string; monitoring: string }, criteria?: string[]) {
+  requireText(operation.id); requireText(operation.monitoring);
+  const checked = assertCompanyBoundary(root, assignment, boundary, criteria); if (!checked) return undefined;
+  const receipts = checked.receipts.map(row => {
+    const selected = binding(root, row.bindingId);
+    return { bindingId: row.bindingId, claim: row.claim, criterionIds: row.criterionIds,
+      binding: immutable(root, 'admitted-bindings', selected), connection: immutable(root, 'admitted-connections', connection(root, selected.connectionId, true)),
+      receipt: immutable(root, 'receipt-history', row.receipt), completions: row.receipt.completions! };
+  });
+  const proof = immutable(root, 'admissions', { schemaVersion: 1, assignment, operation, target: boundary.target,
+    basis: checked.basis, approval: checked.approval, requirement: checked.requirement, criteria: criteria ?? null,
+    receipts, admittedAt: new Date().toISOString() });
+  // No network under locks. Reject a changed local basis/receipt before committing the operation link.
+  if (digest(JSON.stringify(assertCompanyBoundary(root, assignment, boundary, criteria))) !== digest(JSON.stringify(checked))) {
+    throw new ContextError('BASIS_CHANGED', 'Source evidence changed during admission; retain the attempt and prepare its current basis.');
+  }
+  return proof;
 }

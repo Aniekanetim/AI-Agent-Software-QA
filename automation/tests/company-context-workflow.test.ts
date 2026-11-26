@@ -13,12 +13,12 @@ import { bindReleaseScope, releaseScope } from '../release/scope.js';
 import { findTicket, transitionTicket } from '../board/board.js';
 import { ingestPr } from '../github/github.js';
 import { recordEquivalent } from '../company-context/knowledge.js';
-import type { Claim } from '../company-context/types.js';
+import { slackNow, type Claim } from '../company-context/types.js';
 import { readState, writeState } from '../onboarding/state.js';
 import * as menu from '../settings/menu.js';
 import * as config from '../company-context/config.js';
-import { recordAnalysis, inspectedSources } from '../company-context/knowledge.js';
-import { retainFixResults, recordFixReview, fixStatus, prepareFixSources, defectCompletion } from '../regression/fix.js';
+import { recordAnalysis, inspectedSources, recordClaim } from '../company-context/knowledge.js';
+import { retainFixResults, recordFixReview, fixStatus, prepareFixSources, prepareDispositionSources, defectCompletion } from '../regression/fix.js';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -120,6 +120,12 @@ test('source-bound case evidence reaches module-based G5 and an observed Tested-
 
 test('complete synthetic adoption, changed context, reviewed continuation, fix regression and handoff', async () => {
   const f = await workflowFixture();
+  const reviews = new Map<string, import('../shared/store.js').Evidence>();
+  const reviewed = (id: string, ref: import('../shared/store.js').Evidence) => { assert(!reviews.has(id)); reviews.set(id, ref); return ref; };
+  reviewed('initial-G1', f.g1); reviewed('initial-G2', f.approval);
+  let routinePrompts = 0;
+  const reviewRequests: { id: string; reason: 'scope' | 'material-change' | 'routine-case' }[] = [];
+  const requestReview = (id: string, reason: 'scope' | 'material-change' | 'routine-case') => { reviewRequests.push({ id, reason }); if (reason === 'routine-case') routinePrompts++; };
   const state = readState(f.root); state.value.completed = true; writeState(f.root, state.value, state.revision);
   let actions = 0;
   const runner = { companyAdapter: () => f.adapter, target: () => f.observed, execute: () => { actions++; return { outcome: 'matched' as const, source: 'Synthetic observed approved action', evidence: [f.observation] }; } };
@@ -138,18 +144,22 @@ test('complete synthetic adoption, changed context, reviewed continuation, fix r
   assert.equal(readState(f.root).value.completed, true);
   assert.equal((await f.run(1)).job.state, 'partial'); assert.equal((await f.run(1)).job.state, 'partial'); assert.equal((await f.run()).job.state, 'complete');
   const beforeChange = f.authorize({ both: true });
+  requestReview('selection-scope', 'scope'); reviewed('selection-G1', beforeChange.g1);
   const rebind = (name: string, basis: ReturnType<typeof f.authorize>, batchInput: any) => {
     const batch = f.put(name + '-batch.json', { ...batchInput, understanding: basis.understanding });
     const approval = f.put(name + '-g2.json', { gate: 'G2', decision: 'Approved', assignment: basis.assignment, understanding: basis.understanding, scopeReview: basis.g1, caseBatch: batch, packet: basis.packet, reviewer: 'Synthetic human QA', source: 'Synthetic informed batch review' });
-    return { batch, approval };
+    reviewed(name + '-G2', approval); return { batch, approval };
   };
   const old = rebind('before-change', beforeChange, readObject(f.root, f.batch));
   startCases(f.root, { id: 'changed-sources', ...old, target: f.observed });
-  f.adapter.messages[0]!.editedTs = '900.000001'; f.adapter.messages[0]!.text = 'Retry must preserve payment identity and show the original reference.';
+  const supersedingTs = slackNow(Date.now());
+  f.adapter.messages.push({ channelId: 'C1', ts: supersedingTs, authorId: 'U2', text: 'Current release decision: supersedes the earlier retry rule. Retry must preserve payment identity and show the original reference.' });
   const changed = await runApprovedCases(f.root, 'changed-sources', runner);
   assert.equal(changed.session.attempts.find(a => a.caseId === 'dependent')!.status, 'Blocked');
   assert.equal(changed.session.attempts.find(a => a.caseId === 'independent')!.status, 'Pass');
-  const revised = f.authorize({ both: true, statement: f.adapter.messages[0]!.text });
+  requestReview('changed-understanding', 'material-change');
+  const revised = f.authorize({ both: true, claimId: 'retry-rule-v2', supersedes: ['retry-rule'], statement: 'Retry must preserve payment identity and show the original reference.' });
+  reviewed('revised-G1', revised.g1);
   const continued = rebind('revised', revised, readObject(f.root, f.batch));
   startCases(f.root, { id: 'reviewed-continuation', ...continued, target: f.observed });
   assert((await runApprovedCases(f.root, 'reviewed-continuation', runner)).session.attempts.every(a => a.status === 'Pass'));
@@ -165,24 +175,36 @@ test('complete synthetic adoption, changed context, reviewed continuation, fix r
     sources: readObject<any>(f.root, child.understanding).sources.map((s: any) => ({ ...s, id: s.id === 'rule' ? 'route-rule' : s.id })),
     flows: readObject<any>(f.root, child.understanding).flows.map((s: any) => ({ ...s, id: s.id === 'retry' ? 'route' : s.id, criteria: s.criteria.map((id: string) => id === 'rule' ? 'route-rule' : id) })) });
   const childG1 = f.put('child-g1.json', { ...readObject<any>(f.root, child.g1), assignment: defect, understanding: childUnderstanding });
+  reviewed('child-G1', childG1);
   bindBasis(f.root, { basis: childBasis, approval: childG1, source: 'Synthetic reviewed mapped fix criteria' }); refreshReceipt(f.root, defect);
   const bug = findTicket(f.root, defect.ticketId);
   const fixed = regressionFixture(f.root, defect, bug.revision, { parent: revised.assignment, base, cases: true, understanding: childUnderstanding }); fixed.approve();
+  reviewed('fix-G4', fixed.g4);
   const target = f.put('served-release-target.json', { ...base.target, source: 'Synthetic observed release build', observedAt: new Date().toISOString() });
   const plan = readObject<any>(f.root, fixed.plan);
   for (const phase of ['confirmation', 'regression']) {
     const batch = plan.caseBatches.find((b: any) => b.batchId === phase).batch;
     const id = 'fix-' + phase; startCases(f.root, { id, batch, approval: fixed.g4, target });
-    const result = await runApprovedCases(f.root, id, { ...runner, target: () => target }); assert(result.session.attempts.every(a => a.status === 'Pass'));
+    const result = await runApprovedCases(f.root, id, { ...runner, target: () => target, execute: step => {
+      const value = runner.execute(); return { ...value, outcome: phase === 'regression' && step.checkpoint.id === 'result' ? 'deviation' : value.outcome };
+    } });
+    assert.equal(result.session.attempts[0]!.status, phase === 'regression' ? 'Fail' : 'Pass');
     const design = readCaseBatch(f.root, batch);
     const run = f.put(id + '-run.json', { schemaVersion: 1, id, round: fixed.roundRef, target: base.target, observedAt: new Date().toISOString(), targetEvidence: target,
-      observations: [...design.cases.values()].map(c => ({ checkId: c.checkId, conditionId: c.conditionId, context: c.context, outcome: 'Pass', evidence: [result.receipt], caseExecution: { receipt: result.receipt, caseId: c.id } })) });
+      observations: [...design.cases.values()].map(c => ({ checkId: c.checkId, conditionId: c.conditionId, context: c.context, outcome: phase === 'regression' ? 'Fail' : 'Pass', evidence: [result.receipt], caseExecution: { receipt: result.receipt, caseId: c.id } })) });
     retainRun(f.root, { round: fixed.roundRef, run }); retainFixResults(f.root, { fix: fixed.key, plan: fixed.plan, batchId: phase, round: fixed.roundRef, run });
     if (phase === 'confirmation') { assert.equal(findTicket(f.root, defect.ticketId).status, 'Retest'); assert.throws(() => fixed.review(), /regression|confirmation|Complete/); }
   }
+  mkdirSync(resolve(f.root, 'QA task management Board/Dev Todo'), { recursive: true });
+  writeFileSync(resolve(f.root, 'QA task management Board/Dev Todo/BUG-002.md'), '# BUG-002: Synthetic separate regression failure\n\n| Type | Regression bug |\n| Originating defect | BUG-001 |\n\nNew regression observed during the reviewed fix regression batch.\n');
+  const regressionTicket = { source: 'local', ticketId: 'BUG-002' };
+  assert.equal(findTicket(f.root, regressionTicket.ticketId).status, 'Dev Todo');
+  assert.equal(findTicket(f.root, defect.ticketId).status, 'Retest', 'Passing original confirmation must not enter Rework for a separate regression');
+  const findings = [{ checkId: 'shared', conditionId: 'route', ticket: regressionTicket, impact: 'nonblocking', evidence: f.put('observed-regression-ticket.json', {
+    fix: fixed.key, ticket: regressionTicket, destination: 'Dev Todo', source: 'Synthetic canonical ticket readback; actual synthetic QA accepts this separate residual risk for this bounded fixture release' }) }];
   await prepareFixSources(f.root, { fix: fixed.key }, () => f.adapter);
-  const draftFixDecision = fixed.review([], false);
-  const fixDecision = f.put('observed-fix-review.json', { ...readObject<any>(f.root, draftFixDecision), targetObservation: f.put('fix-review-build.json', { ...base.target, fixRevision: 'r1', source: 'Synthetic served fix readback after both batches', observedAt: new Date().toISOString() }) });
+  const draftFixDecision = fixed.review(findings, false);
+  const fixDecision = reviewed('fix-G5', f.put('observed-fix-review.json', { ...readObject<any>(f.root, draftFixDecision), decision: 'Approved with limits', targetObservation: f.put('fix-review-build.json', { ...base.target, fixRevision: 'r1', source: 'Synthetic served fix readback after both batches', observedAt: new Date().toISOString() }) }));
   recordFixReview(f.root, { fix: fixed.key, review: fixDecision, requireCases: true }); assert.equal(fixStatus(f.root, fixed.key).state, 'reviewed');
   assert.throws(() => defectCompletion(f.root, defect, bug.revision, { fix: fixed.key }, undefined, false, true), /Prepare/);
   await prepareFixSources(f.root, { fix: fixed.key, close: fixDecision }, () => f.adapter);
@@ -190,29 +212,68 @@ test('complete synthetic adoption, changed context, reviewed continuation, fix r
     decision: { actor: 'Synthetic QA', source: 'Synthetic reviewed fix closure', reason: 'Original confirmation and authorized regression passed', evidence: [fixDecision], scope: { kind: 'assignment' }, checkpoint: 'Scoped G5 complete', nextOwner: 'Synthetic release owner', nextAction: 'Include verified fix evidence in release', handoff: 'Synthetic scoped fix evidence retained' } });
   assert.equal(findTicket(f.root, bug.id).status, 'Tested-Ok');
 
+  const noChange = { source: 'local', ticketId: 'BUG-003' };
+  writeFileSync(resolve(f.root, 'QA task management Board/Retest/BUG-003.md'), '# BUG-003: Synthetic clarification of expected retry behavior\n\n| Type | Bug |\n| Originating defect | BUG-001 |\n');
+  const noChangeTicket = findTicket(f.root, noChange.ticketId);
+  const noChangeBasis = immutable(f.root, 'basis', { ...revised.basis, assignment: noChange });
+  const noChangeUnderstanding = f.put('no-change-understanding.json', { ...readObject<any>(f.root, revised.understanding), assignment: noChange, companyContext: noChangeBasis });
+  const noChangeG1 = reviewed('no-change-G1', f.put('no-change-g1.json', { ...readObject<any>(f.root, revised.g1), assignment: noChange, understanding: noChangeUnderstanding }));
+  bindBasis(f.root, { basis: noChangeBasis, approval: noChangeG1, source: 'Synthetic actual no-change understanding review' }); refreshReceipt(f.root, noChange);
+  const noChangePacket = f.put('no-change-packet.json', { assignment: noChange, ticketRevision: noChangeTicket.revision, understanding: noChangeUnderstanding,
+    targetObservation: target, defectReport: f.put('no-change-report.json', { source: 'Synthetic reported expectation discrepancy' }),
+    ownerDecision: f.put('no-change-owner.json', { assignment: noChange, decision: 'noProductChange', source: 'Synthetic responsible owner confirms current one-payment expectation; no product change' }) });
+  await prepareDispositionSources(f.root, { packet: noChangePacket }, () => f.adapter);
+  const noChangeDecision = reviewed('no-change-G5', f.put('no-change-g5.json', { ...readObject<any>(f.root, noChangePacket), packet: noChangePacket, target: base.target,
+    gate: 'G5', decision: 'Approved', reviewer: 'Synthetic actual QA', source: 'Synthetic reviewed owner clarification and no-change disposition' }));
+  assert.throws(() => defectCompletion(f.root, noChange, noChangeTicket.revision, { refutation: noChangeDecision }), /Prepare/);
+  await prepareDispositionSources(f.root, { packet: noChangePacket, close: noChangeDecision }, () => f.adapter);
+  transitionTicket(f.root, { id: 'integrated-no-change-close', ticketId: noChangeTicket.id, expectedRevision: noChangeTicket.revision, to: 'Tested-Ok', defect: { refutation: noChangeDecision },
+    decision: { actor: 'Synthetic QA', source: 'Synthetic disposition response', reason: 'Reviewed no product change', evidence: [noChangeDecision], scope: { kind: 'assignment' }, checkpoint: 'Scoped G5', nextOwner: 'Synthetic team', nextAction: 'Retain owner clarification', handoff: 'No product-fix regression fabricated' } });
+  assert.equal(findTicket(f.root, noChangeTicket.id).status, 'Tested-Ok');
+
   const definition = f.put('release-definition.json', { expected: revised.basis.dependencies[0]!.claim, action: 'Retry preserves identity and displays original reference' });
   const library = { ...base.library, conditions: [{ ...base.library.conditions[0]!, basis: revised.claim }], checks: [{ ...base.library.checks[0]!, definition }] };
   const libraryRef = f.put('release-library.json', library);
-  const final = rebind('release', revised, { schemaVersion: 1, assignment: revised.assignment, target: base.target, cases: [{ id: 'shared', flowId: 'retry', checkId: 'shared', conditionId: 'route', criteria: ['rule'], definition, dependsOn: [], checkpoints: [{ id: 'precondition', action: 'Observe payment', expected: 'Saved payment exists' }, { id: 'result', action: 'Retry', expected: 'Original reference displayed; one payment remains' }] }] });
+  const final = rebind('final-batch', revised, { schemaVersion: 1, assignment: revised.assignment, target: base.target, cases: [{ id: 'shared', flowId: 'retry', checkId: 'shared', conditionId: 'route', criteria: ['rule'], definition, dependsOn: [], checkpoints: [{ id: 'precondition', action: 'Observe payment', expected: 'Saved payment exists' }, { id: 'result', action: 'Retry', expected: 'Original reference displayed; one payment remains' }] }] });
   const applicability = f.put('release-applicability.json', { ...readObject<any>(f.root, base.applicability), library: libraryRef });
   const round = { ...base.round, library: libraryRef, applicability, caseBatches: [final.batch] }, roundRef = f.put('release-round.json', round);
   const approval = f.put('release-scope-g2.json', { ...readObject<any>(f.root, base.approvalFor('local', round, roundRef, 'integrated', [{ defect, fixRevision: 'r1' }])), ...readObject<any>(f.root, final.approval),
     scopeReview: f.put('release-scope-g1.json', { ...readObject<any>(f.root, readObject<any>(f.root, base.approvalFor('local', round, roundRef, 'integrated', [{ defect, fixRevision: 'r1' }])).scopeReview), understanding: revised.understanding }), round: roundRef });
   bindReleaseScope(f.root, { assignment: revised.assignment, round: roundRef, approval, expectedRevision: releaseScope(f.root, revised.assignment).revision, requireCases: true });
+  reviewed('release-G1', readObject<any>(f.root, approval).scopeReview); reviewed('release-G2', approval);
   startCases(f.root, { id: 'final-release', batch: final.batch, approval, target });
   const result = await runApprovedCases(f.root, 'final-release', { ...runner, target: () => target }); assert(result.session.attempts.every(a => a.status === 'Pass'));
   const run = f.put('final-run.json', { schemaVersion: 1, id: 'final-run', round: roundRef, target: base.target, targetEvidence: target, observedAt: new Date().toISOString(), observations: [{ checkId: 'shared', conditionId: 'route', outcome: 'Pass', evidence: [result.receipt], caseExecution: { receipt: result.receipt, caseId: 'shared' } }] });
   retainRun(f.root, { round: roundRef, run }); const { assessment } = recordAssessment(f.root, { round: roundRef, runs: [run] });
   await prepareReleaseSources(f.root, { assignment: revised.assignment, assessment }, () => f.adapter);
   const ticket = findTicket(f.root, 'QA-001'), route = { channel: 'recorded' as const, recipient: 'Synthetic release owner', destination: 'Synthetic handoff record', acknowledgementRequired: false };
-  const decision = f.put('integrated-g5.json', { gate: 'G5', decision: 'Approved', reviewer: 'Synthetic human QA', source: 'Synthetic informed release review', packet: revised.packet, ticketId: ticket.id, ticketRevision: ticket.revision, target: base.target,
-    handoff: { assessment, route, targetObservation: f.put('g5-build.json', { ...base.target, observedAt: new Date().toISOString(), source: 'Synthetic served-build recheck' }), regressionDigest: currentReleaseRegression(f.root, revised.assignment).digest, understandings: [revised.understanding] } });
-  f.adapter.messages.push({ channelId: 'C1', ts: '105.000001', threadTs: '100.000001', authorId: 'U2', text: 'Meeting moved to Thursday; no change to the payment rule.' });
+  const decision = reviewed('release-G5', f.put('integrated-g5.json', { gate: 'G5', decision: 'Approved with limits', reviewer: 'Synthetic human QA', source: 'Synthetic informed release review; separate nonblocking regression accepted and left in Dev Todo', packet: revised.packet, ticketId: ticket.id, ticketRevision: ticket.revision, target: base.target,
+    handoff: { assessment, route, targetObservation: f.put('g5-build.json', { ...base.target, observedAt: new Date().toISOString(), source: 'Synthetic served-build recheck' }), regressionDigest: currentReleaseRegression(f.root, revised.assignment).digest, understandings: [revised.understanding] } }));
+  const postG5Ts = slackNow(Date.now());
+  f.adapter.messages.push({ channelId: 'C1', ts: postG5Ts, authorId: 'U2', text: 'New decision for current release: retries create a new payment. This supersedes the previous single-payment policy.' });
   await assert.rejects(prepareReleaseSources(f.root, { assignment: revised.assignment, assessment, action: 'close', id: ticket.revision, decision }, () => f.adapter), /Analyze/);
-  recordAnalysis(f.root, { bindingId: f.selected.id, sources: inspectedSources(f.root, f.selected.id).map(s => s.ref), reason: 'Synthetic owner follow-up concerns meeting time; reviewed payment expectation is unchanged.', source: 'Synthetic actual context analysis' });
-  await prepareReleaseSources(f.root, { assignment: revised.assignment, assessment, action: 'close', id: ticket.revision, decision }, () => f.adapter);
-  const delivery = f.put('integrated-delivery.json', { decisionSha256: decision.sha256, recipient: route.recipient, destination: route.destination, state: 'delivered', source: 'Synthetic observed authorized handoff' });
-  transitionTicket(f.root, { id: 'integrated-close', ticketId: ticket.id, expectedRevision: ticket.revision, to: 'Tested-Ok', release: { decision, delivery, requireCases: true }, decision: { actor: 'Synthetic QA', source: 'Synthetic actual closure decision', reason: 'Reviewed module coverage, source basis and included fix regression', evidence: [decision], scope: { kind: 'assignment' }, checkpoint: 'G5 complete', nextOwner: route.recipient, nextAction: 'Review handoff', handoff: 'Synthetic delivery observed' } });
+  const originalClaim = readObject<Claim>(f.root, revised.claim);
+  const changedSource = inspectedSources(f.root, f.selected.id).find(s => s.content.message.ts === postG5Ts)!.ref;
+  const material = { ...originalClaim, id: 'post-review-rule', statement: 'Retries create a new payment.', sources: [changedSource], supersedes: [originalClaim.id] };
+  recordClaim(f.root, { bindingId: f.selected.id, claim: material });
+  recordAnalysis(f.root, { bindingId: f.selected.id, sources: inspectedSources(f.root, f.selected.id).map(s => s.ref), reason: 'Synthetic owner decision materially changes the current expected retry behavior.', source: 'Synthetic actual source interpretation' });
+  assert.throws(() => currentAssessment(f.root, assessment, revised.assignment), /replacement decision/);
+  assert.equal(findTicket(f.root, ticket.id).status, 'Ready for QA');
+  // The responsible owner corrects the effective release in Slack; QA must not invent that resolution.
+  const correctionTs = slackNow(Date.now());
+  f.adapter.messages.push({ channelId: 'C1', ts: correctionTs, threadTs: postG5Ts, authorId: 'U2', text: 'Owner correction: that policy starts NEXT release only. Current release keeps one payment and its original reference.' });
+  await f.run();
+  const correction = inspectedSources(f.root, f.selected.id).find(s => s.content.message.ts === correctionTs)!.ref;
+  recordClaim(f.root, { bindingId: f.selected.id, claim: { ...material, sources: [changedSource, correction], effective: 'Next release by explicit owner correction', effectiveScope: { environment: 'staging', release: 'next' } } });
+  recordAnalysis(f.root, { bindingId: f.selected.id, sources: inspectedSources(f.root, f.selected.id).map(s => s.ref), reason: 'The actual owner correction restores the unchanged current-release expectation; preserve the future policy and withdrawn current applicability.', source: 'Synthetic source-linked owner clarification' });
+  requestReview('post-G5-effective-release', 'material-change');
+  await prepareReleaseSources(f.root, { assignment: revised.assignment, assessment }, () => f.adapter);
+  const reaffirmed = reviewed('reconciled-G5', f.put('reconciled-g5.json', { ...readObject<any>(f.root, decision), source: 'Synthetic actual G5 response after reviewing material change and explicit owner effective-release correction' }));
+  await prepareReleaseSources(f.root, { assignment: revised.assignment, assessment, action: 'close', id: ticket.revision, decision: reaffirmed }, () => f.adapter);
+  const delivery = f.put('integrated-delivery.json', { decisionSha256: reaffirmed.sha256, recipient: route.recipient, destination: route.destination, state: 'delivered', source: 'Synthetic observed authorized handoff' });
+  transitionTicket(f.root, { id: 'integrated-close', ticketId: ticket.id, expectedRevision: ticket.revision, to: 'Tested-Ok', release: { decision: reaffirmed, delivery, requireCases: true }, decision: { actor: 'Synthetic QA', source: 'Synthetic actual closure decision', reason: 'Reviewed module coverage, source basis and included fix regression', evidence: [reaffirmed], scope: { kind: 'assignment' }, checkpoint: 'G5 complete', nextOwner: route.recipient, nextAction: 'Review handoff', handoff: 'Synthetic delivery observed' } });
   assert.equal(findTicket(f.root, ticket.id).status, 'Tested-Ok'); assert.equal(readState(f.root).value.completed, true);
   assert(original.session.attempts.every(a => a.status === 'Pass')); assert.equal(actions, 16);
+  assert.equal(routinePrompts, 0); assert.equal(reviewRequests.filter(r => r.reason === 'material-change').length, 2);
+  assert.equal(reviews.size, 16); assert.equal(findTicket(f.root, 'BUG-002').status, 'Dev Todo');
 });

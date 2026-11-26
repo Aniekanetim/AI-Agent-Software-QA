@@ -1,4 +1,6 @@
 # Inactive adoption template: supply reviewed project files and enable deliberately.
+# Associate dispatched results with the caller's retained companyAdmission through qa_run_key.
+# Never export private Slack content; admission does not establish continuous remote source monitoring.
 name: Reviewed project regression
 on:
   pull_request:

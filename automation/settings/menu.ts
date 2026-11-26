@@ -10,6 +10,7 @@ import { dataStatus } from '../data/intake.js';
 import { activeSource, sourcePath } from '../task-source/config.js';
 import * as company from '../company-context/config.js';
 import { status as companyStatus, settingsPath as companySettingsPath } from '../company-context/store.js';
+import { pendingCatalogs } from '../company-context/catalog.js';
 import { refreshSchedule } from '../company-context/schedule.js';
 
 const existingAreas = [
@@ -77,7 +78,7 @@ export function showMenu(root: string) {
     choices: area ? ['Back', 'Cancel this edit', 'Close settings'] : menuChoices.map(({ id, label }) => ({ id, label })),
     current,
     ...(menu.open && area?.id === 'testData' ? { testData: dataStatus(root) } : {}),
-    ...(menu.open && area?.id === 'companyContext' ? { companyContext: { provider: 'slack', ...companyStatus(root) }, companySchedule: (() => { try { return refreshSchedule(root); } catch { return { issue: 'The refresh schedule needs reconciliation; other Settings remain available.' }; } })(), actions: ['Inspect Slack connection', 'Add or remove channels', 'Refresh catalog/history', 'Directory access', 'Freshness and schedule', 'Disconnect'] } : {}),
+    ...(menu.open && area?.id === 'companyContext' ? { companyContext: { provider: 'slack', ...companyStatus(root) }, pendingCatalogs: (() => { try { return pendingCatalogs(root); } catch { return { issue: 'Inspect retained catalogs; Back and Close remain available.' }; } })(), companySchedule: (() => { try { return refreshSchedule(root); } catch { return { issue: 'The refresh schedule needs reconciliation; other Settings remain available.' }; } })(), actions: ['Inspect Slack connection', 'Add or remove channels', 'Refresh catalog/history', 'Inspect unfinished catalogs', 'Directory access', 'Freshness and schedule', 'Disconnect'] } : {}),
     ...(menu.open && area?.id === 'browser' ? {
       browserAccess: browserAccessStatus(root),
       browserNetworking: {
