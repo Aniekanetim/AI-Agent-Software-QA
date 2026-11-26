@@ -65,3 +65,32 @@ test('connected no-change closure enforces sources and records an already-observ
   assert.equal(observed.state, 'confirmed'); assert.match(observed.reviewRequired ?? '', /source changed/); assert.equal(writes, 0);
   await assert.rejects(live.closeCurrentClaim(f.root, { claimId: f.claim.id, disposition: 'completed', source: 'Synthetic close', evidence: [decision] }, f.reader), /source changed|disposition/);
 });
+
+test('native publication and later claim closure require their own unchanged source reads', async () => {
+  const f = await connectedFixture(true);
+  const target = { buildId: 'B-1', environment: 'staging' };
+  const defectReport = f.put('defect.json', { source: 'Synthetic original report' });
+  const packet = f.put('packet-disposition.json', { assignment: f.assignment, ticketRevision: f.claim.ticket.revision,
+    defectReport, understanding: f.understanding, targetObservation: f.put('target.json', { ...target, source: 'Synthetic actual target', observedAt: new Date().toISOString() }),
+    ownerDecision: f.put('owner.json', { assignment: f.assignment, decision: 'noProductChange', source: 'Synthetic actual owner clarification' }) });
+  await prepareDispositionSources(f.root, { packet }, () => f.adapter);
+  const refutation = f.put('refutation.json', { ...readObject<any>(f.root, packet), packet, target, gate: 'G5', decision: 'Approved', reviewer: 'Synthetic QA', source: 'Synthetic actual disposition response' });
+  const gate = { claimId: f.claim.id, ticketRevision: f.claim.ticket.revision, decision: 'Approved', reviewer: 'Synthetic QA', source: 'Synthetic actual gate decision', packet };
+  const g4 = f.put('g4.json', { ...gate, gate: 'G4', defectReport });
+  const request = { id: 'native-move', claimId: f.claim.id, action: 'move' as const, to: 'testedOk' as const, defect: g4, completion: { refutation } };
+  const preview = await live.publicationPreview(f.root, request, f.reader);
+  const decision = f.put('g5-publication.json', { ...gate, gate: 'G5', target, fixReview: refutation, publicationDigest: preview.publicationDigest });
+  await prepareDispositionSources(f.root, { packet, close: refutation }, () => f.adapter);
+  let writes = 0;
+  const writer = async () => async () => { writes++; f.remote.tickets[0]!.state = 'done'; return { remoteId: 'task' }; };
+  await assert.rejects(live.publish(f.root, { ...request, decision, source: 'Synthetic actual publication' }, f.reader, writer), /Prepare.*publish/);
+  assert.equal(writes, 0);
+  await prepareDispositionSources(f.root, { packet, close: refutation, action: { purpose: 'publish', id: request.id, decision } }, () => f.adapter);
+  await live.publish(f.root, { ...request, decision, source: 'Synthetic actual publication' }, f.reader, writer);
+  assert.equal(writes, 1);
+  const close = { claimId: f.claim.id, disposition: 'completed' as const, source: 'Synthetic current claim closure', evidence: [decision] };
+  await assert.rejects(live.closeCurrentClaim(f.root, close, f.reader), /Prepare.*close/);
+  await prepareDispositionSources(f.root, { packet, close: refutation, action: { purpose: 'close', id: f.claim.id, decision } }, () => f.adapter);
+  const closed = await live.closeCurrentClaim(f.root, close, f.reader);
+  assert.equal(closed.state, 'closed'); assert.equal(writes, 1);
+});

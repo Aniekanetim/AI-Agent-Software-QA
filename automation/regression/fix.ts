@@ -352,14 +352,26 @@ function verifyReview(root: string, entry: Fix, ref: Evidence, requireCases = fa
   return { review, assessmentDigest: current.assessmentDigest, approval: current.revision.approval };
 }
 
-export async function prepareFixSources(root: string, input: { fix: string; close?: Evidence }, adapterFor: (id: string) => Adapter = id => apiAdapter(root, id)) {
+export interface DispositionAction { purpose: 'publish' | 'close' | 'reconcile' | 'observe'; id: string; decision: Evidence }
+function dispositionAction(root: string, target: Target, ticketRevision: string, review: Evidence, action?: DispositionAction): Boundary {
+  if (action) {
+    if (!['publish', 'close', 'reconcile', 'observe'].includes(action.purpose)) throw new Error('Use the actual scoped publication, observation, reconciliation or closure action.');
+    const actual = pinned<{ gate: string; decision: string; fixReview?: Evidence; ticketRevision: string; reviewer: string; source: string }>(root, action.decision, 'actual scoped action decision');
+    if (!sameEvidence(action.decision, review) && (!sameEvidence(actual.fixReview, review) || actual.ticketRevision !== ticketRevision)) throw new Error('Bind this exact action to the actual scoped disposition review.');
+    if (actual.gate !== 'G5' || !['Approved', 'Approved with limits'].includes(actual.decision)) throw new Error('Use the actual G5 action decision.');
+    requireText(actual.reviewer); requireText(actual.source); requireText(action.id);
+  }
+  return { purpose: action?.purpose ?? 'close', id: action?.id ?? ticketRevision, target, decision: action?.decision ?? review };
+}
+export async function prepareFixSources(root: string, input: { fix: string; close?: Evidence; action?: DispositionAction }, adapterFor: (id: string) => Adapter = id => apiAdapter(root, id)) {
   const entry = findFix(root, input.fix), current = assess(root, entry);
   if (!current || current.report.state !== 'reviewPending') throw new Error('Complete confirmation and required regression before preparing scoped G5.');
   let boundary: Boundary = { purpose: 'g5', id: `fix:${entry.key}:${current.assessmentDigest}`, target: entry.identity.target };
   if (input.close) {
     const review = verifyReview(root, entry, input.close).review;
-    boundary = { purpose: 'close', id: review.ticketRevision, target: entry.identity.target, decision: input.close };
+    boundary = dispositionAction(root, entry.identity.target, review.ticketRevision, input.close, input.action);
   }
+  if (input.action && !input.close) throw new Error('Retain the actual scoped G5 decision before preparing its action.');
   await prepareCompanyBasis(root, entry.identity.defect, undefined, adapterFor, boundary);
   return { prepared: true, boundary };
 }
@@ -386,7 +398,7 @@ export function requireVerifiedFix(root: string, key: string, defect: Assignment
   return { key, target: entry.identity.target, ...verified, evidence: review };
 }
 
-export function defectCompletion(root: string, defect: Assignment, ticketRevision: string, completion: DefectCompletion | undefined, approval?: Evidence, preview = false, requireCases = false) {
+export function defectCompletion(root: string, defect: Assignment, ticketRevision: string, completion: DefectCompletion | undefined, approval?: Evidence, preview = false, requireCases = false, action?: DispositionAction) {
   if (!preview) assertCompanyBasis(root, defect);
   if (!completion) throw new Error('Record separate confirmation and regression outcomes for the fix, or the reviewed no-change disposition.');
   if (completion.fix) {
@@ -399,7 +411,7 @@ export function defectCompletion(root: string, defect: Assignment, ticketRevisio
     if (!preview) {
       const verified = requireVerifiedFix(root, completion.fix, defect, approval, requireCases);
       if (verified.review.ticketRevision !== ticketRevision) throw new Error('The scoped fix disposition must cover this ticket revision.');
-      assertCompanyBoundary(root, defect, { purpose: 'close', id: ticketRevision, target: entry.identity.target, decision: verified.evidence });
+      assertCompanyBoundary(root, defect, dispositionAction(root, entry.identity.target, ticketRevision, verified.evidence, action));
     }
     return current.assessmentDigest;
   }
@@ -418,7 +430,7 @@ export function defectCompletion(root: string, defect: Assignment, ticketRevisio
   if (!preview && currentBasis(root, defect)?.dependencies.length) {
     const scoped = verifyDisposition(root, completion.refutation!);
     if (!sameAssignment(scoped.packet.assignment, defect) || scoped.packet.ticketRevision !== ticketRevision) throw new Error('Use the current scoped no-change disposition.');
-    assertCompanyBoundary(root, defect, { purpose: 'close', id: ticketRevision, target: scoped.target, decision: completion.refutation });
+    assertCompanyBoundary(root, defect, dispositionAction(root, scoped.target, ticketRevision, completion.refutation!, action));
   }
   return completion.refutation!.sha256;
 }
@@ -458,15 +470,16 @@ function verifyDisposition(root: string, ref: Evidence, structureOnly = false) {
   else assertCompanyBoundary(root, scoped.packet.assignment, scoped.boundary);
   return scoped;
 }
-export async function prepareDispositionSources(root: string, input: { packet: Evidence; close?: Evidence }, adapterFor: (id: string) => Adapter = id => apiAdapter(root, id)) {
+export async function prepareDispositionSources(root: string, input: { packet: Evidence; close?: Evidence; action?: DispositionAction }, adapterFor: (id: string) => Adapter = id => apiAdapter(root, id)) {
   const scoped = dispositionPacket(root, input.packet);
   let boundary = scoped.boundary;
   if (input.close) {
     const review = pinned<{ packet: Evidence }>(root, input.close, 'no-change disposition');
     if (!sameEvidence(review.packet, input.packet)) throw new Error('Prepare the same reviewed no-change packet.');
     verifyDisposition(root, input.close, true);
-    boundary = { purpose: 'close', id: scoped.packet.ticketRevision, target: scoped.target, decision: input.close };
+    boundary = dispositionAction(root, scoped.target, scoped.packet.ticketRevision, input.close, input.action);
   }
+  if (input.action && !input.close) throw new Error('Retain the actual no-change G5 decision before preparing its action.');
   await prepareCompanyBasis(root, scoped.packet.assignment, undefined, adapterFor, boundary);
   if (input.close) verifyDisposition(root, input.close);
   return { prepared: true, boundary };
