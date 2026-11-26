@@ -4,8 +4,8 @@ import { retainedRun, retainedRuns, sameTarget, type Round, type Target } from '
 import type { Assignment } from '../release/scope.js';
 import type { ReleaseBoard } from './board.js';
 import { caseBasis, caseResult, verifyCaseAuthorization } from '../execution/cases.js';
-import { assertCompanyBasis } from '../company-context/guards.js';
-import { assertCompanyBoundary, type Boundary } from '../company-context/boundary.js';
+import { assertCompanyBasis, assertCompanyPlan, currentBasis } from '../company-context/guards.js';
+import { assertCompanyBoundary, boundaryRequirement, type Boundary } from '../company-context/boundary.js';
 import { prepareCompanyBasis, apiAdapter } from '../company-context/runtime.js';
 import type { Adapter } from '../company-context/types.js';
 
@@ -415,7 +415,61 @@ export function defectCompletion(root: string, defect: Assignment, ticketRevisio
   const owner = pinned<{ assignment: Assignment; decision: string; source: string }>(root, review.ownerDecision, 'responsible owner clarification');
   if (owner?.decision !== 'noProductChange' || !sameAssignment(owner.assignment, defect)) throw new Error('Link the actual owner decision confirming no product change.');
   requireText(owner.source, 'Actual owner decision source');
+  if (!preview && currentBasis(root, defect)?.dependencies.length) {
+    const scoped = verifyDisposition(root, completion.refutation!);
+    if (!sameAssignment(scoped.packet.assignment, defect) || scoped.packet.ticketRevision !== ticketRevision) throw new Error('Use the current scoped no-change disposition.');
+    assertCompanyBoundary(root, defect, { purpose: 'close', id: ticketRevision, target: scoped.target, decision: completion.refutation });
+  }
   return completion.refutation!.sha256;
+}
+
+interface DispositionPacket {
+  assignment: Assignment; ticketRevision: string; defectReport: Evidence; ownerDecision: Evidence;
+  understanding: Evidence; targetObservation: Evidence;
+}
+function dispositionPacket(root: string, ref: Evidence) {
+  const packet = pinned<DispositionPacket>(root, ref, 'no-change disposition packet');
+  requireText(packet.ticketRevision); requireText(packet.assignment?.source); requireText(packet.assignment?.ticketId);
+  verifyEvidence(root, packet.defectReport); verifyEvidence(root, packet.understanding);
+  const owner = pinned<{ assignment: Assignment; decision: string; source: string }>(root, packet.ownerDecision, 'responsible owner clarification');
+  if (!sameAssignment(owner.assignment, packet.assignment) || owner.decision !== 'noProductChange') throw new Error('Retain the actual owner no-product-change decision.');
+  requireText(owner.source);
+  const target = pinned<Target & { source: string; observedAt: string }>(root, packet.targetObservation, 'disposition target');
+  requireText(target.buildId); requireText(target.environment); requireText(target.source);
+  if (!Number.isFinite(Date.parse(target.observedAt))) throw new Error('Observe the actual disposition target.');
+  const boundary: Boundary = { purpose: 'g5', id: `disposition:${ref.sha256}`, target };
+  assertCompanyPlan(root, packet.assignment);
+  const basis = currentBasis(root, packet.assignment);
+  if (basis && !sameEvidence(pinned<{ companyContext?: Evidence }>(root, packet.understanding, 'disposition understanding').companyContext, basis.basis)) {
+    throw new Error('Use the reviewed understanding for the current disposition source basis.');
+  }
+  return { packet, target, boundary };
+}
+function verifyDisposition(root: string, ref: Evidence, structureOnly = false) {
+  const review = pinned<DispositionPacket & { gate: string; decision: string; reviewer: string; source: string; packet: Evidence }>(root, ref, 'no-change disposition');
+  const scoped = dispositionPacket(root, review.packet);
+  if (review.gate !== 'G5' || review.decision !== 'Approved' || !sameAssignment(review.assignment, scoped.packet.assignment) ||
+      review.ticketRevision !== scoped.packet.ticketRevision || ['defectReport', 'ownerDecision', 'understanding', 'targetObservation'].some(field =>
+        !sameEvidence(review[field as keyof DispositionPacket] as Evidence, scoped.packet[field as keyof DispositionPacket] as Evidence))) {
+    throw new Error('Review this exact no-change packet, target and source understanding at G5.');
+  }
+  requireText(review.reviewer); requireText(review.source);
+  if (structureOnly) boundaryRequirement(root, scoped.packet.assignment, scoped.boundary);
+  else assertCompanyBoundary(root, scoped.packet.assignment, scoped.boundary);
+  return scoped;
+}
+export async function prepareDispositionSources(root: string, input: { packet: Evidence; close?: Evidence }, adapterFor: (id: string) => Adapter = id => apiAdapter(root, id)) {
+  const scoped = dispositionPacket(root, input.packet);
+  let boundary = scoped.boundary;
+  if (input.close) {
+    const review = pinned<{ packet: Evidence }>(root, input.close, 'no-change disposition');
+    if (!sameEvidence(review.packet, input.packet)) throw new Error('Prepare the same reviewed no-change packet.');
+    verifyDisposition(root, input.close, true);
+    boundary = { purpose: 'close', id: scoped.packet.ticketRevision, target: scoped.target, decision: input.close };
+  }
+  await prepareCompanyBasis(root, scoped.packet.assignment, undefined, adapterFor, boundary);
+  if (input.close) verifyDisposition(root, input.close);
+  return { prepared: true, boundary };
 }
 
 export function requireFixBatch(root: string, defect: Assignment, target: Target, approval: Evidence, selection: { fix: string; batchId: string }) {

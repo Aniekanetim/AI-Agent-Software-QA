@@ -1,4 +1,4 @@
-import { assertCompanyBoundary, type Boundary } from '../company-context/boundary.js';
+import { assertCompanyBoundary, retainCompanyAdmission, type Boundary } from '../company-context/boundary.js';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { existsSync, readFileSync, readdirSync, mkdirSync } from 'node:fs';
@@ -118,7 +118,7 @@ export function assertRegression(root: string, policy: RegressionPolicy, pr: Pul
   if (!policy.command.executable || !Array.isArray(policy.command.args) || policy.command.args.some(a => typeof a !== 'string') || /[\r\n\0]/.test(policy.command.executable)) throw new Error('Use an explicit executable and argument array without a shell.');
   return digest(JSON.stringify({ repository: pr.repository, pr: pr.number, head: pr.head, tested: target.commit, build: target.buildId, policy: policy.id, revision: policy.revision, scopeDigest: policyDigest(policy), suite: policy.suiteId, evidence: policy.suiteEvidence, target: target.id }));
 }
-interface RunRecord { schemaVersion: 1; key: string; head: string; testedCommit: string; buildId: string; status: 'running' | 'completed' | 'uncertain'; startedAt: string; completedAt?: string; exitCode?: number; productVerdict: 'Not assessed'; source: string; ticketId: string; generation: string; operationId: string; lifecycleStopRequested?: boolean; data?: DataReceipt; caseExecution?: string }
+interface RunRecord { schemaVersion: 1; key: string; head: string; testedCommit: string; buildId: string; status: 'running' | 'completed' | 'uncertain'; startedAt: string; completedAt?: string; exitCode?: number; productVerdict: 'Not assessed'; source: string; ticketId: string; generation: string; operationId: string; lifecycleStopRequested?: boolean; data?: DataReceipt; caseExecution?: string; companyAdmission?: Evidence }
 interface RegressionData { observations?: Evidence[]; expectedDigest?: string; expectedCaseDigest?: string; requireCaseBatch?: boolean }
 
 function checkDataRequest(policy: RegressionPolicy, input: RegressionData) {
@@ -280,6 +280,8 @@ export async function executeRegression(root: string, policy: RegressionPolicy, 
         assertCaseInputs(root, caseExecution, policy.suiteEvidence);
         record.caseExecution = caseExecution;
       }
+      record.companyAdmission = retainCompanyAdmission(root, { source: 'local', ticketId: ticket.id }, companyExecution(policy, key, target),
+        { id: operationId, ticketRevision: ticket.revision, monitoring: 'Admission only; current case checkpoints and G5 revalidate applicable sources.' });
       startOperation(root, ticket, { id: operationId, source, kind: 'localRegression', resultPath: path });
       save(root, path, record, null);
       monitor = watchTicket(root, ticket, operationId, () => controller.abort());
@@ -330,6 +332,7 @@ export async function dispatchRegression(root: string, policy: RegressionPolicy,
   await prepareCompanyBasis(root, { source: 'local', ticketId: ticket.id }, undefined, undefined, companyExecution(policy, key, target));
   const operationId = `dispatch-${key}`;
   let data: DataReceipt | undefined;
+  let companyAdmission: Evidence | undefined;
   const previous = withLock(root, 'qa-board', () => {
     assertExecutable(root, ticket.id, ticket.generation);
     assertCompanyBoundary(root, { source: 'local', ticketId: ticket.id }, companyExecution(policy, key, target));
@@ -338,8 +341,10 @@ export async function dispatchRegression(root: string, policy: RegressionPolicy,
     if (existing) throw new Error('A dispatch already exists and its outcome is uncertain. Inspect its actual GitHub run before repeating.');
     assertLegacyStart(root, binding);
     data = regressionData(root, policy, target, dataInput);
+    companyAdmission = retainCompanyAdmission(root, { source: 'local', ticketId: ticket.id }, companyExecution(policy, key, target),
+      { id: operationId, ticketRevision: ticket.revision, monitoring: 'Dispatch admission only; no continuous remote Slack monitoring. Associate receiver results through qa_run_key; current G5 requires its own sources.' });
     startOperation(root, ticket, { id: operationId, source: `Reviewed policy ${policy.id}/${policy.revision}; ${pr.url}`, kind: 'workflowDispatch', resultPath: path });
-    save(root, path, { key, state: 'invoking', head: pr.head, testedCommit: target.commit, ticketId: ticket.id, generation: ticket.generation, operationId, workflow: policy.dispatch!.workflow, ref: policy.dispatch!.ref, ...(data ? { data } : {}) }, null);
+    save(root, path, { key, state: 'invoking', head: pr.head, testedCommit: target.commit, ticketId: ticket.id, generation: ticket.generation, operationId, workflow: policy.dispatch!.workflow, ref: policy.dispatch!.ref, ...(companyAdmission ? { companyAdmission } : {}), ...(data ? { data } : {}) }, null);
     return null;
   });
   if (previous) return { ...previous, key, action: 'unchanged', result: 'Not yet observed' };
@@ -357,9 +362,9 @@ export async function dispatchRegression(root: string, policy: RegressionPolicy,
     });
     const observed = await work;
     const requested = monitor.finish();
-    save(root, path, { key, state: 'dispatched', head: pr.head, testedCommit: target.commit, ticketId: ticket.id, generation: ticket.generation, operationId, observation: observed.trim(), lifecycleStopRequested: requested, result: 'Remote run state not yet observed; dispatch acknowledgement is not completion or cancellation.', ...(data ? { data } : {}) }, revision(root, path));
+    save(root, path, { key, state: 'dispatched', head: pr.head, testedCommit: target.commit, ticketId: ticket.id, generation: ticket.generation, operationId, observation: observed.trim(), lifecycleStopRequested: requested, result: 'Remote run state not yet observed; dispatch acknowledgement is not completion or cancellation.', ...(companyAdmission ? { companyAdmission } : {}), ...(data ? { data } : {}) }, revision(root, path));
   } catch (error) {
-    monitor.finish(); save(root, path, { key, state: sent ? 'uncertain' : 'notStarted', head: pr.head, ticketId: ticket.id, operationId, ...(data ? { data } : {}) }, revision(root, path));
+    monitor.finish(); save(root, path, { key, state: sent ? 'uncertain' : 'notStarted', head: pr.head, testedCommit: target.commit, ticketId: ticket.id, generation: ticket.generation, operationId, ...(companyAdmission ? { companyAdmission } : {}), ...(data ? { data } : {}) }, revision(root, path));
     if (!sent) throw new Error(`No workflow request was sent. ${(error as Error).message}`);
     throw new Error('Workflow dispatch outcome is uncertain; inspect GitHub rather than dispatching again.');
   }

@@ -91,6 +91,14 @@ G5 and handoff/closure recheck current source validity alongside module/test-typ
 
 ## Retention, sharing and another machine
 
+### No-change dispositions and execution provenance
+
+A source-dependent defect refutation needs current scoped G5 evidence too. Retain a private packet with `assignment`, `ticketRevision`, `defectReport`, `ownerDecision`, reviewed `understanding` and actual `targetObservation`. The owner decision records `noProductChange`; this does not create a product fix. Run `company-context prepare-disposition --input ...` with `{ "packet": <Evidence> }` before the existing G5 review. Its actual decision pins that same packet and fields, G5 Approved, reviewer and source. Before closure prepare `{ "packet": <Evidence>, "close": <actual-G5-Evidence> }`. The close boundary obtains a post-decision read. Unchanged repeated preparation reuses proof and the actual decision. Missing target/scope on an open legacy disposition needs the specific clarification; completed history is not rewritten.
+
+GitHub local runs, remote dispatch, connected aggregate execution and case checkpoints retain `companyAdmission` evidence under private immutable storage before the action. It identifies the actual assignment/operation/target, reviewed basis, boundary, connection/selection snapshots, receipt history and completed reads. Later receipt renewal cannot replace the original proof. Remote results associate through the existing `qa_run_key`; this does not add undeclared workflow inputs or claim continuous remote Slack monitoring. Old operations without such evidence remain historical with missing provenance, never backfilled from a new read.
+
+For a partial native catalog failure, inspect the returned `operationId`/`progress`, correct only the failed page and resume with that progress as `previous`. `company-context catalog-jobs --connection <id>` finds unfinished operations even before channel selection. `catalog-job --operation <id>` inspects the current snapshot; `recover-catalog` requires the actual stopped-reader investigation. Inspecting does not fetch, update freshness or change selections. Another live reader's reservation must be retained.
+
 Credentials, OTPs, full raw provider errors and unrestricted company exports do not belong in committed records. Source text receives targeted secret redaction, which cannot promise to identify every possible secret. Outbound posting is separately authorized; reading Slack grants no message-sending permission.
 
 The selected private-cache policy controls removed local sources. With `keepHistorical: true`, preserve evidence and show lost refresh coverage. With `false`, removal purges managed private source/claim content when another active selection does not need it, retaining a purge marker and explicit historical-verification limitation. This does not delete the original Slack messages, user-supplied tool captures or published documents; their owners apply their retention policies.

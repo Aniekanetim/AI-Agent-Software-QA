@@ -41,14 +41,16 @@ export function importHostCatalog(root: string, input: { connectionId: string; p
   if (!input.pages.length) throw new Error('Retain actual native catalog pages.');
   let catalog = beginCatalog(root, actual.id, input.source, input.previous);
   for (const item of input.pages) {
+    let reservationId: string | undefined;
+    try {
     if (catalog.complete || item.cursor !== catalog.cursor) throw new Error('Retain the original native catalog page chain.');
     const call = readObject<{ connectionId: string; cursor: string | null; identity: Identity; source: string; resultDigest: string }>(root, item.call);
     assertIdentity(call.identity, actual.identity); if (call.connectionId !== actual.id || call.cursor !== item.cursor || !call.source) throw new Error('Bind the native catalog call to its actual account/cursor.');
     if (call.resultDigest !== hostPageDigest(item.page)) throw new Error('The native channel page differs from its recorded output.');
     item.page.evidence.forEach(ref => verifyEvidence(root, ref));
-    reserveCatalogPage(root, catalog);
-    try { catalog = commitCatalogPage(root, catalog, { ...item.page, evidence: [...item.page.evidence, item.call] }); }
-    catch (error) { throw failCatalogPage(root, catalog, error); }
+    reservationId = reserveCatalogPage(root, catalog);
+    catalog = commitCatalogPage(root, catalog, { ...item.page, evidence: [...item.page.evidence, item.call] }, Date.now(), reservationId);
+    } catch (error) { throw failCatalogPage(root, catalog, error, reservationId); }
   }
   const reference = catalogProgress(root, catalog.operationId!).value.catalog; recordCapability(root, actual.id, 'channels', reference);
   if (catalog.complete) for (const selected of settings(root).value?.bindings ?? []) if (selected.connectionId === actual.id && selected.selection.followNewChannels) adoptFollowingCatalog(root, selected.id, reference);

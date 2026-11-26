@@ -50,8 +50,8 @@ import * as companyKnowledge from './company-context/knowledge.js';
 import * as companyGuards from './company-context/guards.js';
 import * as companyImpact from './company-context/impact.js';
 import { apiAdapter, prepareCompanyBasis } from './company-context/runtime.js';
-import { catalogProgress, recoverCatalog } from './company-context/catalog.js';
-import { prepareFixSources } from './regression/fix.js';
+import { catalogProgress, catalogJobs, pendingCatalogs, recoverCatalog } from './company-context/catalog.js';
+import { prepareFixSources, prepareDispositionSources } from './regression/fix.js';
 import { SlackApi } from './slack/api.js';
 import { importHostPage, importHostCatalog } from './slack/import.js';
 import { refreshSchedule, recordRefreshSchedule } from './company-context/schedule.js';
@@ -80,7 +80,7 @@ async function currentPr(repository: string, number: number) {
   const raw = JSON.parse(await github.runGh(['api', `repos/${repository}/pulls/${number}`])); return github.normalizePr(repository, raw);
 }
 const help = {
-  'company-context': 'status | discover [--input] | inspect --connection [--input] | channels --connection [--previous] [--budget] --source | import-host-catalog --input | catalog-job --operation | recover-catalog --operation --source | prepare-boundary/prepare-release/prepare-fix --input | preview/apply --input | recover --operation | refresh --binding [--budget] | resume --job [--retry-failures] | recover-refresh --job --source | job --job | import-host-page --input | sources --binding | claim/analyze/bind-basis/verify-basis/impact/equivalent/reconcile-source/source-link/import-link/join/disconnect/schedule --input : selected read access supplies context, not test or posting authority',
+  'company-context': 'status | discover [--input] | inspect --connection [--input] | channels --connection [--previous] [--budget] --source | import-host-catalog --input | catalog-job --operation | catalog-jobs --connection | recover-catalog --operation --source | prepare-boundary/prepare-release/prepare-fix/prepare-disposition --input | preview/apply --input | recover --operation | refresh --binding [--budget] | resume --job [--retry-failures] | recover-refresh --job --source | job --job | import-host-page --input | sources --binding | claim/analyze/bind-basis/verify-basis/impact/equivalent/reconcile-source/source-link/import-link/join/disconnect/schedule --input : selected read access supplies context, not test or posting authority',
   cases: 'validate --input | start --input | next --input | observe --input | reconcile-runner --input | status --id | finish --id',
   regression: 'register --input | approve-plan --input | status --fix | retain-results --input | record-review --input | release --input',
   release: 'library --input | scope --input | preview-scope --input | bind-scope --input | invalidate-scope --input | retain-run --input | runs --input | assess --input | record-assessment --input | verify-assessment --input | route [--ticket-url]',
@@ -110,7 +110,7 @@ async function main() {
   }
   if (area === 'evidence') { output(store.evidence(root, option('path'), options.get('pointer'))); return; }
   if (area === 'company-context') {
-    if (action === 'status') output({ ...companyStore.status(root), schedule: (() => { try { return refreshSchedule(root); } catch { return { issue: 'Refresh schedule record needs reconciliation; preserve it and inspect the actual scheduler.' }; } })() });
+    if (action === 'status') output({ ...companyStore.status(root), pendingCatalogs: pendingCatalogs(root), schedule: (() => { try { return refreshSchedule(root); } catch { return { issue: 'Refresh schedule record needs reconciliation; preserve it and inspect the actual scheduler.' }; } })() });
     else if (action === 'discover') {
       if (options.has('input')) output(companyConfig.recordConnection(root, input()));
       else output({ provider: 'slack', next: 'Inspect the actual harness integration directory and connected Slack account metadata. Reuse existing access, then retain actual identity/capability evidence with discover --input. If missing, guide native OAuth connection; direct API setup is available through inspect --input. No connection is created by this command.' });
@@ -121,9 +121,11 @@ async function main() {
     } else if (action === 'channels') output(await companyConfig.discoverChannels(root, option('connection'), apiAdapter(root, option('connection')), { source: option('source'), budget: Number(options.get('budget') ?? 20), ...(options.has('previous') ? { previous: fromFile<store.Evidence>(option('previous')) } : {}) }));
     else if (action === 'import-host-catalog') output(importHostCatalog(root, input()));
     else if (action === 'catalog-job') output(catalogProgress(root, option('operation')).value);
+    else if (action === 'catalog-jobs') output(catalogJobs(root, option('connection')));
     else if (action === 'recover-catalog') output(recoverCatalog(root, option('operation'), option('source')));
     else if (action === 'prepare-release') output(await prepareReleaseSources(root, input()));
     else if (action === 'prepare-fix') output(await prepareFixSources(root, input()));
+    else if (action === 'prepare-disposition') output(await prepareDispositionSources(root, input()));
     else if (action === 'prepare-boundary') { const value = input<{ assignment: { source: string; ticketId: string }; boundary: import('./company-context/boundary.js').Boundary; criteria?: string[] }>(); await prepareCompanyBasis(root, value.assignment, value.criteria, undefined, value.boundary); output({ prepared: true, boundary: value.boundary }); }
     else if (action === 'preview') output(companyConfig.previewConfiguration(root, input()));
     else if (action === 'apply' || action === 'disconnect') output(companyConfig.applyConfiguration(root, input()));

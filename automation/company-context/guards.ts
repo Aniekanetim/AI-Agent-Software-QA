@@ -81,11 +81,12 @@ export function refreshReceipt(root: string, assignment: Assignment, now = Date.
   }
   return { required: true, receipts };
 }
-export function assertCompanyBasis(root: string, assignment: Assignment, criteria?: string[], understanding?: Evidence, now = Date.now()): void {
+export function assertCompanyBasis(root: string, assignment: Assignment, criteria?: string[], understanding?: Evidence, now = Date.now()) {
   const current = currentRecord(root, assignment); if (!current) return;
   validateBasis(root, current.basis);
   if (understanding && !sameEvidence(readObject<{ companyContext?: Evidence }>(root, understanding).companyContext, current.record.basis)) throw new ContextError('BASIS_CHANGED', 'Use the feature understanding approved for the current company-source basis.');
   const dependencies = current.basis.dependencies.filter(item => !criteria || item.criterionIds.some(id => criteria.includes(id)));
+  const verified: { bindingId: string; claim: Evidence; criterionIds: string[]; receipt: Receipt }[] = [];
   for (const dependency of dependencies) {
     const selected = binding(root, dependency.bindingId), actual = connection(root, selected.connectionId, true), storage = storeRoot(root, selected);
     const resolved = effectiveClaim(root, current.record.basis, dependency), claim = resolved.claim;
@@ -120,7 +121,9 @@ export function assertCompanyBasis(root: string, assignment: Assignment, criteri
       if (!relevantChannels.has(source.ref.sourceId.split('/')[1]!)) continue;
       if (source.conflict || analysis?.entries[source.ref.sourceId]?.revision !== source.ref.revision) throw new ContextError('ANALYSIS_PENDING', 'Analyze the changed relevant channel/thread context before dependent work; independent approved cases can continue.');
     }
+    verified.push({ bindingId: selected.id, claim: dependency.claim, criterionIds: dependency.criterionIds, receipt });
   }
+  return { basis: current.record.basis, approval: current.record.approval, receipts: verified };
 }
 export function currentBasis(root: string, assignment: Assignment) { const current = currentRecord(root, assignment); return current ? { basis: current.record.basis, dependencies: current.basis.dependencies } : null; }
 export function assertCompanyPlan(root: string, assignment: Assignment) { const current = currentRecord(root, assignment); if (current) validateBasis(root, current.basis); }

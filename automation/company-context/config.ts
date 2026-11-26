@@ -39,12 +39,13 @@ export async function discoverChannels(root: string, id: string, adapter: Adapte
   const budget = input.budget ?? 20; if (!Number.isSafeInteger(budget) || budget < 1 || budget > 1000) throw new Error('Use a bounded catalog page budget.');
   let catalog = beginCatalog(root, id, input.source, input.previous, now);
   for (let index = 0; index < budget && !catalog.complete; index++) {
-    reserveCatalogPage(root, catalog, now);
+    let reservationId: string | undefined;
     try {
+      reservationId = reserveCatalogPage(root, catalog, now);
       const page = channelPage(await adapter.channels(catalog.cursor ?? undefined), actual.identity);
       page.evidence.forEach(ref => verifyEvidence(root, ref));
-      catalog = commitCatalogPage(root, catalog, page, now);
-    } catch (error) { throw failCatalogPage(root, catalog, error); }
+      catalog = commitCatalogPage(root, catalog, page, now, reservationId);
+    } catch (error) { throw failCatalogPage(root, catalog, error, reservationId); }
   }
   const reference = catalogProgress(root, catalog.operationId!).value.catalog; recordCapability(root, id, 'channels', reference);
   return { catalog: reference, complete: catalog.complete, channelCount: catalog.channels.length, operationId: catalog.operationId,

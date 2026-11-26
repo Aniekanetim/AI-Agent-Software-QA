@@ -1,4 +1,4 @@
-import { assertCompanyBoundary } from '../company-context/boundary.js';
+import { assertCompanyBoundary, retainCompanyAdmission } from '../company-context/boundary.js';
 import { randomUUID } from 'node:crypto';
 import { assertDataReady, dataScopeDigest, requireCaseData, type DataReceipt, type DataScope } from '../data/readiness.js';
 import { assertNonsecret, digest, load, requireText, save, verifyEvidence, withLock, type Evidence } from '../shared/store.js';
@@ -38,6 +38,7 @@ interface Execution {
   startedAt: string; terminal?: { state: 'completed' | 'stopped' | 'notStarted'; source: string; evidence: Evidence[] };
   fixBatch?: ReturnType<typeof requireFixBatch>;
   caseExecution?: true;
+  companyAdmission?: Evidence;
 }
 interface Journal { schemaVersion: 1; claims: Claim[]; publications: Publication[]; executions: Execution[] }
 const journalPath = '.local/task-source-work.json';
@@ -658,8 +659,8 @@ function finishObservedReview(root: string, claim: Claim, item: Publication, boa
       if (!item.rework) throw new Error('Record the reviewed confirmation failure for the observed Rework move.');
       verifyRework(root, assignmentFor(claim), claim.ticket.revision, item.rework);
     }
-    if (item.fixProof && requireCases) {
-      const current = scopedCompletion(root, claim, item.fixProof.defect, item.fixProof.completion, false, true);
+    if (item.fixProof) {
+      const current = scopedCompletion(root, claim, item.fixProof.defect, item.fixProof.completion, false, requireCases);
       if (JSON.stringify(current) !== JSON.stringify(item.fixProof)) throw new Error('Reconcile the observed move against the current reviewed fix disposition.');
     }
     if (item.handoff && (item.handoff.kind === 'completion' || recheck)) {
@@ -755,11 +756,9 @@ export async function observeReleaseCompletion(root: string, request: { id: stri
     let fixProof: ReturnType<typeof scopedCompletion> | undefined;
     let reviewRequired: string | undefined;
     if (request.defect) {
-      fixProof = scopedCompletion(root, claim, request.defect, request.completion);
-      if (request.requireCases) {
-        try { scopedCompletion(root, claim, request.defect, request.completion, false, true); }
-        catch (error) { reviewRequired = error instanceof Error ? error.message : 'Review the observed fix completion.'; }
-      }
+      fixProof = { ...scopedCompletion(root, claim, request.defect, request.completion, true), review: decision.fixReview };
+      try { fixProof = scopedCompletion(root, claim, request.defect, request.completion, false, request.requireCases); }
+      catch (error) { reviewRequired = error instanceof Error ? error.message : 'Review the observed fix completion.'; }
     }
     let rework: ReworkDecision | undefined;
     let handoff: Publication['handoff'];
@@ -829,6 +828,8 @@ export async function beginExecution(root: string, request: Parameters<typeof pr
       connected: { claimId: claim.id }, ...(scope && data ? { dataBinding: { scope, observations: data.observations } } : {}) });
     else if (request.previousCases || request.caseIds) throw new Error('Case selection needs a reviewed case batch.');
     const execution: Execution = { id: request.id, claimId: claim.id, buildId, target, gates, startedAt: checkedAt,
+      ...(!caseAuthorization ? { companyAdmission: retainCompanyAdmission(root, assignmentFor(claim), { purpose: 'execution', id: request.id, target: observation },
+        { id: request.id, ticketRevision: claim.ticket.revision, monitoring: 'Connected aggregate admission only; actual runner evidence and current G5 are separately required.' }) } : {}),
       ...(data ? { data } : {}), ...(fixBatch ? { fixBatch } : {}), ...(caseAuthorization ? { caseExecution: true } : {}) };
     current.value.executions.push(execution);
     save(root, journalPath, current.value, current.revision);
