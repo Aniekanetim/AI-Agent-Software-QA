@@ -49,13 +49,13 @@ export async function companyFixture(channels = ['C1']) {
   const run = async (budget = 50, options: Parameters<typeof refresh>[3] = {}) => { const job = startRefresh(base.root, selected.id).job; return refresh(base.root, job.id, adapter, { budget, ...options }); };
   await run();
   const analyze = () => recordAnalysis(base.root, { bindingId: selected.id, sources: inspectedSources(base.root, selected.id).map(item => item.ref), reason: 'Synthetic project relevance and decision analysis', source: 'Synthetic agent analysis' });
-  const authorize = (options: { both?: boolean; skipAnalysis?: boolean; statement?: string; assignment?: { source: string; ticketId: string } } = {}) => {
+  const authorize = (options: { both?: boolean; skipAnalysis?: boolean; statement?: string; claimId?: string; supersedes?: string[]; assignment?: { source: string; ticketId: string } } = {}) => {
     const assignment = options.assignment ?? { source: 'local', ticketId: 'QA-001' };
     const scopeChannels = settings(base.root).value!.bindings.find(item => item.id === selected.id)!.selection.channelIds;
     const author = base.put(base.next(), { ownerId: 'U2', source: 'Synthetic established project ownership' });
     const refs = inspectedSources(base.root, selected.id);
     const makeClaim = (channelId: string, id: string) => {
-      const claim: Claim = { schemaVersion: 1, id, statement: channelId === 'C1' ? options.statement ?? 'Retry must preserve payment identity.' : 'Summary must load independently.', kind: 'decision', sources: refs.filter(item => item.ref.sourceId.includes(`/${channelId}/`)).map(item => item.ref), authority: { ownerId: 'U2', basis: author }, applicability: 'Synthetic staging scope', effective: 'Current reviewed staging build', supersedes: [], uncertainty: null, source: 'Synthetic owner decision in Slack', analyzedAt: new Date().toISOString() };
+      const claim: Claim = { schemaVersion: 1, id: channelId === 'C1' ? options.claimId ?? id : id, statement: channelId === 'C1' ? options.statement ?? 'Retry must preserve payment identity.' : 'Summary must load independently.', kind: 'decision', sources: refs.filter(item => item.ref.sourceId.includes(`/${channelId}/`)).map(item => item.ref), authority: { ownerId: 'U2', basis: author }, applicability: 'Synthetic staging scope', effective: 'Current reviewed staging build', supersedes: channelId === 'C1' ? options.supersedes ?? [] : [], uncertainty: null, source: 'Synthetic owner decision in Slack', analyzedAt: new Date().toISOString() };
       return recordClaim(base.root, { bindingId: selected.id, claim });
     };
     const claim = makeClaim('C1', 'retry-rule'), other = options.both ? makeClaim('C2', 'list-rule') : undefined;
