@@ -20,6 +20,7 @@ import './company-context.test.js';
 import './slack-provider.test.js';
 import './company-context-workflow.test.js';
 import './company-context-correction.test.js';
+import './company-context-remaining.test.js';
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync, renameSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
