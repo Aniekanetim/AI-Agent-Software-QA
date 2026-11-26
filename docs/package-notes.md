@@ -1,6 +1,10 @@
 # Package notes
 
-**Version:** 1.16.2. **Created:** 22 October 2026. **Updated:** 26 November 2026. **State:** reusable workflow package.
+**Version:** 1.16.3. **Created:** 22 October 2026. **Updated:** 26 November 2026. **State:** reusable workflow package.
+
+## Version 1.16.3 — independent source work cycles
+
+A new source-bound cycle reads only its required channels and starts/resumes a generation eligible for that boundary. Unrelated directory cooldowns or incomplete channels no longer hold an independent cycle. Actual connection/method cooldowns survive job changes and reinspection; older broad reads cannot regress newer coverage. Native preparation identifies the precise pending job for import. This completes the new-boundary branch of independent-coverage verification.
 
 ## Version 1.16.2 — disposition boundaries and retained admission evidence
 

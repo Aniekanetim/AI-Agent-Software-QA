@@ -518,6 +518,9 @@ async function main() {
   throw new Error('Unknown command. Run npm run qa -- help.');
 }
 main().catch(error => {
+  if (error?.jobId) output({ jobId: error.jobId, next: error.code === 'HOST_READ_REQUIRED'
+    ? 'Inspect company-context job --job with this exact ID; use native tools and import-host-page for its next recorded unit.'
+    : 'Inspect company-context job --job with this exact ID; resolve its recorded gap or cooldown before resuming the required units.' });
   if (error instanceof taskSource.LiveCheckInError) output(error.guidance);
   if (error?.progress) output({ progress: error.progress, next: 'Inspect the retained catalog operation and resume its continuation after any cooldown.' });
   const message = error instanceof Error ? error.message : 'Operation failed; inspect retained state.';

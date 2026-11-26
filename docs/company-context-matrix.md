@@ -53,6 +53,8 @@ Sources: [core tests](../automation/tests/company-context.test.ts) (Core), [prov
 
 ## Required correction acceptance
 
+The [scoped refresh cases](../automation/tests/company-context-scoped-refresh.test.ts) supplement CC-08, CC-17, CC-29, CC-31 and CC-37: new independent boundary preparation performs actual scoped reads while unrelated work remains pending; provider method cooldowns cannot be evaded by new jobs/reinspection; older broad completion cannot regress newer coverage. Native callers receive the exact scoped job ID.
+
 - RA-01: direct/local and connected source-dependent no-change closure reject absent/stale proof; unchanged scoped G5 plus post-decision read permits completion. Local and native observed moves retain missing-review conditions.
 - RA-02: native public CLI returns page-two error/progress and resumes without page-one resubmission. Per-request reservations survive other requests/processes. Read-only unfinished-operation listing changes no selection or observation time.
 - RA-03: before invocation, the actual operation references immutable reviewed basis, boundary, selection/connection snapshots, receipt history and completed reads. Renewal, uncertain response and recovery do not rewrite the original proof. No raw Slack content is passed to a workflow.

@@ -24,6 +24,7 @@ import './company-context-remaining.test.js';
 import './company-context-recovery.test.js';
 import './company-context-live.test.js';
 import './company-context-contracts.test.js';
+import './company-context-scoped-refresh.test.js';
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync, renameSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';

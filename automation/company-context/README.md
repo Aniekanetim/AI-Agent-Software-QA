@@ -65,6 +65,8 @@ Cooldowns are recorded with the refresh job. Resolve recorded access gaps, then 
 
 ## Reviewed execution and G5
 
+Boundary preparation reads the channels required by the applicable claims, including their known threads. It preserves unfinished broad discovery jobs instead of waiting on unrelated directory/channel work or resetting their progress. A new boundary requires a suitably new generation; repeated preparation reuses its eligible job/evidence. Real provider method cooldowns still apply across channels, jobs and access reinspection. An older broad read cannot move a newer channel watermark backward. For native access, use the exact `jobId` returned by preparation and inspect/import that job's pending request; do not substitute an unrelated broad refresh.
+
 Version 1.16.1 ties freshness to completed relevant history/thread page chains and actual read-generation IDs. A recent message observation cannot renew evidence while required replies remain unread. Pending unrelated sources do not block eligible independent cases. A prior complete receipt can serve its existing work cycle until expiry or a known invalidation; it cannot certify a newly prepared boundary.
 
 An execution/resume gets one stable boundary ID, actual target and source-basis revision. Its source reads must follow that boundary. Reuse its receipt between checkpoints rather than asking for case-by-case approval or rereading before every click. A materially changed expectation returns affected work to the existing review gate; unchanged reads reuse the approval.
