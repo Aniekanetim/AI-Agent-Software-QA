@@ -53,6 +53,8 @@ The private store contains connections, source objects, version heads, refresh j
 
 ## Refresh and interruptions
 
+Channel discovery retains each successful catalog page before asking for the next. An error returns `progress` evidence and the original operation ID. Inspect it with `company-context catalog-job --operation <id>` and resume `channels` using that retained evidence as `--previous`. Persistent cursor history detects loops across bounded resumptions. Cooldowns survive retries. If a reader was interrupted, investigate its actual process and use `recover-catalog --operation <id> --source <investigation>`; a live reader cannot be stolen. Native `import-host-catalog` accepts `previous` so earlier pages need not be resubmitted. Partial catalogs remain partial and cannot authorize all-accessible selection.
+
 Refresh reads bounded pages with a fixed history cutoff and preserves cursors, thread queues and incomplete coverage. `--budget` bounds logical page reads; identity verification is additional. A short/empty page with a cursor is incomplete. An available cursor is not a completed read. Native host calls must be performed through the actual host and imported with exact request/output evidence; the terminal cannot invoke a hidden native connector.
 
 Keep retrieval coverage and analysis coverage separate. `sources` displays sanitized source records to the authorized agent; `analyze` identifies exact inspected revisions and rationale. It does not grant test authority. A newly retrieved relevant statement needs interpretation before dependent work continues.
@@ -62,6 +64,18 @@ Known message/thread roots are rechecked, including replies to old discussions. 
 Cooldowns are recorded with the refresh job. Resolve recorded access gaps, then use `resume --retry-failures`; do not repeat an unchanged denied request during every check-in. `recover-refresh --job ... --source ...` requires investigation of the original reader. A live in-flight reader cannot be replaced solely because time elapsed.
 
 ## Reviewed execution and G5
+
+Version 1.16.1 ties freshness to completed relevant history/thread page chains and actual read-generation IDs. A recent message observation cannot renew evidence while required replies remain unread. Pending unrelated sources do not block eligible independent cases. A prior complete receipt can serve its existing work cycle until expiry or a known invalidation; it cannot certify a newly prepared boundary.
+
+An execution/resume gets one stable boundary ID, actual target and source-basis revision. Its source reads must follow that boundary. Reuse its receipt between checkpoints rather than asking for case-by-case approval or rereading before every click. A materially changed expectation returns affected work to the existing review gate; unchanged reads reuse the approval.
+
+Before G5, run `company-context prepare-release --input .local/prepare-release.json` with `assignment` and exact `assessment` evidence. This prepares the parent and included fixes' applicable sources. Before a later publication/closure, use the same command with `action`, actual action `id` and recorded G5 `decision` evidence. The synchronous handoff/closure guards reject missing or stale evidence; they never perform network requests inside board locks. For a local close, the action ID is the reviewed ticket revision. For connected actions it is the exact inventory-recheck action/ID.
+
+For scoped fix review use `company-context prepare-fix --input ...` with `fix`; for its later close add `close` containing the actual scoped G5 review evidence. This preserves the required original confirmation and regression checks. No-change dispositions retain their owner-clarification path and do not claim a tested product fix.
+
+For direct/native case actions use `company-context prepare-boundary --input ...` with `assignment`, optional scoped `criteria` and `boundary: { purpose: "execution", id, target: { buildId, environment } }`. The ID must match the case session or concrete execution operation. Native setup prepares a job and reports the real host read needed; perform/import its actual pages, analyze relevant changes, then retry preparation. An old capture cannot be relabeled as a new-boundary read. Source-bound case evidence still requires the reviewed starting state, checkpoints and actual outcome.
+
+Completed evidence remains historical. Open legacy work without the new completion proof obtains a fresh actual read; this does not reset onboarding or automatically require a new human approval. Source policy, connection, target and current interpretation still have to match.
 
 For a configured project, record the selected sources considered for each assignment. A `Basis` names exact selection digests, decision dependencies and reasoned channel exclusions. Add its evidence reference as `companyContext` on the feature understanding. Its criterion source must cite the actual decision/retained source evidence. `bind-basis` reuses the actual G1/G2/G4 approval of that understanding; it is not an extra approval gate.
 

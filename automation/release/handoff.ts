@@ -5,6 +5,9 @@ import { releaseBoard, requireCurrentScope, sameEvidence, type Assignment } from
 import { releaseFixes } from '../regression/fix.js';
 import type { ReleaseBoard } from '../regression/board.js';
 import { assertCompanyBasis } from '../company-context/guards.js';
+import { assertCompanyBoundary, boundaryRequirement, type Boundary } from '../company-context/boundary.js';
+import { prepareCompanyBasis, apiAdapter } from '../company-context/runtime.js';
+import type { Adapter } from '../company-context/types.js';
 
 type Preferences =
   | { channel: 'taskBoard'; recipient: string; acknowledgementRequired: boolean }
@@ -68,11 +71,36 @@ export function resolveHandoffRoute(root: string, requested?: Route, ticketUrl?:
 export function currentAssessment(root: string, assessment: Evidence, assignment: Assignment) {
   assertCompanyBasis(root, assignment);
   const scope = requireCurrentScope(root, assignment);
+  assertReleaseSources(root, assignment, { purpose: 'g5', id: assessment.sha256, target: scope.target });
   const report = verifyAssessment(root, assessment, true, scope.round);
   if (!report.assignmentIds.includes(assignment.ticketId) || !sameTarget(report.target, scope.target)) {
     throw new Error('The release assessment must cover this assignment and its reviewed build and environment.');
   }
   return report;
+}
+
+function sourceAssignments(root: string, assignment: Assignment) {
+  const scope = requireCurrentScope(root, assignment);
+  const manifest = scope.changeManifest && pinned<{ fixes: { defect: Assignment }[] }>(root, scope.changeManifest, 'release change manifest');
+  const entries = [assignment, ...(manifest ? manifest.fixes.map(fix => fix.defect) : [])];
+  return [...new Map(entries.map(value => [JSON.stringify([value.source, value.ticketId]), value])).values()];
+}
+export function assertReleaseSources(root: string, assignment: Assignment, boundary: Boundary) {
+  for (const item of sourceAssignments(root, assignment)) assertCompanyBoundary(root, item, boundary);
+}
+/** Prepare before G5 review, or after the recorded decision for a precise publication/closure action. */
+export async function prepareReleaseSources(root: string, input: { assignment: Assignment; assessment: Evidence; action?: Exclude<Boundary['purpose'], 'execution' | 'g5'>; id?: string; decision?: Evidence }, adapterFor: (id: string) => Adapter = id => apiAdapter(root, id)) {
+  const scope = requireCurrentScope(root, input.assignment);
+  const boundary: Boundary = { purpose: input.action ?? 'g5', id: input.action ? input.id! : input.assessment.sha256, target: scope.target, ...(input.decision ? { decision: input.decision } : {}) };
+  if (input.action) {
+    const decision = pinned<ReleaseDecision>(root, input.decision!, 'actual G5 decision');
+    if (!sameEvidence(decision.handoff?.assessment, input.assessment)) throw new Error('Prepare the actual reviewed assessment for this release action.');
+  }
+  const assignments = sourceAssignments(root, input.assignment);
+  for (const item of assignments) boundaryRequirement(root, item, boundary, true);
+  for (const item of assignments) await prepareCompanyBasis(root, item, undefined, adapterFor, boundary);
+  assertReleaseSources(root, input.assignment, boundary);
+  return { prepared: true, boundary, assignments };
 }
 
 export function currentReleaseRegression(root: string, assignment: Assignment, liveBoard?: ReleaseBoard,
@@ -137,6 +165,7 @@ export function reviewHandoff(root: string, decision: ReleaseDecision, assessmen
     throw new Error('G5 must review this release assessment and handoff destination.');
   }
   const report = currentAssessment(root, assessment, assignment);
+  if (recheck) assertReleaseSources(root, assignment, { purpose: recheck.action, id: recheck.id, target: report.target, decisionSha256: recheck.decisionSha256 });
   if (requireCases || requireCurrentScope(root, assignment).plan.caseBatches) verifyHandoffCases(root, decision);
   if (!sameTarget(decision.target, report.target)) throw new Error('G5 must match the assessed release build and environment.');
   const observed = pinned<Target & { observedAt: string; source: string }>(root, reviewed.targetObservation, 'G5 target observation');
@@ -199,6 +228,7 @@ export function verifyLocalHandoff(root: string, ticketId: string, ticketRevisio
   }
   const route = resolveHandoffRoute(root, decision.handoff.route);
   const report = reviewHandoff(root, decision, decision.handoff.assessment, route, { source: 'local', ticketId }, undefined, undefined, request.requireCases);
+  assertReleaseSources(root, { source: 'local', ticketId }, { purpose: 'close', id: ticketRevision, target: report.target, decision: request.decision, decisionSha256: request.decision.sha256 });
   verifyDelivery(root, request.decision, route, request);
   return report;
 }

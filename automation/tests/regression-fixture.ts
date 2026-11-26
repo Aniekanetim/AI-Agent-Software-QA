@@ -5,7 +5,7 @@ import type { Assignment } from '../release/scope.js';
 import { releaseFixture } from './release-fixture.js';
 
 export function regressionFixture(root: string, defect: Assignment, ticketRevision: string, options: {
-  parent?: Assignment; claimId?: string; base?: ReturnType<typeof releaseFixture>; fixRevision?: string; supersedes?: string; cases?: boolean; interruptConfirmation?: boolean;
+  parent?: Assignment; claimId?: string; base?: ReturnType<typeof releaseFixture>; fixRevision?: string; supersedes?: string; cases?: boolean; interruptConfirmation?: boolean; understanding?: import('../shared/store.js').Evidence;
 } = {}) {
   const base = options.base ?? releaseFixture(root, defect.ticketId);
   const { put, target } = base;
@@ -43,10 +43,10 @@ export function regressionFixture(root: string, defect: Assignment, ticketRevisi
     { id: 'regression', phase: 'regression', checks: [{ ...critical, context }] },
   ];
   const basis = library.conditions[0]!.basis;
-  const understanding = options.cases ? put(file('understanding'), { schemaVersion: 1, assignment: defect,
+  const understanding = options.understanding ?? (options.cases ? put(file('understanding'), { schemaVersion: 1, assignment: defect,
     sources: [{ id: 'route-rule', authority: 'Fixture business rule', accepted: basis, current: basis }],
     flows: [{ id: 'route', featureId: 'reporting', relationshipIds: [], actor: 'QA', startingState: 'Reviewed route',
-      expectedFlow: 'Use the reviewed route.', criteria: ['route-rule'] }] }) : undefined;
+      expectedFlow: 'Use the reviewed route.', criteria: ['route-rule'] }] }) : undefined);
   const g1 = understanding && put(file('g1'), { gate: 'G1', assignment: defect, decision: 'Approved', understanding,
     reviewer: 'Fixture reviewer', source: 'Synthetic G1 review', packet: defectReport });
   const checkpoints = [

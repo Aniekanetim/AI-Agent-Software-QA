@@ -1,5 +1,7 @@
 # Release sign-off and handoff
 
+For Slack-dependent evidence, prepare the exact assessment using company-context prepare-release before requesting G5. The packet links the completed relevant read generation and actual target. Later publication/closure requires its own post-decision revalidation for the precise action. For scoped fixes use prepare-fix and retain original confirmation plus regression evidence. A receipt from before the new boundary cannot substitute for that read, and unchanged rereads do not request another routine approval.
+
 For releases using [company-source decisions](../../automation/company-context/README.md), link the reviewed source basis, exact decision versions, effective scope, actual freshness receipts and unresolved impact/coverage limits in the packet. Recheck them for current G5, publication, closure and recovery. Old green results remain historical when an applicable expectation changes; they cannot independently establish current readiness. A future-effective decision applies according to its recorded release/environment/date. Preserve actual delivery and approval evidence.
 
 G5 closes a defined QA scope with a reviewable record and a usable handoff. A passing run, closed bug or short confirmation message alone is insufficient. The agent prepares the evidence and recommendation; the human QA reviewer makes the scoped decision. Product, release and operations owners retain their own authority.

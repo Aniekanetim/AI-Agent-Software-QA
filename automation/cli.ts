@@ -28,7 +28,7 @@ import * as postman from './postman/postman.js';
 import { assessCoverage, type CoverageSnapshot } from './coverage/coverage.js';
 import { browseLibrary } from './release/library.js';
 import { assessRound, recordAssessment, retainRun, retainedRuns, verifyAssessment } from './release/round.js';
-import { handoffRoute, reportingPreference } from './release/handoff.js';
+import { handoffRoute, reportingPreference, prepareReleaseSources } from './release/handoff.js';
 import { invalidateReleaseScope, releaseScope } from './release/scope.js';
 import { approveFixPlan, fixStatus, recordFixReview, registerFix, retainFixResults } from './regression/fix.js';
 import { validateFlowMap, traceFlowMap, type FlowMapSnapshot, type Direction } from './flow-map/flow-map.js';
@@ -49,7 +49,9 @@ import * as companySync from './company-context/sync.js';
 import * as companyKnowledge from './company-context/knowledge.js';
 import * as companyGuards from './company-context/guards.js';
 import * as companyImpact from './company-context/impact.js';
-import { apiAdapter } from './company-context/runtime.js';
+import { apiAdapter, prepareCompanyBasis } from './company-context/runtime.js';
+import { catalogProgress, recoverCatalog } from './company-context/catalog.js';
+import { prepareFixSources } from './regression/fix.js';
 import { SlackApi } from './slack/api.js';
 import { importHostPage, importHostCatalog } from './slack/import.js';
 import { refreshSchedule, recordRefreshSchedule } from './company-context/schedule.js';
@@ -78,7 +80,7 @@ async function currentPr(repository: string, number: number) {
   const raw = JSON.parse(await github.runGh(['api', `repos/${repository}/pulls/${number}`])); return github.normalizePr(repository, raw);
 }
 const help = {
-  'company-context': 'status | discover [--input] | inspect --connection [--input] | channels --connection [--previous] [--budget] --source | import-host-catalog --input | preview/apply --input | recover --operation | refresh --binding [--budget] | resume --job [--retry-failures] | recover-refresh --job --source | job --job | import-host-page --input | sources --binding | claim/analyze/bind-basis/verify-basis/impact/equivalent/reconcile-source/source-link/import-link/join/disconnect/schedule --input : selected read access supplies context, not test or posting authority',
+  'company-context': 'status | discover [--input] | inspect --connection [--input] | channels --connection [--previous] [--budget] --source | import-host-catalog --input | catalog-job --operation | recover-catalog --operation --source | prepare-boundary/prepare-release/prepare-fix --input | preview/apply --input | recover --operation | refresh --binding [--budget] | resume --job [--retry-failures] | recover-refresh --job --source | job --job | import-host-page --input | sources --binding | claim/analyze/bind-basis/verify-basis/impact/equivalent/reconcile-source/source-link/import-link/join/disconnect/schedule --input : selected read access supplies context, not test or posting authority',
   cases: 'validate --input | start --input | next --input | observe --input | reconcile-runner --input | status --id | finish --id',
   regression: 'register --input | approve-plan --input | status --fix | retain-results --input | record-review --input | release --input',
   release: 'library --input | scope --input | preview-scope --input | bind-scope --input | invalidate-scope --input | retain-run --input | runs --input | assess --input | record-assessment --input | verify-assessment --input | route [--ticket-url]',
@@ -118,6 +120,11 @@ async function main() {
       output(await companyConfig.inspectApi(root, value, new SlackApi(process.env[value.credentialVariable] ?? '')));
     } else if (action === 'channels') output(await companyConfig.discoverChannels(root, option('connection'), apiAdapter(root, option('connection')), { source: option('source'), budget: Number(options.get('budget') ?? 20), ...(options.has('previous') ? { previous: fromFile<store.Evidence>(option('previous')) } : {}) }));
     else if (action === 'import-host-catalog') output(importHostCatalog(root, input()));
+    else if (action === 'catalog-job') output(catalogProgress(root, option('operation')).value);
+    else if (action === 'recover-catalog') output(recoverCatalog(root, option('operation'), option('source')));
+    else if (action === 'prepare-release') output(await prepareReleaseSources(root, input()));
+    else if (action === 'prepare-fix') output(await prepareFixSources(root, input()));
+    else if (action === 'prepare-boundary') { const value = input<{ assignment: { source: string; ticketId: string }; boundary: import('./company-context/boundary.js').Boundary; criteria?: string[] }>(); await prepareCompanyBasis(root, value.assignment, value.criteria, undefined, value.boundary); output({ prepared: true, boundary: value.boundary }); }
     else if (action === 'preview') output(companyConfig.previewConfiguration(root, input()));
     else if (action === 'apply' || action === 'disconnect') output(companyConfig.applyConfiguration(root, input()));
     else if (action === 'recover') output(companyConfig.recoverConfiguration(root, option('operation')));
@@ -510,6 +517,7 @@ async function main() {
 }
 main().catch(error => {
   if (error instanceof taskSource.LiveCheckInError) output(error.guidance);
+  if (error?.progress) output({ progress: error.progress, next: 'Inspect the retained catalog operation and resume its continuation after any cooldown.' });
   const message = error instanceof Error ? error.message : 'Operation failed; inspect retained state.';
   try { store.assertNonsecret(message); process.stderr.write(message + '\n'); } catch { process.stderr.write('Operation failed; sensitive details suppressed.\n'); }
   process.exitCode = 1;

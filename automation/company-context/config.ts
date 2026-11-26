@@ -1,3 +1,4 @@
+import { beginCatalog, reserveCatalogPage, commitCatalogPage, failCatalogPage, catalogProgress } from './catalog.js';
 import { readFileSync } from 'node:fs';
 import { contained, load, save, digest, withLock, verifyEvidence, evidence, requireText, assertNonsecret, type Evidence } from '../shared/store.js';
 import { currentHarness } from '../tools/runtime.js';
@@ -36,21 +37,18 @@ export function recordCapability(root: string, id: string, capability: Capabilit
 export async function discoverChannels(root: string, id: string, adapter: Adapter, input: { budget?: number; previous?: Evidence; source: string }, now = Date.now()) {
   const actual = connection(root, id, true); assertIdentity(await adapter.identity(), actual.identity); requireText(input.source);
   const budget = input.budget ?? 20; if (!Number.isSafeInteger(budget) || budget < 1 || budget > 1000) throw new Error('Use a bounded catalog page budget.');
-  const old = input.previous ? readObject<Catalog>(root, input.previous) : null;
-  if (old && (old.connectionId !== id || !sameIdentity(old.identity, actual.identity))) throw new Error('Resume the same Slack catalog identity.');
-  if (old?.complete) return { catalog: input.previous!, complete: true };
-  const channels = new Map((old?.channels ?? []).map(item => [item.id, item])); let cursor = old?.cursor ?? undefined;
-  const seen = new Set<string>(); const receipts: Evidence[] = [...(old?.evidence ?? [])]; let complete = false;
-  for (let index = 0; index < budget; index++) {
-    const page = channelPage(await adapter.channels(cursor), actual.identity); page.evidence.forEach(ref => verifyEvidence(root, ref)); receipts.push(...page.evidence);
-    for (const item of page.items) channels.set(item.id, item);
-    if (!page.nextCursor) { complete = true; cursor = undefined; break; }
-    if (seen.has(page.nextCursor) || page.nextCursor === cursor) throw new ContextError('PAGINATION_STALLED', 'Slack channel pagination did not progress. Preserve the earlier catalog.');
-    seen.add(page.nextCursor); cursor = page.nextCursor;
+  let catalog = beginCatalog(root, id, input.source, input.previous, now);
+  for (let index = 0; index < budget && !catalog.complete; index++) {
+    reserveCatalogPage(root, catalog, now);
+    try {
+      const page = channelPage(await adapter.channels(catalog.cursor ?? undefined), actual.identity);
+      page.evidence.forEach(ref => verifyEvidence(root, ref));
+      catalog = commitCatalogPage(root, catalog, page, now);
+    } catch (error) { throw failCatalogPage(root, catalog, error); }
   }
-  const catalog: Catalog = { schemaVersion: 1, id: digest(`${id}:${now}`).slice(0, 24), connectionId: id, identity: actual.identity, channels: [...channels.values()], cursor: cursor ?? null, complete, source: input.source, checkedAt: new Date(now).toISOString(), evidence: receipts };
-  const reference = immutable(root, 'catalogs', catalog); recordCapability(root, id, 'channels', reference);
-  return { catalog: reference, complete, channelCount: channels.size, next: complete ? 'Select channels and preview configuration.' : 'Resume this catalog before selecting all accessible channels.' };
+  const reference = catalogProgress(root, catalog.operationId!).value.catalog; recordCapability(root, id, 'channels', reference);
+  return { catalog: reference, complete: catalog.complete, channelCount: catalog.channels.length, operationId: catalog.operationId,
+    next: catalog.complete ? 'Select channels and preview configuration.' : 'Resume this catalog before selecting all accessible channels.' };
 }
 interface Preview { schemaVersion: 1; bindings: Binding[]; expectedRevision: string | null; source: string; connections: Evidence[]; digest: string }
 export function previewConfiguration(root: string, input: { bindings: Binding[]; source: string }) {

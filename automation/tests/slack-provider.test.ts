@@ -61,3 +61,7 @@ test('native catalog and history use actual request-bound call evidence', async 
   const result = await importHostPage(f.root, { ...request, page: body, call: readCall }); assert.equal(result.job.units[0]!.done, true);
   await assert.rejects(importHostPage(f.root, { ...request, channelId: 'C2', page: body, call: readCall }), /exact recorded Slack request/);
 });
+test('a provider more-results flag without a continuation cannot certify complete coverage', async () => {
+  const adapter = new SlackApi('synthetic', async url => url.includes('auth.test') ? ok({ team_id: 'T1', user_id: 'U1' }) : ok({ messages: [], has_more: true }));
+  await assert.rejects(adapter.history('C1', '0.000000', '999.000000'), /more results/);
+});

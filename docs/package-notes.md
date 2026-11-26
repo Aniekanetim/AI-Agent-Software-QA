@@ -1,6 +1,10 @@
 # Package notes
 
-**Version:** 1.16.0. **Created:** 22 October 2026. **Updated:** 19 November 2026. **State:** reusable workflow package.
+**Version:** 1.16.1. **Created:** 22 October 2026. **Updated:** 26 November 2026. **State:** reusable workflow package.
+
+## Version 1.16.1 — completed source reads and release boundaries
+
+Company-source freshness requires completed relevant page chains and actual read generations. Execution/resumption and G5/publication/closure use distinct source boundaries, preserving unchanged batch approvals and independent case progress. Catalog discovery retains successful pages, cooldowns and cursor history through failures and resumptions. The integrated synthetic journey covers changed-source review, confirmation/regression and handoff. [Upgrade and operating guidance](../automation/company-context/README.md#reviewed-execution-and-g5). Package test results are distinct from adopting-project and authenticated Slack outcomes.
 
 ## Version 1.16.0 — selected company Slack context
 

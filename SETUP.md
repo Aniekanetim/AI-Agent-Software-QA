@@ -113,6 +113,10 @@ Follow [notification setup](automation/attention/README.md#configure-once-preser
 
 The Reporting settings area has an isolated notification editor. Its saves preserve existing onboarding, report preferences, mailbox bindings and schedules. Missing/disabled notification configuration leaves established QA work unchanged. The reusable package contains no live blocker, recipient, delivery receipt or active notification schedule. Existing installed check-in prompts need an authorized update through the host's supported scheduling interface; editing the repository template alone does not update them.
 
+### Upgrade to 1.16.1
+
+Preserve existing private settings, source snapshots, receipts, approvals and completed onboarding. For open work relying on Slack, obtain a completed relevant read for the current execution/review boundary using the [company-context procedure](automation/company-context/README.md#reviewed-execution-and-g5). Legacy receipts remain historical; they cannot replace missing proof of completed coverage. Unchanged expectations reuse the existing human approval. Retain partial catalog progress and resume its actual operation instead of starting over. No connection, schedule or project test is activated by this upgrade.
+
 ### Upgrade to 1.15.3
 
 Keep completed receipts and assessments available under their original revisions. For active work, reconcile any original invocation before resuming. Use the reviewed case data scope and actual source/claim to restart an old unbound session. For an open parent release, review and pin the applicable module, test type and condition combinations against the current library, then refresh the affected G1/G2 and G5 records. Retain eligible earlier runs using their original times and occurrence identities, and review any evidence that cannot support the current decision. See [case recovery](automation/execution/README.md) and [release scope](automation/release/README.md).

@@ -1,5 +1,7 @@
 # Module test library and release evidence
 
+For configured company sources, prepare-release binds completed relevant reads to this assessment and actual target before G5. After the actual G5 decision, prepare the exact publication/closure action with its action ID and decision evidence. Current helpers reject an earlier work-cycle receipt even if its age has not expired. Synchronous board checks perform no network work. Follow the company-context procedure; retain historical assessments without presenting them as current readiness.
+
 Build, feature, and PR assignments use a current module assessment for G5 sign-off and handoff. Reuse the project's requirements, test cases, and regression inventory. Prepare the affected modules during normal QA work so a project can start with the context it already has. Individual defect retests use their scoped QA disposition and can link to the parent release.
 
 ## Maintain the library

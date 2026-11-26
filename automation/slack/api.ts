@@ -34,6 +34,7 @@ export class SlackApi implements Adapter {
   private async page<T>(method: string, query: Record<string, string>, field: string, normalize: (value: any) => T): Promise<Page<T>> {
     const identity = this.observed ?? await this.identity(), value = await this.call(method, { limit: '100', ...query });
     if (!Array.isArray(value[field])) throw new ContextError('INVALID_PAGE', 'Slack returned an incomplete collection.');
+    if (value.has_more === true && !value.response_metadata?.next_cursor) throw new ContextError('PAGINATION_UNVERIFIED', 'Slack reports more results without a usable continuation. Retain partial coverage and inspect the actual paging capability.');
     return { identity, items: value[field].map(normalize), nextCursor: value.response_metadata?.next_cursor || null, source: `Slack Web API ${method} observed ${new Date(this.now()).toISOString()}`, evidence: [] };
   }
   channels(cursor?: string) { return this.page<Channel>('conversations.list', { types: 'public_channel,private_channel', ...(cursor ? { cursor } : {}) }, 'channels', slackChannel); }

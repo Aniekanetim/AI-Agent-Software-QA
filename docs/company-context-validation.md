@@ -13,9 +13,14 @@ The tests use temporary QA roots, synthetic companies/messages, actual local per
 | Connection/channel selection, pagination, source revisions, interruption, Settings and private-cache handling | `automation/tests/company-context.test.ts` |
 | API identity, HTTP-200 errors, 429, native request/output bindings, directory/membership and harness changes | `automation/tests/slack-provider.test.ts` |
 | Changed criteria before action, independent batch progress, current release handoff and scoped fix review | `automation/tests/company-context-workflow.test.ts` |
+| Incomplete-thread renewal, durable catalog recovery, cross-resume cursor loops, boundary rereads, equal-clock/replay protection, native imports and legacy evidence | `automation/tests/company-context-correction.test.ts` |
 | Existing onboarding, data, board, execution, regression, coverage, release and browser integrations | Existing package and tool-specific suites |
 
 Run `npm run check`, `npm test`, `npm run test:postman`, `npm run test:browsers` and `npm run test:chrome`. The existing package CI covers Windows and Ubuntu. Link actual results for the tested revision from the implementation PR; this guide itself is not a passing execution receipt.
+
+The integrated synthetic workflow reuses completed onboarding, changes selected channels through Settings, resumes bounded reads, runs an approved multi-case batch, discovers an upstream rule change, holds the dependent case, records revised review and continues. It then verifies original confirmation plus regression for a linked fix, closes that defect with a current scoped review, and completes module-based parent G5 and observed handoff. A post-review context change holds closure until its applicability is assessed. The scenario uses synthetic review records and controlled product-state observations; it establishes package workflow behavior, not an adopting product's acceptance or a real human signature.
+
+Version 1.16.1 regression assertions require the intended contract, rather than asserting that audit counterexamples reproduce. Completed relevant read generations and their operation evidence are distinct from receipt age, interpretation, source ownership and actual product verdicts. The package is unconfigured: no real Slack access, live company decisions or schedules are supplied by the tests.
 
 ## Authorized live check
 
