@@ -1,6 +1,6 @@
 # Shared project progress
 
-Version 1.16.1 corrects [company context](automation/company-context/README.md): freshness requires completed relevant reads and distinct execution/review/action boundaries; catalog pages and cursor history survive resumptions. The reusable package remains unconfigured; no adopting-company workspace, decision, test outcome or refresh schedule is established. Record actual project connections/coverage/decisions only in the adopting root and preserve their source versions separately from application builds.
+Version 1.16.2 corrects [company context](automation/company-context/README.md): freshness requires completed relevant reads and distinct execution/review/action boundaries; catalog pages and cursor history survive resumptions. The reusable package remains unconfigured; no adopting-company workspace, decision, test outcome or refresh schedule is established. Record actual project connections/coverage/decisions only in the adopting root and preserve their source versions separately from application builds.
 
 **Project:** not configured. **Current checkpoint:** setup. **QA/discovery execution:** not started. **Human project decisions:** none recorded. **Schedules:** not configured for this project.
 
@@ -9,6 +9,8 @@ Version 1.16.1 corrects [company context](automation/company-context/README.md):
 Record the supplied product goal, learning/testing objective and actual owner/reviewer/contact roles. The [root context](Project%20Context/README.md) is human-maintained; the [discovery context](Product%20Discovery/Project%20Context/README.md) is agent-maintained. Link their sources without duplicating requirements or inferring owner agreement. Operational progress here may be maintained by the agent.
 
 ## Current work
+
+Package maintenance 1.16.2 closes no-change source-boundary, native recovery-diagnostic and execution-provenance gaps. Actual package validation and environment limitations are recorded in [company-context verification](docs/company-context-validation.md); synthetic fixtures are not adopting-project outcomes or real approvals.
 
 No live QA assignment or discovery request exists. [The QA board](QA%20task%20management%20Board/README.md) supplies testing work; [discovery requests](Product%20Discovery/README.md) supply learning work. Record the active ID/link, owner, pipeline checkpoint, human source revisions, discovery entry versions, served identity, next action and waiting reason when work materially changes. Keep pipeline authorizations distinct.
 

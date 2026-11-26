@@ -1,5 +1,7 @@
 # Guided onboarding procedure
 
+Use `company-context catalog-jobs --connection <id>` to recover an unfinished native inventory even when an older error omitted its reference. Company context Settings exposes retained progress without resetting completed onboarding. Read-only listing does not fetch messages, join channels or change selections.
+
 Slack catalog errors preserve the original page chain and operation ID. Resume retained progress rather than re-asking for supplied channel choices. Completed onboarding stays complete while optional source reads or later task-specific freshness are pending.
 
 During the existing tools/context stages, inspect [company-source access](../automation/company-context/README.md). Reuse the actual Slack connection and supplied workspace/channel choice before asking setup questions. Present channel catalog completeness, actual history/thread/directory access, initial history bounds and refresh/retention choices. Use the dedicated preview/apply procedure and record the real answer. Account for retrieved versus interpreted coverage in the existing understanding handoff. Slack setup can wait without resetting onboarding when independent context is available. Later changes use Settings → Company context.

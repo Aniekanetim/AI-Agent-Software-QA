@@ -1,6 +1,10 @@
 # Package notes
 
-**Version:** 1.16.1. **Created:** 22 October 2026. **Updated:** 26 November 2026. **State:** reusable workflow package.
+**Version:** 1.16.2. **Created:** 22 October 2026. **Updated:** 26 November 2026. **State:** reusable workflow package.
+
+## Version 1.16.2 — disposition boundaries and retained admission evidence
+
+Source-dependent no-change dispositions now enforce scoped G5 and post-decision closure reads. Execution operations and checkpoints retain immutable source-admission proof through renewal and recovery. Native catalog failures expose resumable progress with request-specific ownership and read-only discovery. Synthetic verification covers actual persistence crashes, competing processes, superseding decisions, separate regression defects and source-linked post-G5 reconciliation. Historical decisions remain historical; no live Slack workspace or schedule is activated. See [verification and limits](company-context-validation.md).
 
 ## Version 1.16.1 — completed source reads and release boundaries
 
